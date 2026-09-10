@@ -77,7 +77,7 @@ export default function RootLayout({
             offset={{ top: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
             mobileOffset={{ top: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
           />
-          {process.env.NODE_ENV === 'production' && <Analytics />}
+          {process.env.NODE_ENV === 'production' && process.env.VERCEL === '1' && <Analytics />}
         </ThemeProvider>
       </body>
     </html>

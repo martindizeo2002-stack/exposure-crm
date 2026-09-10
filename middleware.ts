@@ -124,6 +124,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // todo menos assets estaticos, PWA (manifest/service worker) y rutas de auth publicas
-    "/((?!_next/static|_next/image|favicon.ico|opengraph-image|login|pendiente|solicitar-acceso|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next|_vercel/static|_next/image|favicon.ico|opengraph-image|login|pendiente|solicitar-acceso|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 }
