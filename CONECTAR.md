@@ -106,3 +106,17 @@ solo tiene `ads_read` y no ve tu página. Hace falta un token que vea la página
 
 Mientras la app siga "en desarrollo", esto funciona igual para tu propia cuenta (sos administrador de la app); la verificación de
 Meta solo hace falta para cuentas de terceros.
+
+## 9 · Marketing y Sistema IA (11/09, tarde)
+
+- **Contenido** (`/contenido-angulos`): una sola cuenta ("CONTENIDO EXPOSURE"), los 25 ángulos del banco de EXPOSURE (`lib/angulos-exposure.ts`),
+  los 5 sub-perfiles del avatar en las secuencias de historias, responsables Alex / Nahuel / Editor / Máximo, guionista con IA configurado para
+  el nicho IA Partner. Lo que se carga ahí se guarda en `crm_content_assets` (Supabase).
+- **Formatos** (`/contenido/formatos`): ya no es una tabla fija. Calcula agendas, presentadas, calificadas, cierres y cash del día 1 por tipo de
+  pieza (reel, carrusel, historia, webinar, ads, nuevo seguidor), por pieza concreta (el tag de ManyChat) y por canal. Fuente: `agendas`
+  cruzadas con ManyChat. Ventana 30/90/180/365 días.
+- **Testimonios** (`/testimonios`): banco real (Supabase), sin cuentas de Paul.
+- **Sistema IA** (Centro de mando, Agentes, Tareas, Agenda, Herramientas, Analítica, Contenido IA, Memoria): es la maqueta de Exposure OS con
+  datos inventados (`components/exposure/data.ts`). Ahora lleva el aviso "Maqueta" en cada pantalla y el grupo del menú se llama
+  "Sistema IA · maqueta". Conectarlo de verdad es un proyecto aparte: definir qué hace cada agente y con qué datos.
+- **Instagram** (página "El contenido" del panel): sigue apagada hasta tener el token con permisos de página (sección 8).
