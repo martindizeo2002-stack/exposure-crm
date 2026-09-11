@@ -7,7 +7,7 @@
 | Usuario | Rol | Qué ve |
 |---|---|---|
 | Alex, Nahuel | CEO / admin | Todo: home con cash, panel del negocio, métricas, finanzas, equipo, accesos. |
-| Cristian, Kenneth (y Tobías si se le crea usuario) | Closer | Home con **sus** números, pipeline, sus agendas, carga de pagos, pagos, seguimientos, cobros y clientes. |
+| Cristian, Bener (y Tobías si se le crea usuario) | Closer | Home con **sus** números, pipeline, sus agendas, carga de pagos, pagos, seguimientos, cobros y clientes. |
 | Máximo | Setter | Pipeline, agendas, seguimientos, carga de pagos. |
 
 Lo que no le corresponde a un rol rebota con "Tu cuenta no tiene acceso a este módulo". Para cambiar roles o crear usuarios: `node scripts/crear-usuario.mjs <mail> <contraseña> "<nombre>" <rol>` desde la carpeta del CRM.
@@ -28,7 +28,7 @@ Lo que no le corresponde a un rol rebota con "Tu cuenta no tiene acceso a este m
 - **Google Sheet CRM CENTRAL 2026**: cada pago o agenda que se carga o cambia en el CRM se escribe en la pestaña del mes (`💰 PAGOS <MES>`, `📆 AGENDAS <MES>`) al instante. Es de ida: lo que se toca a mano en el sheet **no** vuelve al CRM.
 - **Leaderboard, métricas y panel del negocio** se calculan de los pagos y agendas cargados. No hay que llenar METRICS ni LEADERBOARDS a mano.
 - **ManyChat**: cada contacto nuevo y cada etiqueta llegan al CRM al instante (automatización "CRM EXPOSURE · sincronizar contactos"); el cruce con las agendas por Instagram dice qué pieza de contenido trajo cada lead y las conversaciones nuevas por mes y setter alimentan el panel.
-- **Fathom**: una vez por día el CRM lee las grabaciones y marca show / no show real y motivo de no cierre en la agenda.
+- **Fathom**: cada 30 minutos el CRM lee las grabaciones nuevas, las transcribe y analiza, y marca la llamada como tomada en su agenda.
 
 ## Reglas para que los números cierren
 
