@@ -298,7 +298,8 @@ export default function HomePage() {
       </div>
     </section>
 
-    {isCEO && !isCristianAccount && <section className="flex flex-wrap gap-2 rounded-2xl border border-white/8 bg-white/[.025] p-2" aria-label="Cuenta del panel">
+    {/* EXPOSURE opera una sola cuenta: las pestañas por cuenta (plantilla de Paul) quedan ocultas */}
+    {false && isCEO && !isCristianAccount && <section className="flex flex-wrap gap-2 rounded-2xl border border-white/8 bg-white/[.025] p-2" aria-label="Cuenta del panel">
       {([['general', 'General'], ['paul', 'Cuenta de Cuenta A'], ['cris', 'Cuenta de Cris']] as const).map(([value, label]) => (
         <button key={value} type="button" onClick={() => setAccountScope(value)} className={`rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-[.12em] transition ${accountScope === value ? 'bg-white text-black shadow-lg' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}>
           {label}
