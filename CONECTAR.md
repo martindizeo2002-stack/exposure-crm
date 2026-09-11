@@ -120,3 +120,27 @@ Meta solo hace falta para cuentas de terceros.
   datos inventados (`components/exposure/data.ts`). Ahora lleva el aviso "Maqueta" en cada pantalla y el grupo del menú se llama
   "Sistema IA · maqueta". Conectarlo de verdad es un proyecto aparte: definir qué hace cada agente y con qué datos.
 - **Instagram** (página "El contenido" del panel): sigue apagada hasta tener el token con permisos de página (sección 8).
+
+## 10 · Reportes diarios del setter → CRM (11/09, noche)
+
+Los dashboards que arma Máximo (`setting_dashboard_N.html`) se archivan en
+`EXPOSURE/Central Negocio/datos/setting-reports/` (cada uno reemplaza al del día anterior, así que
+hay que guardarlos con el número siguiente). Para llevarlos al CRM:
+
+```
+cd "C:\Users\Alex\Documents\EXPOSURE\Central Negocio"
+python scripts/setting/actualizar.py
+```
+
+Qué hace (idempotente: se puede repetir sin duplicar):
+
+- **Cruza cada lead del reporte con su agenda** (usuario de Instagram, nombre o alias, ±10 días) y completa en la
+  agenda lo que estaba vacío: setter, fuente, recurso, ángulo de entrada (gatillo + feed), dolor y objetivo.
+  Deja un evento "Reporte del setter" en la ficha de la persona con todo el detalle.
+- **Panel del negocio → El equipo → "Setting diario"**: día por día (calendarios, agendas, cuántas existen en el CRM,
+  calificados, fups, embudos de nuevos seguidores / historia / outbound) y la tabla lead por lead.
+- **Métricas → Setting**: los calendarios enviados de Máximo salen de acá (tipo `calendarios_enviados`, por semana).
+- Los leads que no encuentran agenda quedan listados al pie del bloque ("sin agenda"): o el setter los reportó
+  con otro nombre, o la agenda nunca se creó en iClosed.
+
+Ojo con "calificado" en estos reportes: significa negocio + dolor identificados, no capacidad de pago.

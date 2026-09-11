@@ -30,6 +30,8 @@ Lo que no le corresponde a un rol rebota con "Tu cuenta no tiene acceso a este m
 - **ManyChat**: cada contacto nuevo y cada etiqueta llegan al CRM al instante (automatización "CRM EXPOSURE · sincronizar contactos"); el cruce con las agendas por Instagram dice qué pieza de contenido trajo cada lead y las conversaciones nuevas por mes y setter alimentan el panel.
 - **Fathom**: cada 30 minutos el CRM lee las grabaciones nuevas, las transcribe y analiza, y marca la llamada como tomada en su agenda.
 
+- **Reportes del setter**: cada dashboard diario de Máximo se archiva en `Central Negocio/datos/setting-reports` y se carga con `python scripts/setting/actualizar.py`. Aparece en Panel del negocio → El equipo → Setting diario, en Métricas (calendarios enviados) y en la ficha de cada lead.
+
 ## Reglas para que los números cierren
 
 - El **concepto** del pago es lo que decide todo: cash collected, FECCU/FECCPP, comisiones y si el cliente tiene acceso. Usá siempre el de la lista.

@@ -83,10 +83,21 @@ export type EntradaPanel = {
   cuotas: CuotaPanel[]
   clientes: ClientePanel[]
   metricas: MetricaPanel[]
+  // reportes diarios del setter (crm_integration_assets source=setting), tal como los cargó scripts/setting
+  setting?: SettingDiaPanel[]
   hoy?: Date
   metaMensual?: number
   precioBase?: number
   marca?: { nombre?: string; bajada?: string; moneda?: string }
+}
+
+export type SettingDiaPanel = {
+  fecha: string; setter: string
+  calendarios_enviados: number | null; agendas: number | null; calificados_dia: number | null; fups: number | null
+  nuevos_seguidores: number | null; ns_contestan: number | null; ns_califican: number | null; ns_bookeados: number | null
+  historia: string | null; historia_comentaron: number | null; historia_calificaron: number | null; historia_bookeados: number | null
+  outbound_enviados: number | null; outbound_respuestas: number | null; outbound_agendas: number | null
+  leads: Array<{ lead: string; usuario: string; nombre: string; origen: string; calificado: boolean; ciclo: string; gatillo: string; feed: string | null; fups: number | null; dolor: string | null; objetivo: string | null; agenda_id?: string | null; agenda_nombre?: string | null }>
 }
 
 export type DatosPanel = {
@@ -105,6 +116,8 @@ export type DatosPanel = {
   segmentos: Array<{ segmento: string; agendas: number; vencidas: number; pendientes: number; presentadas: number; noShow: number; sinDato: number; calificadas: number; cierres: number }>
   closers: Array<{ nombre: string; presentadas: number; calificadas: number; cierres: number; cobrado: number }>
   setters: Array<{ nombre: string; inbound: number; fups: number; agendas: number }>
+  // setting diario: un elemento por día reportado por el setter (vacío si no hay reportes cargados)
+  setting: SettingDiaPanel[]
   fuentes: Array<{ nombre: string; leads: number; agendas: number; cierres: number }>
   contenido: Array<{ formato: string; piezas: number; views: number; ctas: number; leads: number; agendas: number }>
   reels: Array<Record<string, unknown>>
@@ -443,6 +456,7 @@ export function armarDatosPanel(e: EntradaPanel): DatosPanel {
     meses: filas,
     closers: [...closers.values()].map(redondear),
     setters: [...setters.values()],
+    setting: (e.setting ?? []).slice().sort((a, b) => a.fecha.localeCompare(b.fecha)),
     fuentes: [...fuentes.values()],
     contenido: [], // el CRM todavía no mide piezas/views por formato: la página se esconde sola
     reels: [],     // ídem: sin atribución por reel no se inventa nada

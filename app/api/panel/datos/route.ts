@@ -49,7 +49,7 @@ export async function GET() {
     const desde = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1)
     const desdeIso = `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, "0")}-01`
 
-    const [agendas, pagos, cuotas, clientes, metricas] = await Promise.all([
+    const [agendas, pagos, cuotas, clientes, metricas, settingDias] = await Promise.all([
       todas<Record<string, unknown>>((a, b) => sb.from("agendas")
         .select("id,nombre,fecha_agenda,fecha_closer,fecha_lead,fecha_tc,closer,setter,fuente,recurso,angulo_entrada,calificacion,calificaba_realmente,show,cerro,estado,tipo_cierre,seguimiento_estado,seguimiento_nota,seguimiento_actualizado_at,motivo_urgencia,operacion,plan_de_pago,cc_dia_1,created_at")
         .or(`fecha_agenda.gte.${desdeIso},fecha_agenda.is.null`)
@@ -71,6 +71,13 @@ export async function GET() {
       todas<Record<string, unknown>>((a, b) => sb.from("metricas_manual")
         .select("tipo,valor,semana,persona,mes,created_at")
         .range(a, b)),
+      // reportes diarios del setter, uno por día (los carga scripts/setting/cargar-setting-reports.py)
+      todas<Record<string, unknown>>((a, b) => sb.from("crm_integration_assets")
+        .select("source_id,metadata")
+        .eq("source", "setting").eq("asset_type", "dia")
+        .gte("source_id", desdeIso)
+        .order("source_id", { ascending: true })
+        .range(a, b)),
     ])
 
     if (!agendas.length && !pagos.length) return js(await demo(), { "X-Panel-Datos": "demo" })
@@ -78,6 +85,7 @@ export async function GET() {
     const datos = armarDatosPanel({
       agendas: agendas as never, pagos: pagos as never, cuotas: cuotas as never,
       clientes: clientes as never, metricas: metricas as never, hoy,
+      setting: settingDias.map((r) => r.metadata as never),
       metaMensual: Number(process.env.PANEL_META_MENSUAL || 50000) || 50000,
       precioBase: Number(process.env.PANEL_PRECIO_BASE || 1300) || 1300,
     })

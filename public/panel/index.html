@@ -1080,6 +1080,18 @@ html.embed .top{padding-top:22px}
         <div class="lb" id="lbSetters"></div>
       </div></div>
     </div>
+    <div class="card" id="cardSetting" hidden style="margin-top:18px"><div class="card-b">
+      <p class="card-t">Setting diario · lo que reporta el setter</p>
+      <p class="card-s" id="settingSub"></p>
+      <div id="settingKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0 18px"></div>
+      <p class="card-t" style="margin-top:6px">Día por día</p>
+      <p class="card-s">Calendarios → agendas del reporte, y cuántas de esas agendas existen en el CRM. Los embudos son nuevos seguidores, historia con keyword y outbound.</p>
+      <div class="tabla-wrap" style="margin-top:10px"><table id="tablaSetting"></table></div>
+      <p class="card-t" style="margin-top:22px">Lead por lead</p>
+      <p class="card-s">Origen, gatillo de agenda, dolor y objetivo tal como los anotó el setter. "En el CRM" dice si se pudo cruzar con su agenda; los que no, se listan al final.</p>
+      <div class="tabla-wrap" style="margin-top:10px"><table id="tablaSettingLeads"></table></div>
+      <p class="card-s" id="settingSinAgenda" style="margin-top:12px"></p>
+    </div></div>
   </section>
 </div>
 
@@ -1813,6 +1825,81 @@ function fila(i, nombre, valor, sub, prop, color){
     + ultimoC.nombre+"</b> el <b>"+pct(ultimoC.cierres/ultimoC.calificadas*100)+"</b>. Esa diferencia son "
     + money((top.cierres/top.calificadas - ultimoC.cierres/ultimoC.calificadas) * ultimoC.calificadas * (top.cobrado/top.cierres))
     + " que no entraron.";
+})();
+
+/* ══ 5b · setting diario (reportes del setter, cargados desde datos/setting-reports) ═══
+   Números tal como los reporta el setter; "en el CRM" es el cruce con la tabla de
+   agendas. Si no hay reportes cargados, la tarjeta no se muestra. */
+(function settingDiario(){
+  const S = (D.setting || []).slice().sort((a,b) => a.fecha < b.fecha ? -1 : 1);
+  const card = document.getElementById("cardSetting");
+  if (!S.length || !card) return;
+  card.hidden = false;
+  const n = v => (v === null || v === undefined) ? 0 : v;
+  const sum = k => S.reduce((t,d) => t + n(d[k]), 0);
+  const dm = f => f.slice(8,10) + "/" + f.slice(5,7);
+  const guion = v => (v === null || v === undefined) ? "—" : miles(v);
+  const leads = [];
+  S.forEach(d => (d.leads || []).forEach(l => leads.push(Object.assign({fecha: d.fecha}, l))));
+  const enCrm = leads.filter(l => l.agenda_id).length;
+  const sinCrm = leads.filter(l => !l.agenda_id);
+  document.getElementById("settingSub").innerHTML =
+    "<b>" + S.length + "</b> días reportados, del <b>" + dm(S[0].fecha) + "</b> al <b>" + dm(S[S.length-1].fecha)
+    + "</b>. El reporte del día reemplaza al anterior: se archivan en datos/setting-reports y se cargan con scripts/setting.";
+  const kpis = [
+    ["Calendarios enviados", sum("calendarios_enviados"), (sum("calendarios_enviados") / S.length).toFixed(1).replace(".", ",") + " por día"],
+    ["Agendas reportadas", sum("agendas"), "<b>" + enCrm + "</b> de " + leads.length + " leads con agenda en el CRM"],
+    ["Calificados", sum("calificados_dia"), "negocio + dolor identificados, no capacidad de pago"],
+    ["Seguimientos", sum("fups"), "fups hechos en el día"],
+    ["Nuevos seguidores", sum("nuevos_seguidores"), sum("ns_contestan") + " contestan · " + sum("ns_califican") + " califican · " + sum("ns_bookeados") + " bookean"],
+    ["Historia con keyword", sum("historia_comentaron"), sum("historia_calificaron") + " califican · " + sum("historia_bookeados") + " bookean"],
+    ["Outbound", sum("outbound_enviados"), sum("outbound_respuestas") + " respuestas · " + sum("outbound_agendas") + " agendas"],
+  ];
+  document.getElementById("settingKpis").innerHTML = kpis.map(k =>
+    '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px">'
+    + '<div style="font:600 10.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted-fg)">' + k[0] + "</div>"
+    + '<div style="font:700 26px/1.1 var(--sans);letter-spacing:-.02em;margin:8px 0 6px">' + miles(k[1]) + "</div>"
+    + '<div style="font-size:12px;color:var(--muted-fg)">' + k[2] + "</div></div>").join("");
+  const embudo = (a, b, c) => guion(a) + " → " + guion(b) + " → " + guion(c);
+  document.getElementById("tablaSetting").innerHTML =
+    "<thead><tr><th>Día</th><th class='num'>Calendarios</th><th class='num'>Agendas</th><th class='num'>En el CRM</th><th class='num'>Calificados</th><th class='num'>Fups</th>"
+    + "<th>Nuevos seg. → contestan → califican → bookean</th><th>Historia → califican → bookean</th><th>Outbound → resp. → agendas</th></tr></thead><tbody>"
+    + S.slice().reverse().map(d => {
+        const ls = d.leads || [], ok = ls.filter(l => l.agenda_id).length;
+        return "<tr>"
+          + '<td class="fecha">' + dm(d.fecha) + "</td>"
+          + '<td class="num">' + guion(d.calendarios_enviados) + "</td>"
+          + '<td class="num"><b>' + guion(d.agendas) + "</b></td>"
+          + '<td class="num">' + (ls.length ? '<span class="chip ' + (ok === ls.length ? "ok" : ok ? "warn" : "bad") + '">' + ok + " / " + ls.length + "</span>" : "—") + "</td>"
+          + '<td class="num">' + guion(d.calificados_dia) + "</td>"
+          + '<td class="num">' + guion(d.fups) + "</td>"
+          + '<td style="color:var(--muted-fg)">' + guion(d.nuevos_seguidores) + " → " + embudo(d.ns_contestan, d.ns_califican, d.ns_bookeados) + "</td>"
+          + '<td style="color:var(--muted-fg)">' + (d.historia ? '<span class="chip v">' + esc(d.historia) + "</span> " : "") + embudo(d.historia_comentaron, d.historia_calificaron, d.historia_bookeados) + "</td>"
+          + '<td style="color:var(--muted-fg)">' + embudo(d.outbound_enviados, d.outbound_respuestas, d.outbound_agendas) + "</td></tr>";
+      }).join("")
+    + "<tr style='background:var(--muted)'><td class='fecha'>Total</td><td class='num'><b>" + miles(sum("calendarios_enviados")) + "</b></td><td class='num'><b>" + miles(sum("agendas")) + "</b></td>"
+    + "<td class='num'><b>" + enCrm + " / " + leads.length + "</b></td><td class='num'><b>" + miles(sum("calificados_dia")) + "</b></td><td class='num'><b>" + miles(sum("fups")) + "</b></td>"
+    + "<td style='color:var(--muted-fg)'>" + miles(sum("nuevos_seguidores")) + " → " + embudo(sum("ns_contestan"), sum("ns_califican"), sum("ns_bookeados")) + "</td>"
+    + "<td style='color:var(--muted-fg)'>" + embudo(sum("historia_comentaron"), sum("historia_calificaron"), sum("historia_bookeados")) + "</td>"
+    + "<td style='color:var(--muted-fg)'>" + embudo(sum("outbound_enviados"), sum("outbound_respuestas"), sum("outbound_agendas")) + "</td></tr></tbody>";
+  const corto = (t, m) => { t = t || ""; return esc(t.length > m ? t.slice(0, m - 1) + "…" : t); };
+  document.getElementById("tablaSettingLeads").innerHTML =
+    "<thead><tr><th>Día</th><th>Lead</th><th>Origen</th><th>Calif.</th><th>Gatillo</th><th>Dolor</th><th>Objetivo</th><th class='num'>Fups</th><th>En el CRM</th></tr></thead><tbody>"
+    + leads.slice().reverse().map(l => "<tr>"
+      + '<td class="fecha">' + dm(l.fecha) + "</td>"
+      + "<td><b>" + esc(l.lead) + "</b></td>"
+      + '<td style="color:var(--muted-fg)">' + corto(l.origen, 46) + "</td>"
+      + "<td>" + (l.calificado ? '<span class="chip ok">Sí</span>' : '<span class="chip n">No</span>') + "</td>"
+      + '<td style="color:var(--muted-fg)">' + corto(l.gatillo, 40) + (l.feed ? " · " + corto(l.feed, 30) : "") + "</td>"
+      + '<td title="' + esc(l.dolor || "") + '">' + corto(l.dolor, 90) + "</td>"
+      + '<td title="' + esc(l.objetivo || "") + '">' + corto(l.objetivo, 70) + "</td>"
+      + '<td class="num">' + guion(l.fups) + "</td>"
+      + "<td>" + (l.agenda_id ? '<span class="chip ok">' + corto(l.agenda_nombre || "sí", 26) + "</span>" : '<span class="chip bad">sin agenda</span>') + "</td></tr>").join("")
+    + "</tbody>";
+  document.getElementById("settingSinAgenda").innerHTML = sinCrm.length
+    ? "<b>" + sinCrm.length + " leads del reporte no tienen agenda en el CRM</b> (o están con otro nombre): "
+      + sinCrm.map(l => esc(l.lead) + " (" + dm(l.fecha) + ")").join(", ") + "."
+    : "Todos los leads del reporte tienen su agenda en el CRM.";
 })();
 
 /* ══ 6 · fuentes (donut) ══════════════════════════════════════════════════ */
