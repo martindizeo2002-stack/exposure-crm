@@ -356,7 +356,7 @@ export async function GET(request: Request) {
     })
 
     // CASH COLLECTED POR CALIFICACIÓN, DESGLOSADO POR CLOSER. Los apodos
-    // (Nawe → Nahuel, Cris → Cristian, Ken → Kenneth) se unifican con
+    // (Nawe → Nahuel, Cris → Cristian, Bener) se unifican con
     // lib/equipo.ts para que una misma persona no aparezca dos veces.
     function closerKey(s: string | null | undefined): string {
       return nombreCanonico(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim()

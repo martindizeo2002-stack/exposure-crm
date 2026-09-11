@@ -1,7 +1,7 @@
 // Catálogo de programas de EXPOSURE (11/09/2026). Alimenta el selector de "Cargar pago",
 // la duración para calcular fecha_baja y el total del contrato. Las etiquetas históricas
 // (tal como están escritas en el sheet CRM CENTRAL 2026) se reconocen en OPERACIONES_HISTORICAS.
-// Duraciones marcadas [CONFIRMAR] salen del sheet (alta → baja = 4 meses) y no de una definición del negocio.
+// Todos los programas duran 4 meses (Alex, 11/09/2026); Círculo Privado es anual y las variantes "8 meses" llevan su override.
 export type ProgramaId = "ia_partner" | "agency" | "agency_pro" | "content" | "circulo"
 
 export type OperacionCatalogo = { label: string; total: number; meses?: number }
@@ -19,7 +19,7 @@ export const PROGRAMAS: ProgramaDef[] = [
     id: "ia_partner",
     nombreCompleto: "IA Partner",
     nombreCorto: "IA Partner",
-    duracionMeses: 4, // [CONFIRMAR]
+    duracionMeses: 4,
     operaciones: [
       { label: "IA PARTNER | $1300 PIF", total: 1300 },
       { label: "IA PARTNER | $1300 PP", total: 1300 },
@@ -45,7 +45,7 @@ export const PROGRAMAS: ProgramaDef[] = [
     id: "agency_pro",
     nombreCompleto: "Exposure Agency Pro",
     nombreCorto: "Agency Pro",
-    duracionMeses: 4, // [CONFIRMAR]
+    duracionMeses: 4,
     operaciones: [
       { label: "Agency Pro | $2300 PIF", total: 2300 },
       { label: "Agency Pro | $3000 PIF", total: 3000 },
@@ -58,7 +58,7 @@ export const PROGRAMAS: ProgramaDef[] = [
     id: "content",
     nombreCompleto: "Exposure Content",
     nombreCorto: "Content",
-    duracionMeses: 3, // [CONFIRMAR]
+    duracionMeses: 4,
     operaciones: [
       { label: "Content | $500 PIF", total: 500 },
       { label: "Content | $600 (PP)", total: 600 },

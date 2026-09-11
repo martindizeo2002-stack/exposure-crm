@@ -65,7 +65,7 @@ function personalMonthlyGoal(month: string, name: string): number | null {
 function stripAccents(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim()
 }
-// Apodos del equipo (Nawe → Nahuel, Cris → Cristian, Ken → Kenneth,
+// Apodos del equipo (Nawe → Nahuel, Cris → Cristian, Bener
 // Maxi → Maximo) viven en lib/equipo.ts.
 function canonical(name: string): string {
   return nombreCanonico(name)

@@ -6,8 +6,8 @@ export const CEO = "Alex"
 export const SALES_MANAGER = "Nahuel"
 
 // Closers reales: Alex y Nahuel hasta junio 2026; desde julio 2026 también
-// Cristian, Tobias y Kenneth.
-export const CLOSERS_ACTIVOS = ["Alex", "Nahuel", "Cristian", "Tobias", "Kenneth", "Bener"]  // Bener confirmado por Alex el 11/09
+// Cristian, Tobias y Bener.
+export const CLOSERS_ACTIVOS = ["Alex", "Nahuel", "Cristian", "Tobias", "Bener"]  // Alex (11/09): el closer es Bener (Benner), no Kenneth
 
 // Setters por período: Lukas (sep–nov 2025) · Cesar (nov–dic 2025) ·
 // Santi (ene–jun 2026) · Andres (jul–ago 2026) · Maximo (desde ago 2026).
@@ -27,8 +27,7 @@ const ALIAS: Record<string, string> = {
   nahuel: "Nahuel", nawe: "Nahuel",
   cristian: "Cristian", cris: "Cristian",
   tobias: "Tobias",
-  kenneth: "Kenneth", ken: "Kenneth",
-  bener: "Bener", "bener.salvod": "Bener",
+  bener: "Bener", benner: "Bener", "bener.salvod": "Bener",
   maximo: "Maximo", maxi: "Maximo", max: "Maximo",
   andres: "Andres",
   santi: "Santi",
@@ -50,5 +49,5 @@ export function nombreCanonico(value: unknown): string {
 
 // Nombres completos de closers conocidos, en minúsculas y sin tildes, para
 // reconocer llamadas de venta en Fathom por el título o los participantes.
-// Cristian Lescano y Bener Salvo salen de los títulos de Fathom (11/09). FALTA: apellidos de Tobias y Kenneth.
+// Cristian Lescano y Bener Salvo salen de los títulos de Fathom (11/09). FALTA: apellido de Tobias.
 export const CLOSERS_NOMBRE_COMPLETO = ["alex carrera", "nahuel carballo", "cristian lescano", "bener salvo"]
