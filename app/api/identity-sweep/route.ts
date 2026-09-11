@@ -111,7 +111,7 @@ export async function GET(request: Request) {
     const pairs: Candidate[] = []
     const seen = new Set<string>()
 
-    // BUG REAL (encontrado 2026-07-23, reportado por Cuenta A: 202.513 "conflictos"
+    // BUG REAL (encontrado 2026-07-23, reportado en la plantilla original: 202.513 "conflictos"
     // quando la base tiene ~9.4k personas nombradas): exact_normalized_match se
     // generaba como TODOS los pares dentro de un cluster de nombre normalizado
     // idéntico -- O(n²). Para nombres repetidos muchas veces (nombres de

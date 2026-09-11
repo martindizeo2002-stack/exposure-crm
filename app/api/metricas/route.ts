@@ -5,7 +5,6 @@ import { BECCPP_TYPES, BECCU_TYPES, FECCPP_TYPES, FECCU_TYPES, frontendCohort, w
 import { ALL_SALE_TYPES, BACK_END_SALE_TYPES, CLOSED_IN_CALL_TYPES, FRONT_END_SALE_TYPES } from "@/lib/revenue"
 import { FEE_TIPOS, FRONT_END_FEE_TIPOS } from "@/lib/cash-collected"
 import { nombreCanonico } from "@/lib/equipo"
-import { buildAccountAttributor, normalizeBusinessAccount, type BusinessAccount } from "@/lib/business-account"
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -114,8 +113,6 @@ export async function GET(request: Request) {
     // tal cual en lugar de derivarlos de mes+semana.
     const startParam = searchParams.get("start")
     const endParam = searchParams.get("end")
-    const accountParam = searchParams.get("account")
-    const businessAccount: BusinessAccount | null = accountParam === "paul" || accountParam === "cris" ? accountParam : null
     const { start, end } = (startParam && endParam) ? { start: startParam, end: endParam } : getDateRange(mes, weekIdx)
     const sb = getSupabase()
 
@@ -147,7 +144,7 @@ export async function GET(request: Request) {
         .or("estado.is.null,estado.neq.Archivada manualmente")
         .gte("fecha_agenda", argentinaAgendaBoundary(start))
         .lte("fecha_agenda", argentinaAgendaBoundary(end, true)),
-      getMetaSpend(start, end, businessAccount),
+      getMetaSpend(start, end),
     ])
 
     if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 })
@@ -155,27 +152,8 @@ export async function GET(request: Request) {
     if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 })
     if (asErr) return NextResponse.json({ error: asErr.message }, { status: 500 })
 
-    let p = pagos || []
-
-    // Pagos y planes no guardan la cuenta comercial directamente. La cuenta
-    // se hereda de la agenda explícita más reciente de la misma persona,
-    // priorizando una agenda anterior a la fecha del cobro/alta del plan.
-    let accountFor: ReturnType<typeof buildAccountAttributor> | null = null
-    if (businessAccount) {
-      const accountAgendas: any[] = []
-      for (let from = 0; ; from += 1000) {
-        const { data: page, error: accountAgendaError } = await sb.from("agendas")
-          .select("person_id,telefono,cuenta,fecha_agenda,fecha_closer,created_at")
-          .not("cuenta", "is", null)
-          .order("fecha_agenda", { ascending: true })
-          .range(from, from + 999)
-        if (accountAgendaError) return NextResponse.json({ error: accountAgendaError.message }, { status: 500 })
-        accountAgendas.push(...(page || []))
-        if (!page || page.length < 1000) break
-      }
-      accountFor = buildAccountAttributor(accountAgendas)
-      p = p.filter(payment => accountFor!(payment, payment.fecha) === businessAccount)
-    }
+    // EXPOSURE opera una sola cuenta (@alexmcarrera): se toman todos los pagos.
+    const p = pagos || []
 
     // La ventana del setter se cuenta desde el primer pago frontend histórico
     // de cada cliente, aunque el período visible empiece después.
@@ -199,14 +177,9 @@ export async function GET(request: Request) {
       if (!firstFrontendPayment.has(key) && payment.fecha) firstFrontendPayment.set(key, payment.fecha)
     }
     // Sin dedup: la data viene limpia del Sheets (1 fila = 1 agenda real)
-    const a = businessAccount
-      ? (agendasRaw || []).filter(agenda => normalizeBusinessAccount((agenda as any).cuenta) === businessAccount)
-      : (agendasRaw || [])
+    const a = agendasRaw || []
     const setterAgendaSeen = new Set<string>()
-    const accountSetterRows = businessAccount
-      ? (agendasSetterRaw || []).filter((agenda: any) => normalizeBusinessAccount(agenda.cuenta) === businessAccount)
-      : (agendasSetterRaw || [])
-    const aBySetterFecha = accountSetterRows.filter((agenda: any) => {
+    const aBySetterFecha = (agendasSetterRaw || []).filter((agenda: any) => {
       const phone = String(agenda.telefono || "").replace(/\D/g, "")
       const name = String(agenda.nombre || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")
       const identity = agenda.person_id ? `person:${agenda.person_id}` : phone ? `phone:${phone}` : `name:${name}`
@@ -215,9 +188,7 @@ export async function GET(request: Request) {
       setterAgendaSeen.add(key)
       return true
     })
-    const planes = businessAccount
-      ? (planesRaw || []).filter((plan: any) => accountFor!(plan, plan.fecha_alta || plan.created_at) === businessAccount)
-      : (planesRaw || [])
+    const planes = planesRaw || []
     const revenue = r2(planes.reduce((total, plan: any) =>
       total + (plan.plan_pago_items || []).reduce(
         (subtotal: number, item: any) => subtotal + Number(item.monto || 0),
@@ -476,12 +447,9 @@ export async function GET(request: Request) {
         .sort((x, y) => y.cantidad - x.cantidad)
     }
 
-    const cuentaNorm = (v: string) => {
-      const low = v.toLowerCase()
-      if (low.includes("cristian") || low.includes("cris")) return "EXPOSURE (@alexmcarrera)"
-      if (low.includes("paul")) return "EXPOSURE (@alexmcarrera)"
-      return v
-    }
+    // EXPOSURE opera una sola cuenta: todo lo cargado en "cuenta" se agrupa
+    // bajo la cuenta real del negocio (misma regla que en detalle/route.ts).
+    const cuentaNorm = () => "EXPOSURE (@alexmcarrera)"
 
     const volumen = {
       total: aBySetterFecha.length,

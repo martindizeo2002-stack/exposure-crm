@@ -45,7 +45,7 @@ function filterToParams(filter: string): string {
 }
 
 // ── Stage logic ───────────────────────────────────────────────────────────────
-// Orden pedido por Cuenta A: Agenda Confirmada -> No se Presentó -> Se Presentó ->
+// Orden del pipeline: Agenda Confirmada -> No se Presentó -> Se Presentó ->
 // No Cerrados -> Fees -> Cerrados -> Archivados. Los leads que todavía no
 // confirmaron la llamada no tienen columna propia (getStage devuelve null y
 // quedan afuera del pipeline; se gestionan desde Centro de Agendas).

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 export type ModuleTab = { id: string; label: string; hint: string; icon: React.ReactNode; content: React.ReactNode }
 
-// Bug reportado por Cuenta A: si dejaba seleccionada una vista (ej. "Agendas" en
+// Bug reportado en la plantilla original: si dejaba seleccionada una vista (ej. "Agendas" en
 // vez de "Pipeline visual") y navegaba a otra pestana del nav y volvia, la
 // seleccion se perdia y volvia siempre a la primera tab. Se persiste la
 // ultima vista elegida por modulo (keyed por title) en localStorage, asi

@@ -2,9 +2,8 @@ import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { canonicalSalesAngle, SALES_ANGLES } from "@/lib/sales-angles"
 import { nextVolumeAngle } from "@/lib/content-volume-angle"
-import { createSupabaseServer } from "@/lib/supabase-server"
 
-// Espacio operativo semanal de Contenido (Cris/Valen). Vive dentro de
+// Espacio operativo semanal de Contenido (el equipo). Vive dentro de
 // crm_content_assets (mismo catálogo que /contenido-angulos usa para
 // trazabilidad), pero acá se lee/escribe el detalle operativo: guion, quién
 // lo hace, estado de producción, calendario. El middleware ya protege esta
@@ -15,16 +14,6 @@ function getSupabase() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!url || !key) throw new Error("Supabase credentials not configured")
   return createClient(url, key)
-}
-
-async function isCristianRestricted() {
-  const session = await createSupabaseServer()
-  const { data: { user } } = await session.auth.getUser()
-  return user?.email?.toLowerCase() === "user@example.invalid"
-}
-
-function isPaulContent(row: { source_key?: string | null; metadata?: Record<string, unknown> | null }) {
-  return String(row.source_key || "").startsWith("manual:toro:paul:") || row.metadata?.content_account === "PAUL"
 }
 
 // Filas que este workspace puede crear/editar/borrar directamente: piezas
@@ -55,17 +44,12 @@ function weekBounds(plannedAt: string) {
   return { start: monday.toISOString().slice(0, 10), end: sunday.toISOString().slice(0, 10) }
 }
 
-async function volumeAngleAssignment(sb: ReturnType<typeof getSupabase>, plannedAt: string, excludeId?: string | null, cristianRestricted = false) {
+async function volumeAngleAssignment(sb: ReturnType<typeof getSupabase>, plannedAt: string, excludeId?: string | null) {
   let query = sb
     .from("crm_content_assets")
     .select("angle")
     .ilike("format", "%VOLUMEN%")
     .neq("status", "historical")
-  if (cristianRestricted) {
-    query = query
-      .not("source_key", "like", "manual:toro:paul:%")
-      .or("metadata->>content_account.is.null,metadata->>content_account.neq.PAUL")
-  }
   const bounds = weekBounds(plannedAt)
   if (bounds) query = query.gte("planned_at", bounds.start).lte("planned_at", bounds.end)
   if (excludeId) query = query.neq("id", excludeId)
@@ -81,27 +65,20 @@ export async function GET(request: Request) {
   try {
     const sb = getSupabase()
     const { searchParams } = new URL(request.url)
-    const cristianRestricted = await isCristianRestricted()
     if (searchParams.get("options") === "next-volume-angle") {
       const assignment = await volumeAngleAssignment(
         sb,
         searchParams.get("planned_at") || "",
         searchParams.get("exclude_id"),
-        cristianRestricted,
       )
       return NextResponse.json(assignment)
     }
     if (searchParams.get("options") === "formats") {
-      let formatQuery = sb
+      const { data, error } = await sb
         .from("crm_content_assets")
         .select("format")
         .not("format", "is", null)
-      if (cristianRestricted) {
-        formatQuery = formatQuery
-          .not("source_key", "like", "manual:toro:paul:%")
-          .or("metadata->>content_account.is.null,metadata->>content_account.neq.PAUL")
-      }
-      const { data, error } = await formatQuery.limit(5000)
+        .limit(5000)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       const storyOnly = /^(¿QUÉ HAGO\??|HAND RAISER|CTA|WHY NOW|AUDITORÍA)$/i
       const formats = [...new Set(
@@ -118,22 +95,14 @@ export async function GET(request: Request) {
     const q = searchParams.get("q")
     const contentAssetId = searchParams.get("content_asset_id")
     const managedOnly = searchParams.get("managed_only") === "1"
-    const contentAccount = searchParams.get("content_account")
+    // EXPOSURE opera una sola cuenta: si llega `content_account` (herencia de la
+    // plantilla) se ignora y se muestran todas las piezas gestionables.
     const contentKind = searchParams.get("content_kind")
-    if (cristianRestricted && contentAccount === "PAUL") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 })
-    }
     const limit = Math.min(Number(searchParams.get("limit") || 200), 500)
 
     let query = sb.from("crm_content_assets").select(SELECT_COLS, { count: "exact" })
     if (contentAssetId) query = query.eq("id", contentAssetId)
     if (managedOnly) query = query.or("source_key.like.manual:%,source_key.like.notion-planner:%")
-    if (contentAccount === "PAUL") query = query.like("source_key", "manual:toro:paul:%")
-    if (contentAccount === "CRIS" || cristianRestricted) {
-      query = query
-        .not("source_key", "like", "manual:toro:paul:%")
-        .or("metadata->>content_account.is.null,metadata->>content_account.neq.PAUL")
-    }
     if (contentKind === "stories") query = query.eq("metadata->>content_type", "stories")
     if (contentKind === "feed") {
       query = query.or("metadata->>content_type.is.null,metadata->>content_type.neq.stories")
@@ -167,9 +136,6 @@ export async function POST(request: Request) {
   try {
     const sb = getSupabase()
     const body = await request.json()
-    if (await isCristianRestricted() && body.content_account === "PAUL") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 })
-    }
     const title = String(body.title || "").trim()
     if (!title) return NextResponse.json({ error: "Falta título/concepto" }, { status: 400 })
 
@@ -193,7 +159,7 @@ export async function POST(request: Request) {
     let volumeAssignment: ReturnType<typeof nextVolumeAngle> | null = null
     if (isVolume && !angle) {
       const plannedAt = String(body.planned_at || "").slice(0, 10)
-      volumeAssignment = await volumeAngleAssignment(sb, plannedAt, null, await isCristianRestricted())
+      volumeAssignment = await volumeAngleAssignment(sb, plannedAt, null)
       angle = volumeAssignment.angle
     }
     if (hasNoAngle) angle = null
@@ -202,9 +168,7 @@ export async function POST(request: Request) {
     }
     const scriptText = body.script_text ? String(body.script_text) : null
     const row = {
-      source_key: body.content_account === "PAUL"
-        ? `manual:toro:paul:${crypto.randomUUID()}`
-        : `manual:${crypto.randomUUID()}`,
+      source_key: `manual:exposure:${crypto.randomUUID()}`,
       title,
       platform: body.platform || null,
       angle,
@@ -224,7 +188,6 @@ export async function POST(request: Request) {
       metadata: {
         import_source: "angle_map_v3",
         created_via: "content-workspace",
-        content_account: body.content_account === "PAUL" ? "PAUL" : "CRIS",
         ...(isStories ? {
           content_type: "stories",
           avatar: storyNeedsAvatar ? String(body.avatar) : null,
@@ -266,7 +229,6 @@ export async function PATCH(request: Request) {
       .maybeSingle()
     if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 })
     if (!existing) return NextResponse.json({ error: "Pieza no encontrada" }, { status: 404 })
-    if (await isCristianRestricted() && isPaulContent(existing)) return NextResponse.json({ error: "No autorizado" }, { status: 403 })
     if (!isWorkspaceManaged(existing.source_key)) {
       return NextResponse.json({
         error: "Esta pieza viene del árbol original de Notion (solo título, sin guion) y no se edita desde el workspace.",
@@ -337,7 +299,6 @@ export async function DELETE(request: Request) {
       .maybeSingle()
     if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 })
     if (!existing) return NextResponse.json({ error: "Pieza no encontrada" }, { status: 404 })
-    if (await isCristianRestricted() && isPaulContent(existing)) return NextResponse.json({ error: "No autorizado" }, { status: 403 })
     if (!isWorkspaceManaged(existing.source_key)) {
       return NextResponse.json({
         error: "Esta pieza viene del árbol original de Notion y no se borra desde el workspace.",

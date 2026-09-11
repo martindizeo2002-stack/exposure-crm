@@ -99,7 +99,7 @@ const categories: Category[] = [
       },
       {
         name: "CRM",
-        detail: "Desde el 1 de agosto de 2026, el CRM debe quedar completo todos los días antes de las 23:59 ARG, sin excepción. Toro puede enviar hasta 4 recordatorios privados durante el día. Los recordatorios son ayuda operativa y no extienden el plazo. A las 23:59 se audita automáticamente: si falta información obligatoria, corresponde strike.",
+        detail: "Desde el 1 de agosto de 2026, el CRM debe quedar completo todos los días antes de las 23:59 ARG, sin excepción. El CRM puede enviar hasta 4 recordatorios privados durante el día. Los recordatorios son ayuda operativa y no extienden el plazo. A las 23:59 se audita automáticamente: si falta información obligatoria, corresponde strike.",
         sanction: "CRM incompleto a las 23:59 ARG = 1 Strike",
       },
       {

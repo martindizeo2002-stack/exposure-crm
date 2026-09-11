@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { SALES_ANGLES } from "@/lib/sales-angles"
 import { BECCPP_TYPES, BECCU_TYPES } from "@/lib/commission-scheme"
-import { createSupabaseServer } from "@/lib/supabase-server"
 import {
   BUYER_ARCHETYPES,
   buyingMotive,
@@ -61,11 +60,6 @@ function sourceGroup(value: unknown) {
 
 export async function GET(request: Request) {
   try {
-    const session = await createSupabaseServer()
-    const { data: { user } } = await session.auth.getUser()
-    if (user?.email?.toLowerCase() === "user@example.invalid") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 })
-    }
     const sb = createSupabaseAdmin()
     const startedAt = Date.now()
     const cacheKey = "trace-intelligence:v3"

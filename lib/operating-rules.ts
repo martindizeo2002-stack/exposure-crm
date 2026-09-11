@@ -12,15 +12,3 @@ export function engagementSignal(lastActivity: Date | null, now = new Date()) {
   return "actividad_reciente" as const
 }
 
-export function financeDistribution(input: { occurredOn: string; isRenewal: boolean | null; soldBy?: string | null; originAccount?: string | null }) {
-  const active = input.occurredOn >= "2026-08-01"
-  const soldBy = String(input.soldBy || "").trim().toLowerCase()
-  const origin = String(input.originAccount || "").trim().toLowerCase()
-  if (active && input.isRenewal === true && ["paul", "paul aragorn"].includes(soldBy)) {
-    return { rule: "paul_renewal", paul: 0.65, cristian: 0.35, priority: 1 }
-  }
-  if (active && ["@cuenta.principal", "cuenta.principal"].includes(origin)) {
-    return { rule: "paul_origin", paul: 0.8, cristian: 0.2, priority: 2 }
-  }
-  return { rule: "default", paul: 0.5, cristian: 0.5, priority: 3 }
-}

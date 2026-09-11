@@ -316,7 +316,7 @@ export async function DELETE(request: Request) {
     const sb = getSupabase()
     const { data: row, error: readError } = await sb.from("agendas").select("id,nombre,fuente").eq("id", id).maybeSingle()
     if (readError) return NextResponse.json({ error: readError.message }, { status: 500 })
-    const isControlledQa = row && row.fuente === "QA interna" && String(row.nombre || "").startsWith("QA TORO ")
+    const isControlledQa = row && row.fuente === "QA interna" && String(row.nombre || "").startsWith("QA EXPOSURE ")
     if (!isControlledQa) {
       return NextResponse.json(
         { error: "El borrado permanente de agendas reales está deshabilitado para preservar la trazabilidad." },

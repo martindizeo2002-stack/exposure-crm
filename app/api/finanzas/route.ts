@@ -103,12 +103,8 @@ export async function GET() {
       checklist: checklistResult.data ?? [],
       audit: auditResult.data ?? [],
       policy: {
-        ownership: "Reglas vigentes desde agosto 2026: default 50/50; renovación cerrada personalmente por Alex 65/35; venta nueva originada en @alexmcarrera 80/20. Renovación Alex prevalece ante solapamiento.",
-        distributionRules: [
-          { key: "paul_renewal", paul: 0.65, cristian: 0.35, appliesFrom: "2026-08-01", priority: 1, base: "cash neto de plataforma y reembolsos" },
-          { key: "paul_origin", paul: 0.80, cristian: 0.20, appliesFrom: "2026-08-01", priority: 2, base: "cash neto de plataforma y reembolsos" },
-          { key: "default", paul: 0.50, cristian: 0.50, appliesFrom: "2026-08-01", priority: 3, base: "utilidad distribuible general" },
-        ],
+        ownership: "EXPOSURE opera una sola cuenta (@alexmcarrera). No hay reglas de reparto entre socios configuradas en el CRM.",
+        distributionRules: [],
         previewReadOnly: process.env.VERCEL_ENV === "preview",
       },
     })

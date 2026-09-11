@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { effectiveCRMRole } from "@/lib/role-access"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { createSupabaseServer } from "@/lib/supabase-server"
-import { buildAccountAttributor, type BusinessAccount } from "@/lib/business-account"
 import { BECCPP_TYPES, FECCPP_TYPES } from "@/lib/commission-scheme"
 
 export async function GET(request: Request) {
@@ -15,8 +14,6 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const month = searchParams.get("month") || new Date().toISOString().slice(0, 7)
-  const accountParam = searchParams.get("account")
-  const businessAccount: BusinessAccount | null = accountParam === "paul" || accountParam === "cris" ? accountParam : null
   const monthOrder = Number(month.replace("-", ""))
   const start = `${month}-01`
   const [year, mon] = month.split("-").map(Number)
@@ -29,23 +26,9 @@ export async function GET(request: Request) {
   if (expenseError) return NextResponse.json({ error: expenseError.message }, { status: 500 })
   if (payrollError) return NextResponse.json({ error: payrollError.message }, { status: 500 })
   if (plansError) return NextResponse.json({ error: plansError.message }, { status: 500 })
-  const accountAgendas: any[] = []
-  if (businessAccount) {
-    for (let from = 0; ; from += 1000) {
-      const { data: page, error: accountAgendaError } = await admin.from("agendas")
-        .select("person_id,telefono,cuenta,fecha_agenda,fecha_closer,created_at")
-        .not("cuenta", "is", null)
-        .order("fecha_agenda", { ascending: true })
-        .range(from, from + 999)
-      if (accountAgendaError) return NextResponse.json({ error: accountAgendaError.message }, { status: 500 })
-      accountAgendas.push(...(page || []))
-      if (!page || page.length < 1000) break
-    }
-  }
-  const accountFor = buildAccountAttributor(accountAgendas)
-  const plans = businessAccount
-    ? (plansRaw || []).filter((plan: any) => accountFor(plan, plan.fecha_alta || plan.created_at) === businessAccount)
-    : (plansRaw || [])
+  // EXPOSURE opera una sola cuenta (@alexmcarrera): el profit se calcula
+  // sobre todo el negocio, sin atribuir planes por cuenta.
+  const plans = plansRaw || []
   const expensesTotal = (expenses || []).reduce((sum, row) => sum + Number(row.monto_usd || 0), 0)
   const commissionsTotal = (payroll || []).reduce((sum, row) => sum + Number(row.total_usd || 0), 0)
   let softwareRows = (expenses || []).filter(row => String(row.tipo_gasto || "").toLowerCase().includes("software"))

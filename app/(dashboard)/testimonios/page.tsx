@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useSession } from "@/components/session-provider"
 
 const fetcher = async (url: string) => {
   const response = await fetch(url)
@@ -31,14 +30,11 @@ function time(seconds: number) {
 }
 
 export default function TestimoniosPage() {
-  const session = useSession()
-  const isCristianRestricted = session.email.toLowerCase() === "user@example.invalid"
   const [status, setStatus] = useState("all")
   const [category, setCategory] = useState("all")
   const [editStatus, setEditStatus] = useState("all")
   const [search, setSearch] = useState("")
   const [saving, setSaving] = useState<string | null>(null)
-  const [accounts, setAccounts] = useState<Record<string, "PAUL" | "CRIS">>({})
   const params = useMemo(() => {
     const value = new URLSearchParams()
     if (status !== "all") value.set("status", status)
@@ -72,7 +68,7 @@ export default function TestimoniosPage() {
 
   const importToContent = async (id: string) => {
     setSaving(id)
-    const response = await fetch("/api/testimonios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, content_account: isCristianRestricted ? "CRIS" : (accounts[id] || "PAUL") }) })
+    const response = await fetch("/api/testimonios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) })
     if (response.ok) await mutate()
     setSaving(null)
   }
@@ -107,14 +103,14 @@ export default function TestimoniosPage() {
 
     {isLoading ? <div className="grid min-h-72 place-items-center"><Loader2 className="h-8 w-8 animate-spin" /></div> : error ? <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-6 text-red-600">No se pudo cargar el banco.</div> : !data?.rows?.length ? <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Todavía no hay candidatos para estos filtros.</div> : <div className="grid gap-4 xl:grid-cols-2">
       {data.rows.map((row: any) => <article key={row.id} className="rounded-2xl border bg-card p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex flex-wrap gap-2"><Badge>{categoryLabels[row.category] || row.category}</Badge><Badge>{statusLabels[row.status] || row.status}</Badge><Badge>Fuerza {row.strength}/5</Badge>{row.content_asset_id && <Badge>Contenido {row.content_account}</Badge>}{row.edit_status === "pending" && <Badge>Pendiente de edición</Badge>}{row.edit_status === "edited" && <Badge>Editado</Badge>}</div><span className="text-xs text-muted-foreground">{row.recorded_at ? new Date(row.recorded_at).toLocaleDateString("es-AR") : ""}</span></div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex flex-wrap gap-2"><Badge>{categoryLabels[row.category] || row.category}</Badge><Badge>{statusLabels[row.status] || row.status}</Badge><Badge>Fuerza {row.strength}/5</Badge>{row.content_asset_id && <Badge>En Contenido</Badge>}{row.edit_status === "pending" && <Badge>Pendiente de edición</Badge>}{row.edit_status === "edited" && <Badge>Editado</Badge>}</div><span className="text-xs text-muted-foreground">{row.recorded_at ? new Date(row.recorded_at).toLocaleDateString("es-AR") : ""}</span></div>
         <div className="mt-4"><ClientSelector clients={clientData?.clients || []} value={row.person_id} label={row.speaker || "Cliente sin identificar"} disabled={saving === row.id} onSelect={(personId) => assignClient(row.id, personId)} /></div>
         <p className="mt-1 text-sm text-muted-foreground">{row.title}</p>
         <p className="mt-4 leading-relaxed">{row.summary}</p>
         <blockquote className="mt-4 rounded-xl border-l-4 border-violet-500 bg-muted/45 p-4 text-sm italic leading-relaxed">“{row.exact_quote}”</blockquote>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3"><a className="inline-flex items-center gap-2 text-sm font-semibold text-violet-600 hover:underline" href={`${row.loom_url}?t=${Math.floor(row.start_seconds || 0)}`} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />{time(row.start_seconds)}–{time(row.end_seconds)}</a><div className="flex flex-wrap gap-2">{row.status === "detected" && <Button size="sm" onClick={() => changeStatus(row.id, "reviewed")} disabled={saving === row.id}><CheckCircle2 className="mr-2 h-4 w-4" />Revisar</Button>}{row.status === "reviewed" && <Button size="sm" onClick={() => changeStatus(row.id, "published")} disabled={saving === row.id}><Sparkles className="mr-2 h-4 w-4" />Marcar publicado</Button>}{row.status !== "discarded" ? <Button size="sm" variant="ghost" onClick={() => changeStatus(row.id, "discarded")} disabled={saving === row.id}><Trash2 className="mr-2 h-4 w-4" />Descartar</Button> : <Button size="sm" variant="outline" onClick={() => changeStatus(row.id, "detected")} disabled={saving === row.id}><RotateCcw className="mr-2 h-4 w-4" />Restaurar</Button>}</div></div>
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
-          {!row.content_asset_id ? <>{isCristianRestricted ? <span className="rounded-md border px-3 py-2 text-sm">Contenido EXPOSURE</span> : <select className="h-9 rounded-md border bg-background px-3 text-sm" value={accounts[row.id] || "PAUL"} onChange={(event) => setAccounts(current => ({ ...current, [row.id]: event.target.value as "PAUL" | "CRIS" }))}><option value="PAUL">Contenido EXPOSURE</option></select>}<Button size="sm" onClick={() => importToContent(row.id)} disabled={saving === row.id}><Clapperboard className="mr-2 h-4 w-4" />Importar a Contenido</Button></> : <><Button asChild size="sm" variant="outline"><a href={`/contenido-angulos?source=testimonios&content_account=${row.content_account || "CRIS"}&content_asset_id=${encodeURIComponent(row.content_asset_id)}`}><ExternalLink className="mr-2 h-4 w-4" />Abrir en Contenido</a></Button>{row.edit_status === "edited" ? <Button size="sm" variant="ghost" onClick={() => changeEditStatus(row.id, "pending")} disabled={saving === row.id}><RotateCcw className="mr-2 h-4 w-4" />Marcar pendiente</Button> : <Button size="sm" onClick={() => changeEditStatus(row.id, "edited")} disabled={saving === row.id}><Pencil className="mr-2 h-4 w-4" />Marcar editado</Button>}</>}
+          {!row.content_asset_id ? <Button size="sm" onClick={() => importToContent(row.id)} disabled={saving === row.id}><Clapperboard className="mr-2 h-4 w-4" />Importar a Contenido</Button> : <><Button asChild size="sm" variant="outline"><a href={`/contenido-angulos?source=testimonios&content_asset_id=${encodeURIComponent(row.content_asset_id)}`}><ExternalLink className="mr-2 h-4 w-4" />Abrir en Contenido</a></Button>{row.edit_status === "edited" ? <Button size="sm" variant="ghost" onClick={() => changeEditStatus(row.id, "pending")} disabled={saving === row.id}><RotateCcw className="mr-2 h-4 w-4" />Marcar pendiente</Button> : <Button size="sm" onClick={() => changeEditStatus(row.id, "edited")} disabled={saving === row.id}><Pencil className="mr-2 h-4 w-4" />Marcar editado</Button>}</>}
         </div>
       </article>)}
     </div>}

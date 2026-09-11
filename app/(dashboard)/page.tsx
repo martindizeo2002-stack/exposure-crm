@@ -50,7 +50,6 @@ type ReconciliacionData = {
 }
 type ProfitInputs = { expenses: number; commissions: number; complete: boolean; expenseRows: number; commissionRows: number; softwareCost: number; softwareSourceMonth: string; softwareEstimated: boolean; pendingInstallments: number; pendingInstallmentCount: number }
 type HomeExceptions = { total: number; overdue: number; high: number; items: { issue_key: string; issue_type: string; entity_name: string; due_at: string }[] }
-type AccountScope = "general" | "paul" | "cris"
 
 function LegacyHomePage() {
   const [greeting, setGreeting] = useState("Hola")
@@ -105,7 +104,7 @@ function LegacyHomePage() {
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/55">Acá está lo que importa hoy. Resolvé pendientes, mové oportunidades y cargá cobros sin recorrer todo el CRM.</p>
         </div>
         {/* "Abrir pipeline" / "Cargar venta o pago" se sacaron de la vista CEO
-            (Cuenta A: no tienen sentido para su rol). Se mantienen SOLO para
+            (no tienen sentido para el rol CEO). Se mantienen SOLO para
             closer, junto a las Quick actions de mas abajo (Cobrar cuota,
             Registrar un pago, Completar una llamada). */}
         {!manager && (
@@ -119,7 +118,7 @@ function LegacyHomePage() {
 
     {loading ? <div className="grid min-h-72 place-items-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div> : <>
       {manager ? <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {/* Metricas del panel CEO confirmadas por Cuenta A (feedback 23/07 lote 2):
+        {/* Metricas del panel CEO confirmadas (feedback 23/07 lote 2):
             Revenue, Cash Collected, Unidades cerradas, Ventas totales, ROAS
             (fórmula: FECCU efectivamente cobrado / gasto Meta del mes),
             AOV TC (ticket promedio de trato cerrado), AOV Dia 1 (ticket
@@ -155,7 +154,7 @@ function LegacyHomePage() {
       </section>}
 
       {/* Bloque "Conciliacion Revenue vs Cash Collected" sacado del Home a
-          pedido de Cuenta A (no lo quiere ver). El endpoint /api/home-ceo-reconciliacion
+          pedido del CEO (no lo quiere ver). El endpoint /api/home-ceo-reconciliacion
           y el fetch de mas arriba se dejan (los sigue usando /finanzas si hace
           falta), solo se retira este bloque visual del Home. */}
 
@@ -170,8 +169,8 @@ function LegacyHomePage() {
           <div className="border-t bg-muted/25 px-5 py-3 text-xs text-muted-foreground">Regla simple: si hiciste una acción, registrala en el momento. El CRM se ocupa del resto.</div>
         </div>
 
-        {/* "Acciones rapidas" se saca de la vista CEO (Cuenta A: no le interesa a
-            el). Se mantiene SOLO para closer con las 3 acciones que Cuenta A pidio
+        {/* "Acciones rapidas" se saca de la vista CEO (no le interesa).
+            Se mantiene SOLO para closer con las 3 acciones que el CEO pidio
             explicitamente: Cobrar cuota, Registrar un pago, Completar una
             llamada (sin "Mover una oportunidad", que era la 4ta y no la pidio). */}
         {!manager && (
@@ -196,7 +195,6 @@ export default function HomePage() {
     setGreeting(hour < 12 ? "Buen día" : hour < 19 ? "Buenas tardes" : "Buenas noches")
   }, [])
   const session = useSession()
-  const isCristianAccount = session.email.trim().toLowerCase() === "user@example.invalid"
   const isCEO = session.rol === "CEO"
   const isSalesManager = session.rol === "Sales Manager"
   const isMarketingManager = session.rol === "Manager MKT"
@@ -207,17 +205,14 @@ export default function HomePage() {
   const hasCommercialMetrics = isCEO || isSalesManager
   const owner = firstName(session.nombre)
   const [monthKey, setMonthKey] = useState(currentMonthKey)
-  const [accountScope, setAccountScope] = useState<AccountScope>(isCristianAccount ? "cris" : "general")
   const selectedMonth = monthWindow(monthKey)
-  const effectiveAccountScope: AccountScope = isCristianAccount ? "cris" : accountScope
-  const accountQuery = effectiveAccountScope === "general" ? "" : `&account=${effectiveAccountScope}`
 
-  const { data: metrics, isLoading: loadingMetrics } = useSWR<Metrics>(hasCommercialMetrics ? `/api/metricas?start=${selectedMonth.start}&end=${selectedMonth.end}${accountQuery}` : null, fetcher, { refreshInterval: 60000 })
-  const { data: profitInputs, isLoading: loadingProfit } = useSWR<ProfitInputs>(isCEO ? `/api/home-ceo-profit?month=${monthKey}${accountQuery}` : null, fetcher)
+  const { data: metrics, isLoading: loadingMetrics } = useSWR<Metrics>(hasCommercialMetrics ? `/api/metricas?start=${selectedMonth.start}&end=${selectedMonth.end}` : null, fetcher, { refreshInterval: 60000 })
+  const { data: profitInputs, isLoading: loadingProfit } = useSWR<ProfitInputs>(isCEO ? `/api/home-ceo-profit?month=${monthKey}` : null, fetcher)
   const { data: agendas = [], isLoading: loadingAgendas } = useSWR<Agenda[]>(isSetter || isCloser ? `/api/agendas?light=1&mine=1&start=${selectedMonth.start}&end=${selectedMonth.end}` : null, fetcher)
   const { data: planes = [], isLoading: loadingPlans } = useSWR<Plan[]>(isCloser ? "/api/planes-pago?mine=1" : isAccounting ? "/api/planes-pago" : null, fetcher)
-  const { data: leaderboard, isLoading: loadingLeaderboard } = useSWR<Leaderboard>((isSetter || isCloser || hasCommercialMetrics) && !isCristianAccount ? `/api/leaderboard?month=${monthKey}` : null, fetcher, { refreshInterval: hasCommercialMetrics ? 60000 : 0 })
-  const { data: exceptions, isLoading: loadingExceptions } = useSWR<HomeExceptions>(!isSetter && !isCloser && !isCristianAccount ? "/api/home-exceptions" : null, fetcher, { refreshInterval: 60000 })
+  const { data: leaderboard, isLoading: loadingLeaderboard } = useSWR<Leaderboard>((isSetter || isCloser || hasCommercialMetrics) ? `/api/leaderboard?month=${monthKey}` : null, fetcher, { refreshInterval: hasCommercialMetrics ? 60000 : 0 })
+  const { data: exceptions, isLoading: loadingExceptions } = useSWR<HomeExceptions>(!isSetter && !isCloser ? "/api/home-exceptions" : null, fetcher, { refreshInterval: 60000 })
 
   const ownCloser = leaderboard?.closers.find(row => firstName(row.nombre) === owner)
   const ownSetter = leaderboard?.setters.find(row => firstName(row.nombre) === owner)
@@ -234,9 +229,7 @@ export default function HomePage() {
     }
   }, [agendas, planes, isAccounting, isCloser, isSetter])
 
-  const loading = isCristianAccount
-    ? loadingMetrics || loadingProfit
-    : isCEO
+  const loading = isCEO
     ? loadingMetrics || loadingProfit || loadingLeaderboard || loadingExceptions
     : isSalesManager
       ? loadingMetrics || loadingLeaderboard || loadingExceptions
@@ -298,15 +291,6 @@ export default function HomePage() {
       </div>
     </section>
 
-    {/* EXPOSURE opera una sola cuenta: las pestañas por cuenta (plantilla de Paul) quedan ocultas */}
-    {false && isCEO && !isCristianAccount && <section className="flex flex-wrap gap-2 rounded-2xl border border-white/8 bg-white/[.025] p-2" aria-label="Cuenta del panel">
-      {([['general', 'General'], ['paul', 'Cuenta de Cuenta A'], ['cris', 'Cuenta de Cris']] as const).map(([value, label]) => (
-        <button key={value} type="button" onClick={() => setAccountScope(value)} className={`rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-[.12em] transition ${accountScope === value ? 'bg-white text-black shadow-lg' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}>
-          {label}
-        </button>
-      ))}
-    </section>}
-
     {loading ? <div className="grid min-h-72 place-items-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div> : isCEO ? <>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <Stat label="Revenue" value={money(cash?.revenue || 0)} helper="valor contractual vendido" icon={TrendingUp} tone="violet" />
@@ -338,12 +322,10 @@ export default function HomePage() {
         </div>
       </section>
       <section><div className="mb-3"><p className="text-xs font-bold uppercase tracking-[.18em] text-red-500">Solo CEO</p><h2 className="text-xl font-bold">Rentabilidad y backend</h2></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {effectiveAccountScope === "general"
-          ? <Stat label="CAC integral" value={fullyLoadedCac == null ? "—" : money(fullyLoadedCac)} helper={`Ads ${money(cash?.ad_spend || 0)} + software ${money(profitInputs?.softwareCost || 0)} + comisiones ${money(commercialCommissions)} ÷ ${metrics?.funnel.cierres_fe || 0} cierres${profitInputs?.softwareEstimated ? ` · software base ${profitInputs.softwareSourceMonth}` : ""}`} icon={Target} tone="orange" />
-          : <Stat label="CAC de pauta" value={cash?.cac == null ? "—" : money(cash.cac)} helper={`Pauta de esta cuenta ÷ ${metrics?.funnel.cierres_fe || 0} cierres FE`} icon={Target} tone="orange" />}
+        <Stat label="CAC integral" value={fullyLoadedCac == null ? "—" : money(fullyLoadedCac)} helper={`Ads ${money(cash?.ad_spend || 0)} + software ${money(profitInputs?.softwareCost || 0)} + comisiones ${money(commercialCommissions)} ÷ ${metrics?.funnel.cierres_fe || 0} cierres${profitInputs?.softwareEstimated ? ` · software base ${profitInputs.softwareSourceMonth}` : ""}`} icon={Target} tone="orange" />
         <Stat label="BECCU" value={money(cash?.beccu || 0)} helper="backend upfront" icon={CircleDollarSign} tone="violet" />
         <Stat label="BECCPP" value={money(cash?.beccpp || 0)} helper="backend payment plans" icon={Receipt} tone="blue" />
-        {effectiveAccountScope === "general" && <Stat label="Profit" value={profit == null ? "Pendiente" : money(profit)} helper={profit == null ? "faltan gastos/comisiones del mes" : `Cash − ${money((profitInputs?.expenses || 0) + (profitInputs?.commissions || 0))} de gastos y comisiones`} icon={TrendingUp} tone="emerald" />}
+        <Stat label="Profit" value={profit == null ? "Pendiente" : money(profit)} helper={profit == null ? "faltan gastos/comisiones del mes" : `Cash − ${money((profitInputs?.expenses || 0) + (profitInputs?.commissions || 0))} de gastos y comisiones`} icon={TrendingUp} tone="emerald" />
       </div></section>
     </> : isSalesManager ? <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Stat label="Cash del equipo" value={money(cash?.cc_total || 0)} helper="sin acceso a cierres o administración crítica" icon={CircleDollarSign} tone="emerald" />

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
-import { createSupabaseServer } from "@/lib/supabase-server"
 
 export const dynamic = "force-dynamic"
 
@@ -33,15 +32,8 @@ function normalize(row: Candidate): Record<string, any> {
   return { id: row.id, fingerprint: row.source_id, name: row.name, ...(row.metadata || {}), created_at: row.first_seen_at, updated_at: row.last_seen_at }
 }
 
-async function isCristianRestricted() {
-  const session = await createSupabaseServer()
-  const { data: { user } } = await session.auth.getUser()
-  return user?.email?.toLowerCase() === "user@example.invalid"
-}
-
 export async function GET(request: Request) {
   const admin = createSupabaseAdmin()
-  const cristianRestricted = await isCristianRestricted()
   const { searchParams } = new URL(request.url)
   if (searchParams.get("mode") === "clients") {
     const { data, error } = await admin
@@ -78,7 +70,6 @@ export async function GET(request: Request) {
     .eq("source", SOURCE)
     .eq("asset_type", "loom_consultation")
   let rows = (candidateRows || []).map((row) => normalize(row as Candidate))
-  if (cristianRestricted) rows = rows.filter((row) => row.content_account !== "PAUL")
   if (status) rows = rows.filter((row) => row.status === status)
   else rows = rows.filter((row) => row.status !== "discarded")
   if (category) rows = rows.filter((row) => row.category === category)
@@ -117,7 +108,7 @@ export async function GET(request: Request) {
   }
 
   const totals = { detected: 0, reviewed: 0, published: 0, discarded: 0, imported: 0, pending_edit: 0, edited: 0 }
-  for (const row of (candidateRows || []).map((item) => normalize(item as Candidate)).filter((row) => !cristianRestricted || row.content_account !== "PAUL")) {
+  for (const row of (candidateRows || []).map((item) => normalize(item as Candidate))) {
     const key = String(row.status || "detected") as keyof typeof totals
     if (key in totals) totals[key] += 1
     if (row.content_asset_id) totals.imported += 1
@@ -143,7 +134,6 @@ export async function PATCH(request: Request) {
     .eq("asset_type", "testimonial_candidate")
     .single()
   if (readError) return NextResponse.json({ error: readError.message }, { status: 404 })
-  if (await isCristianRestricted() && current.metadata?.content_account === "PAUL") return NextResponse.json({ error: "No autorizado" }, { status: 403 })
   const now = new Date().toISOString()
   let canonicalName = ""
   if (personId) {
@@ -188,9 +178,7 @@ export async function POST(request: Request) {
   const admin = createSupabaseAdmin()
   const body = await request.json()
   const id = String(body.id || "")
-  const account = body.content_account === "CRIS" ? "CRIS" : body.content_account === "PAUL" ? "PAUL" : null
-  if (!id || !account) return NextResponse.json({ error: "Elegí PAUL o CRIS" }, { status: 400 })
-  if (await isCristianRestricted() && account === "PAUL") return NextResponse.json({ error: "No autorizado" }, { status: 403 })
+  if (!id) return NextResponse.json({ error: "Falta el id del testimonio" }, { status: 400 })
   const { data: candidate, error: candidateError } = await admin
     .from("crm_integration_assets")
     .select("source_id,metadata")
@@ -201,7 +189,7 @@ export async function POST(request: Request) {
   if (candidateError || !candidate) return NextResponse.json({ error: "Testimonio no encontrado" }, { status: 404 })
   const metadata = candidate.metadata || {}
   if (metadata.content_asset_id) return NextResponse.json({ ok: true, already_imported: true, content_asset_id: metadata.content_asset_id })
-  const sourceKey = account === "PAUL" ? `manual:toro:paul:testimonial:${candidate.source_id}` : `manual:testimonial:cris:${candidate.source_id}`
+  const sourceKey = `manual:testimonial:${candidate.source_id}`
   const { data: existing } = await admin.from("crm_content_assets").select("id").eq("source_key", sourceKey).maybeSingle()
   let contentAssetId = existing?.id
   if (!contentAssetId) {
@@ -231,7 +219,6 @@ export async function POST(request: Request) {
         testimonial_candidate_id: id,
         person_id: metadata.person_id || null,
         client_name: metadata.speaker || null,
-        content_account: account,
         editing_status: "pending",
         loom_id: metadata.loom_id,
         start_seconds: start,
@@ -243,7 +230,7 @@ export async function POST(request: Request) {
   }
   const now = new Date().toISOString()
   const { error: updateError } = await admin.from("crm_integration_assets").update({
-    metadata: { ...metadata, content_asset_id: contentAssetId, content_account: account, edit_status: metadata.edit_status || "pending", imported_to_content_at: now },
+    metadata: { ...metadata, content_asset_id: contentAssetId, edit_status: metadata.edit_status || "pending", imported_to_content_at: now },
     last_seen_at: now,
   }).eq("id", id)
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })

@@ -76,13 +76,6 @@ function isRealMember(name: string): boolean {
   return Boolean(value) && !["sin", "sin setter", "sin asignar", "sin asignado", "no setter"].includes(value)
 }
 
-function paymentAccount(value: string | null | undefined): "paul" | "cristian" | null {
-  const normalized = stripAccents(String(value || "")).replace(/^@/, "")
-  if (normalized.includes("cuenta.principal") || normalized === "paul") return "paul"
-  if (normalized.includes("cristiansocial") || normalized === "cristian" || normalized === "cris") return "cristian"
-  return null
-}
-
 // Fees (FEE_TIPOS, lib/cash-collected.ts): mismo concepto que usa Carga de
 // Pagos / Pipeline para "seña". Back end upfront: lib/commission-scheme.ts.
 const BECCU_TIPOS = BECCU_TYPES
@@ -201,33 +194,6 @@ export async function GET(request: Request) {
       if (!firstFrontendPayment.has(key) && payment.fecha) firstFrontendPayment.set(key, payment.fecha)
     }
 
-    // La cuenta de origen vive en agendas, no en pagos. Para cada identidad se
-    // usa la agenda más reciente anterior al pago (fallback: la última conocida).
-    const accountHistory = new Map<string, Array<{ fecha: string; cuenta: string }>>()
-    for (let from = 0; ; from += 1000) {
-      const { data: page, error: accountError } = await sb
-        .from("agendas")
-        .select("person_id,telefono,nombre,cuenta,fecha_agenda")
-        .not("cuenta", "is", null)
-        .order("fecha_agenda", { ascending: true })
-        .range(from, from + 999)
-      if (accountError) return NextResponse.json({ error: accountError.message }, { status: 500 })
-      for (const agenda of page || []) {
-        const key = identityKey({ person_id: agenda.person_id, telefono: agenda.telefono, cliente: agenda.nombre })
-        const rows = accountHistory.get(key) || []
-        rows.push({ fecha: agenda.fecha_agenda || "", cuenta: agenda.cuenta || "" })
-        accountHistory.set(key, rows)
-      }
-      if (!page || page.length < 1000) break
-    }
-
-    function accountForPayment(payment: { person_id?: string | null; telefono?: string | null; cliente?: string | null; fecha?: string | null }) {
-      const rows = accountHistory.get(identityKey(payment)) || []
-      if (rows.length === 0) return null
-      const prior = rows.filter(row => !payment.fecha || !row.fecha || row.fecha <= payment.fecha)
-      return paymentAccount((prior.at(-1) || rows.at(-1))?.cuenta)
-    }
-
     // Conversaciones asignadas per setter
     const convAsigMap = new Map<string, number>()
     try {
@@ -252,12 +218,15 @@ export async function GET(request: Request) {
       strikesMap.set(firstWord(s.nombre), strikeMonth === month ? (s.count ?? 0) : 0)
     }
 
+    // cc_ponderado es igual a cc_total: EXPOSURE opera una sola cuenta
+    // (@alexmcarrera) y no pondera el cash por cuenta de negocio. Se conserva
+    // el campo porque el esquema legacy de niveles (pre agosto 2026) lo lee.
     type CM = {
-      cc_nuevo: number; cc_total: number; commission_base: number; cc_paul: number; cc_cristian: number; cc_ponderado: number; feccu: number; feccpp: number; unidades: number; fees: number
+      cc_nuevo: number; cc_total: number; commission_base: number; cc_ponderado: number; feccu: number; feccpp: number; unidades: number; fees: number
       llamadas: number; cerradas: number; total_ag: number; pres_ab: number; cerr_ab: number
     }
     type SM = {
-      cc_nuevo: number; cc_total: number; cc_paul: number; cc_cristian: number; cc_ponderado: number; feccu: number; feccpp: number; feccpp_excluido: number; unidades: number; fees: number
+      cc_nuevo: number; cc_total: number; cc_ponderado: number; feccu: number; feccpp: number; feccpp_excluido: number; unidades: number; fees: number
       agendas: number; agendas_ab: number; shows: number
     }
 
@@ -271,14 +240,13 @@ export async function GET(request: Request) {
     // El CEO también cierra. Debe permanecer visible en el ranking aun cuando
     // en el mes seleccionado todavía no tenga pagos o llamadas. El resto del
     // equipo aparece solo con actividad real en el mes (ver filtros abajo).
-    closerMap.set(CEO, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
+    closerMap.set(CEO, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
 
     for (const pago of pagos || []) {
       const closer = canonical(pago.closer || "")
       const setter = canonical(pago.setter || "")
       const monto = pago.monto || 0
       const tipo = pago.tipo || ""
-      const account = accountForPayment(pago)
       const cohort = frontendCohort(tipo)
       if (cohort === "FECCU") teamFeccu += monto
       if (cohort === "FECCPP") teamFeccpp += monto
@@ -297,12 +265,10 @@ export async function GET(request: Request) {
       if (CSM_NOMBRES.has(closer)) { csmCc += monto; continue }
 
       if (isRealMember(closer)) {
-        if (!closerMap.has(closer)) closerMap.set(closer, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
+        if (!closerMap.has(closer)) closerMap.set(closer, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
         const c = closerMap.get(closer)!
         c.cc_total += closerCommissionableCc
         c.commission_base += closerNetCommissionBase(closerCommissionableCc, pago.operacion, uses2026Scheme)
-        if (account === "paul") c.cc_paul += closerCommissionableCc
-        if (account === "cristian") c.cc_cristian += closerCommissionableCc
         c.cc_ponderado += closerCommissionableCc
         if (cohort === "FECCU") c.feccu += monto
         if (cohort === "FECCPP") c.feccpp += monto
@@ -312,11 +278,9 @@ export async function GET(request: Request) {
       }
 
       if (isRealMember(setter)) {
-        if (!setterMap.has(setter)) setterMap.set(setter, { cc_nuevo: 0, cc_total: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0 })
+        if (!setterMap.has(setter)) setterMap.set(setter, { cc_nuevo: 0, cc_total: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0 })
         const s = setterMap.get(setter)!
         s.cc_total += setterCommissionableCc
-        if (account === "paul") s.cc_paul += setterCommissionableCc
-        if (account === "cristian") s.cc_cristian += setterCommissionableCc
         s.cc_ponderado += setterCommissionableCc
         if (setterWindow && cohort === "FECCU") s.feccu += monto
         if (setterWindow && cohort === "FECCPP") s.feccpp += monto
@@ -334,7 +298,7 @@ export async function GET(request: Request) {
       const setter = canonical(ag.setter || "")
 
       if (isRealMember(closerNorm)) {
-        if (!closerMap.has(closerNorm)) closerMap.set(closerNorm, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
+        if (!closerMap.has(closerNorm)) closerMap.set(closerNorm, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
         const c = closerMap.get(closerNorm)!
         c.total_ag++
         if (ag.show) {
@@ -348,7 +312,7 @@ export async function GET(request: Request) {
       }
 
       if (isRealMember(setter)) {
-        if (!setterMap.has(setter)) setterMap.set(setter, { cc_nuevo: 0, cc_total: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0 })
+        if (!setterMap.has(setter)) setterMap.set(setter, { cc_nuevo: 0, cc_total: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0 })
         const s = setterMap.get(setter)!
         s.agendas++
         if (ag.show) {
@@ -376,7 +340,7 @@ export async function GET(request: Request) {
         const nextRate = d.cc_total < 40000 ? 11 : 12
         return {
           nombre, initials: getInitials(nombre),
-          cc_nuevo: round2(d.cc_nuevo), cc_total: round2(d.cc_total), cc_paul: round2(d.cc_paul), cc_cristian: round2(d.cc_cristian), cc_ponderado: round2(d.cc_ponderado),
+          cc_nuevo: round2(d.cc_nuevo), cc_total: round2(d.cc_total), cc_ponderado: round2(d.cc_ponderado),
           feccu: round2(d.feccu), feccpp: round2(d.feccpp), commissionable_cc: round2(d.commission_base),
           unidades: d.unidades, fees: d.fees, llamadas: d.llamadas, cerradas: d.cerradas,
           tasa_cierre: d.llamadas > 0 ? round2((d.unidades / d.llamadas) * 100) : 0,
@@ -405,7 +369,7 @@ export async function GET(request: Request) {
         const nextRate = d.cc_total < 25000 ? 5.5 : 6
         return {
           nombre, initials: getInitials(nombre),
-          cc_nuevo: round2(d.cc_nuevo), cc_total: round2(d.cc_total), cc_paul: round2(d.cc_paul), cc_cristian: round2(d.cc_cristian), cc_ponderado: round2(d.cc_ponderado),
+          cc_nuevo: round2(d.cc_nuevo), cc_total: round2(d.cc_total), cc_ponderado: round2(d.cc_ponderado),
           feccu: round2(d.feccu), feccpp: round2(d.feccpp), feccpp_excluido: round2(d.feccpp_excluido), commissionable_cc: round2(d.cc_total),
           unidades: d.unidades, fees: d.fees, agendas: d.agendas, agendas_ab: d.agendas_ab,
           t_agenda,

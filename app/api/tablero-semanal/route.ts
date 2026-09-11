@@ -13,7 +13,7 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-// Meta mensual vigente del negocio (USD Cash Collected). Cuenta A la cambia
+// Meta mensual vigente del negocio (USD Cash Collected). El CEO la cambia
 // cuando el negocio sostiene un nuevo nivel; hasta entonces es constante y
 // explícita, nunca inferida de datos históricos.
 const META_MENSUAL_USD = 50000

@@ -1,6 +1,6 @@
 # Exposure CRM
 
-El CRM de Paul (plantilla `crm-template-alex`) con el diseño y la capa de agentes de **Exposure OS**.
+La plantilla original de CRM (`crm-template-alex`) con el diseño y la capa de agentes de **Exposure OS**.
 Un solo producto: las funcionalidades del CRM (agendas, pipeline, pagos, cuotas, cobranza, clientes,
 métricas, equipo, comisiones, contenido, finanzas, calidad de datos, integraciones) con la piel de
 Exposure OS (raíl oscuro a la izquierda, papel cálido, oro como acento, Inter) y sus pantallas de
@@ -37,12 +37,12 @@ npx supabase@2.114.0 db push --password "<db-password.txt>"
 
 ### Ojo con el esquema base
 
-La plantilla de Paul trae 25 migraciones que **modifican** tablas que ninguna crea (`agendas`,
+La plantilla original trae 25 migraciones que **modifican** tablas que ninguna crea (`agendas`,
 `pagos`, `clientes`, `planes_pago`, `plan_pago_items`, `team_members`, `cuotas`, `gastos`, `payroll`…).
 El esquema original quedó afuera de la plantilla. `supabase/migrations/20260701000000_base_schema.sql`
 lo **reconstruye** a partir de cómo lo usa el código (tipos de `lib/supabase.ts`, rutas `/api`, y lo
 que las migraciones posteriores esperan: ids `uuid` en agendas/pagos/planes, `bigint` en clientes).
-Si Paul entrega el volcado real del esquema, conviene reemplazar ese archivo por el suyo.
+Si aparece el volcado real del esquema original, conviene reemplazar ese archivo por ese.
 
 Las migraciones originales se renombraron con versión única (`20260723000002_…`) porque Supabase no
 acepta dos migraciones con la misma versión, y se reordenaron por dependencia real (por ejemplo,
@@ -55,7 +55,7 @@ y su fila aprobada en `team_members`. Roles: CEO, Sales Manager, Manager MKT, Co
 Closer, Cobranzas, CSM, Editor. El resto del equipo puede pedir acceso desde `/solicitar-acceso` y el
 CEO lo aprueba en `/accesos`.
 
-En la plantilla original solo "Paul" o "Cristian" podían ser CEO efectivos; acá el CEO es quien
+En la plantilla original solo dos nombres fijos podían ser CEO efectivos; acá el CEO es quien
 figure con ese rol en `team_members`. Si se quiere limitar por nombre, cargar `CRM_CEO_NAMES` en `.env.local`.
 
 ## Qué es de Exposure OS y qué es del CRM
@@ -64,9 +64,9 @@ figure con ese rol en `team_members`. Si se quiere limitar por nombre, cargar `C
 |---|---|---|
 | Paleta, tipografía, tarjetas, fondo | Exposure OS | `app/globals.css` (tokens `:root`), `components/exposure/exposure.css` |
 | Raíl de navegación (escritorio) | Exposure OS | `components/exposure-rail.tsx` (lee los módulos de `components/crm-navigation.tsx`) |
-| Header + cajón (celular), ⌘K, Personalización | CRM de Paul | `components/crm-navigation.tsx` |
+| Header + cajón (celular), ⌘K, Personalización | Plantilla original | `components/crm-navigation.tsx` |
 | Pantallas "Sistema IA" | Exposure OS | `components/exposure/pages/*`, rutas `app/(dashboard)/sistema/*` |
-| Todo lo demás (38 pantallas, 70 rutas API, crons, integraciones) | CRM de Paul | `app/`, `lib/`, `supabase/` |
+| Todo lo demás (38 pantallas, 70 rutas API, crons, integraciones) | Plantilla original | `app/`, `lib/`, `supabase/` |
 
 **Las pantallas de Sistema IA muestran datos ficticios** (`components/exposure/data.ts`): son la maqueta
 de la capa de agentes, todavía sin conectar al CRM.

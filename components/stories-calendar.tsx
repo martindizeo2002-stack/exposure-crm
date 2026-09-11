@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { SALES_ANGLES } from "@/lib/sales-angles"
 
-type Account = "CRIS" | "PAUL"
 type StoryRow = {
   id: string; title: string; format: string | null; angle: string | null; planned_at: string | null
   day_of_week: string | null; status: string; source_url: string | null; metadata: Record<string, unknown> | null
@@ -62,18 +61,18 @@ function shortDate(value: string) {
   return new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "short" })
 }
 
-export function StoriesCalendar({ account, canEdit }: { account: Account; canEdit: boolean }) {
+export function StoriesCalendar({ canEdit }: { canEdit: boolean }) {
   const [offset, setOffset] = useState(0)
   const [editing, setEditing] = useState<StoryRow | null>(null)
   const [creating, setCreating] = useState(false)
   const range = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + offset * 7); return week(d) }, [offset])
-  const key = `/api/content-workspace?managed_only=1&content_account=${account}&content_kind=stories&start=${range.start}&end=${range.end}&limit=50`
+  const key = `/api/content-workspace?managed_only=1&content_kind=stories&start=${range.start}&end=${range.end}&limit=50`
   const { data, mutate, isLoading } = useSWR<Response>(key, fetcher)
 
   async function save(row: StoryRow | null, payload: Record<string, unknown>) {
     const response = await fetch("/api/content-workspace", {
       method: row ? "PATCH" : "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(row ? { id: row.id, ...payload } : { ...payload, content_account: account, content_type: "stories" }),
+      body: JSON.stringify(row ? { id: row.id, ...payload } : { ...payload, content_type: "stories" }),
     })
     const body = await response.json()
     if (!response.ok) return toast.error(body.error || "No se pudo guardar")
@@ -98,11 +97,11 @@ export function StoriesCalendar({ account, canEdit }: { account: Account; canEdi
         {row.metadata?.avatar ? <p className="mt-2 text-xs text-white/50">{String(row.metadata.avatar)}</p> : null}
         {row.angle ? <p className="mt-1 text-xs text-fuchsia-300">{row.angle}</p> : null}
       </button>)}</div>}
-    {(editing || creating) && <StoryDialog row={editing} account={account} onClose={() => { setEditing(null); setCreating(false) }} onSave={(payload) => save(editing, payload)} />}
+    {(editing || creating) && <StoryDialog row={editing} onClose={() => { setEditing(null); setCreating(false) }} onSave={(payload) => save(editing, payload)} />}
   </div>
 }
 
-function StoryDialog({ row, account, onClose, onSave }: { row: StoryRow | null; account: Account; onClose: () => void; onSave: (p: Record<string, unknown>) => void }) {
+function StoryDialog({ row, onClose, onSave }: { row: StoryRow | null; onClose: () => void; onSave: (p: Record<string, unknown>) => void }) {
   const [format, setFormat] = useState(row?.format || "Hand Raiser")
   const [avatar, setAvatar] = useState(String(row?.metadata?.avatar || ""))
   const [angle, setAngle] = useState(row?.angle || "")

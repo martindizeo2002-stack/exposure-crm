@@ -1,4 +1,4 @@
-// Scoring automático CRM (confirmado por Cuenta A 2026-08-04).
+// Scoring automático CRM (criterio confirmado el 2026-08-04).
 // Fuente exclusiva: respuestas literales del calendario/iClosed.
 
 export type ScoreInput = {

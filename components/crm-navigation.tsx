@@ -114,8 +114,7 @@ export function CRMNavigation({ rol = "", nombre = "", email = "" }: { rol?: str
   const [compact, setCompact] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
   const isManager = rol === "CEO" || rol === "Contaduria"
-  const isCristianContentOnly = email.trim().toLowerCase() === "user@example.invalid"
-  const visibleModules = modules.filter(item => (!item.roles || item.roles.includes(rol)) && (!isCristianContentOnly || item.href === "/" || item.href === "/contenido-angulos"))
+  const visibleModules = modules.filter(item => !item.roles || item.roles.includes(rol))
   const groups = GROUP_ORDER
     .map(label => ({ label, items: visibleModules.filter(item => item.group === label) }))
     .filter(group => group.items.length)
@@ -201,13 +200,13 @@ export function CRMNavigation({ rol = "", nombre = "", email = "" }: { rol?: str
             </SheetContent>
           </Sheet>
 
-          <Link href={isCristianContentOnly ? "/contenido-angulos" : "/asistente"} aria-label={isCristianContentOnly ? "Abrir Contenido Cris" : "Abrir Asistente CRM"} title={isCristianContentOnly ? "Contenido Cris" : "Asistente CRM"} className="flex shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
+          <Link href="/asistente" aria-label="Abrir Asistente CRM" title="Asistente CRM" className="flex shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
             <NavIcon ramp={ramps.logo} size={34} radius={11}><Sparkles size={18} strokeWidth={2} /></NavIcon>
             <span className="hidden text-[13px] font-extrabold tracking-[.08em] sm:inline">Exposure OS</span>
           </Link>
 
           <button onClick={() => setSearchOpen(true)} className="hidden max-w-[300px] flex-1 items-center gap-2 rounded-full border border-[#202027] bg-[#121216] px-3 py-1.5 text-left text-[12px] font-semibold text-[#6f6f79] transition-colors hover:border-[#303039] min-[600px]:flex min-[900px]:max-[1399px]:max-w-[200px]">
-            <Search size={17} /><span className="truncate">{isCristianContentOnly ? "Buscar en Contenido…" : "Buscar cliente, agenda, pago…"}</span>
+            <Search size={17} /><span className="truncate">Buscar cliente, agenda, pago…</span>
             <span className="ml-auto rounded-md border border-[#26262e] bg-[#1c1c22] px-1.5 text-[11px] text-[#8c8c96]">⌘K</span>
           </button>
 
@@ -238,17 +237,17 @@ export function CRMNavigation({ rol = "", nombre = "", email = "" }: { rol?: str
     </header>
 
     <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
-      <CommandInput placeholder={isCristianContentOnly ? "Buscar en Contenido…" : "Buscar una sección, cliente, agenda o pago…"} />
+      <CommandInput placeholder="Buscar una sección, cliente, agenda o pago…" />
       <CommandList>
         <CommandEmpty>No encontramos resultados.</CommandEmpty>
         <CommandGroup heading="Secciones">
           {visibleModules.map(item => <CommandItem key={item.href} value={`${item.label} ${item.group}`} onSelect={() => navigate(item.href)}><item.icon className="mr-2 h-4 w-4" />{item.label}</CommandItem>)}
         </CommandGroup>
-        {!isCristianContentOnly && <CommandGroup heading="Buscar datos">
+        <CommandGroup heading="Buscar datos">
           <CommandItem onSelect={() => navigate("/clientes-hub")}><UserRound className="mr-2 h-4 w-4" />Buscar clientes</CommandItem>
           <CommandItem onSelect={() => navigate("/ventas")}><UsersRound className="mr-2 h-4 w-4" />Buscar agendas</CommandItem>
           <CommandItem onSelect={() => navigate("/pagos")}><CircleDollarSign className="mr-2 h-4 w-4" />Buscar pagos</CommandItem>
-        </CommandGroup>}
+        </CommandGroup>
       </CommandList>
     </CommandDialog>
     <PreferencesDialog open={settingsOpen} onOpenChange={setSettingsOpen} theme={theme || "light"} setTheme={setTheme} />

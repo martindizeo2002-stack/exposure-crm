@@ -182,7 +182,7 @@ export async function POST(request: Request) {
               fecha_lead: argentinaWallTime(call.createdAt),
               fecha_closer: fechaCloser,
               closer,
-              cuenta: "@cristiansocial",
+              cuenta: "@alexmcarrera",
               setter: null,
               fuente: "Instagram",
               calificacion: score?.calificacion || null,

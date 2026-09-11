@@ -91,10 +91,9 @@ function normalizeVolumenVal(field: string, raw: unknown): string {
   const v = (raw || "").toString().trim()
   if (field === "cuenta") {
     if (!v || v === "-" || v === "No se le envió") return SIN
-    const low = v.toLowerCase()
-    if (low.includes("cristian") || low.includes("cris")) return "EXPOSURE (@alexmcarrera)"
-    if (low.includes("paul")) return "EXPOSURE (@alexmcarrera)"
-    return v
+    // EXPOSURE opera una sola cuenta: todo lo cargado en "cuenta" se agrupa
+    // bajo la cuenta real del negocio (misma regla que en metricas/route.ts).
+    return "EXPOSURE (@alexmcarrera)"
   }
   if (field === "ocupacion" || field === "manychat") {
     if (!v || v === "-" || v === "No se le envió") return "No se le envió"

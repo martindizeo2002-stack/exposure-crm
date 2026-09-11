@@ -20,7 +20,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type CloserData = {
   nombre: string; initials: string
-  cc_nuevo: number; cc_total: number; cc_paul: number; cc_cristian: number; cc_ponderado: number; unidades: number; fees: number
+  cc_nuevo: number; cc_total: number; cc_ponderado: number; unidades: number; fees: number
   llamadas: number; cerradas: number; tasa_cierre: number; tc_ab: number; aov: number; show_up: number
   feccu: number; feccpp: number; commissionable_cc: number
   nivel: 1 | 2 | 3; rate: number; unlocked_rate: number; strikes: number; comisiones: number
@@ -28,7 +28,7 @@ type CloserData = {
 }
 type SetterData = {
   nombre: string; initials: string
-  cc_nuevo: number; cc_total: number; cc_paul: number; cc_cristian: number; cc_ponderado: number; unidades: number; fees: number
+  cc_nuevo: number; cc_total: number; cc_ponderado: number; unidades: number; fees: number
   agendas: number; agendas_ab: number; t_agenda: number | null; show_up: number
   feccu: number; feccpp: number; feccpp_excluido: number; commissionable_cc: number
   nivel: 1 | 2 | 3; rate: number; unlocked_rate: number; strikes: number; comisiones: number
@@ -345,8 +345,6 @@ export default function EquipoPage() {
 
   const closerTotals = useMemo(() => ({
     cc_total: closers.reduce((s, c) => s + c.cc_total, 0),
-    cc_paul: closers.reduce((s, c) => s + c.cc_paul, 0),
-    cc_cristian: closers.reduce((s, c) => s + c.cc_cristian, 0),
     cc_ponderado: closers.reduce((s, c) => s + c.cc_ponderado, 0),
     unidades: closers.reduce((s, c) => s + c.unidades, 0),
     fees: closers.reduce((s, c) => s + c.fees, 0),
@@ -356,8 +354,6 @@ export default function EquipoPage() {
 
   const setterTotals = useMemo(() => ({
     cc_total: setters.reduce((s, c) => s + c.cc_total, 0),
-    cc_paul: setters.reduce((s, c) => s + c.cc_paul, 0),
-    cc_cristian: setters.reduce((s, c) => s + c.cc_cristian, 0),
     unidades: setters.reduce((s, c) => s + c.unidades, 0),
     fees: setters.reduce((s, c) => s + c.fees, 0),
     agendas: setters.reduce((s, c) => s + c.agendas, 0),

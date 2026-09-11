@@ -2,15 +2,9 @@ export const CRM_ROLES = ["CEO", "Sales Manager", "Manager MKT", "Contaduria", "
 
 export type CRMRole = (typeof CRM_ROLES)[number]
 
-export const CRISTIAN_CONTENT_EMAIL = "user@example.invalid"
-
-export function isCristianContentOnly(email: string | null | undefined) {
-  return String(email || "").trim().toLowerCase() === CRISTIAN_CONTENT_EMAIL
-}
-
 // El rol efectivo sale de team_members tal cual. La plantilla original
-// degradaba a "Sales Manager" a cualquier CEO que no fuera Paul o Cristian;
-// en esta operación el CEO es quien figure con ese rol en team_members.
+// degradaba a "Sales Manager" a cualquier CEO que no figurara como dueño en
+// la plantilla original; en esta operación el CEO es quien figure con ese rol en team_members.
 // Si se quiere limitar el CEO a nombres concretos, cargarlos en CRM_CEO_NAMES
 // (separados por coma) y el resto de los CEO pasa a Sales Manager.
 export function effectiveCRMRole(role: string | null | undefined, name?: string | null) {
@@ -124,17 +118,11 @@ function allowed(pathname: string, role: string | null | undefined, rules: Array
   return rule ? rule[1].includes(role as CRMRole) : defaultAllowed
 }
 
-export function canAccessPage(pathname: string, role: string | null | undefined, email?: string | null) {
-  if (isCristianContentOnly(email)) {
-    return pathname === "/" || pathname === "/contenido-angulos" || pathname === "/sop-crm"
-  }
+export function canAccessPage(pathname: string, role: string | null | undefined) {
   return allowed(pathname, role, pageRules)
 }
 
-export function canAccessApi(pathname: string, role: string | null | undefined, method = "GET", email?: string | null) {
-  if (isCristianContentOnly(email)) {
-    return pathname === "/api/content-workspace" || pathname === "/api/content-script-generator" || pathname === "/api/metricas" || pathname === "/api/home-ceo-profit"
-  }
+export function canAccessApi(pathname: string, role: string | null | undefined, method = "GET") {
   if (role === "Editor" && pathname === "/api/content-workspace") {
     return ["GET", "PATCH"].includes(method.toUpperCase())
   }
@@ -150,8 +138,8 @@ export function canAccessApi(pathname: string, role: string | null | undefined, 
     if (pathname === "/api/cobranza" || pathname === "/api/cobranza/resolver") return verb === "POST"
     return false
   }
-  // Borrados permanentes y administración de identidad quedan reservados a
-  // Cuenta A/Cuenta B (rol CEO canónico), aunque un manager tenga acceso operativo.
+  // Borrados permanentes y administración de identidad quedan reservados al
+  // CEO (rol canónico), aunque un manager tenga acceso operativo.
   // DELETE /api/pagos es una excepción semántica: nunca borra la fila, solo la
   // archiva con actor, fecha y motivo para conservar la trazabilidad.
   if (method.toUpperCase() === "DELETE") {
@@ -161,8 +149,7 @@ export function canAccessApi(pathname: string, role: string | null | undefined, 
   return allowed(pathname, role, apiRules)
 }
 
-export function homeForRole(role: string | null | undefined, email?: string | null) {
-  if (isCristianContentOnly(email)) return "/contenido-angulos"
+export function homeForRole(role: string | null | undefined) {
   if (role === "Manager MKT" || role === "Editor") return "/contenido-angulos"
   if (role === "Sales Manager") return "/"
   if (role === "Contaduria") return "/recordatorios"

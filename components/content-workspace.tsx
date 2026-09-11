@@ -22,7 +22,7 @@ import { useSession } from "@/components/session-provider"
 import { SALES_ANGLES } from "@/lib/sales-angles"
 import { StoriesCalendar } from "@/components/stories-calendar"
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter"
-import { PAUL_RECORDING_WINDOW } from "@/lib/paul-recording-window"
+import { RECORDING_WINDOW } from "@/lib/recording-window"
 import { formatSuggestionAt } from "@/lib/content-format-rotation"
 
 const fetcher = (url: string) => fetch(url).then(async (r) => {
@@ -70,13 +70,10 @@ function statusMeta(status: string) {
 }
 
 const STATUS_OPTIONS = ["idea", "guion_listo", "para_grabar", "grabado", "publicado"]
-const PAUL_REEL_STATUS_OPTIONS = ["idea", "grabado", "edicion", "completo"]
+const REEL_STATUS_OPTIONS = ["idea", "grabado", "edicion", "completo"]
 const RESPONSABLE_OPTIONS = ["SIN ASIGNAR", "ALEX", "NAHUEL", "EDITOR", "MAXIMO"]
-// EXPOSURE opera una sola cuenta: la lista es la misma para cualquier content_account guardado.
-const CRIS_RESPONSABLE_OPTIONS = RESPONSABLE_OPTIONS
-// Quién graba los reels de "Grabar ya". "PAUL" queda por las filas históricas
-// de la plantilla; las nuevas se asignan a ALEX.
-const RECORDING_ASSIGNEES = ["PAUL", "ALEX"]
+// Quién graba los reels de "Grabar ya".
+const RECORDING_ASSIGNEES = ["ALEX"]
 // Catálogo base propio de Preview. No puede depender solo de las piezas que
 // existan hoy: una migración o un archivado nunca debe borrar opciones.
 const OFFICIAL_FORMAT_OPTIONS = [
@@ -99,7 +96,7 @@ function canonicalFormatLabel(value: string) {
 function automaticTitle(angle: string, rawTitle: string, plannedAt: string) {
   const code = (angle.match(/^[A-Z]*\d+/i)?.[0] || "PIEZA").toUpperCase()
   const date = plannedAt.slice(0, 10).split("-").reverse().join("-")
-  const generic = /^(VIDEO (DE )?(CRISTIAN|PAUL|ALEX)|REEL)(\s*[—-]\s*SLOT\s*\d+)?$/i
+  const generic = /^(VIDEO (DE )?ALEX|REEL)(\s*[—-]\s*SLOT\s*\d+)?$/i
   const cleaned = rawTitle.replace(/^([A-Z]*\d+)\s*[-—·]\s*/i, "").replace(/\s*[-—·]\s*\d{2}[-/]\d{2}[-/]\d{2,4}$/i, "").trim()
   const descriptor = (generic.test(cleaned) || !cleaned ? angle.replace(/^[A-Z]*\d+\s*[·—-]\s*/i, "") : cleaned)
     .split(/\s+/).filter(Boolean).slice(0, 4).join(" ").toUpperCase() || "SIN CONCEPTO"
@@ -118,10 +115,9 @@ function hasNoAngle(format: string | null | undefined) {
   return isClipFormat(format) || /TESTIMONIO/i.test(String(format || ""))
 }
 
-function isPaulReel(row: ContentRow) {
+function isReel(row: ContentRow) {
   const slot = Number(row.metadata?.slot)
-  return row.metadata?.content_account === "PAUL"
-    && !/HISTORIA|STORY/i.test(`${row.format || ""} ${row.platform || ""} ${row.title || ""} ${String(row.metadata?.content_type || "")}`)
+  return !/HISTORIA|STORY/i.test(`${row.format || ""} ${row.platform || ""} ${row.title || ""} ${String(row.metadata?.content_type || "")}`)
     && ((slot >= 7 && slot <= 9) || /REEL/i.test(row.title || ""))
 }
 
@@ -139,10 +135,6 @@ function contentPieceKind(row: ContentRow) {
 }
 
 function contentCardBorder(row: ContentRow) {
-  const isPaul = row.metadata?.content_account === "PAUL" || row.source_key.startsWith("manual:toro:paul:")
-  const date = String(row.planned_at || "").slice(0, 10)
-  const isCrisSeptemberCompletion = row.metadata?.content_account === "CRIS" && date >= "2026-09-14" && date <= "2026-09-30"
-  if (!isPaul && !isCrisSeptemberCompletion) return "border-white/[.08] hover:border-white/20"
   return {
     VOLUMEN: "border-emerald-400/70 hover:border-emerald-300",
     ESTRATEGIA: "border-red-400/70 hover:border-red-300",
@@ -193,13 +185,11 @@ function formatWeekLabel(iso: string) {
 
 export function ContentWorkspace() {
   const session = useSession()
-  const isCristianRestricted = session.email.toLowerCase() === "user@example.invalid"
   const searchParams = useSearchParams()
   const canEdit = session.email !== "preview@yin-yang.local"
   const canCreateOrDelete = canEdit && session.rol !== "Editor"
   const initialRecordingView = searchParams.get("view") === "grabar"
   const [view, setView] = useState<"semana" | "stories" | "grabar" | "biblioteca">(initialRecordingView ? "grabar" : "semana")
-  const [contentAccount, setContentAccount] = useState<"CRIS" | "PAUL">("PAUL")
   const [weekOffset, setWeekOffset] = useState(0)
   const [editing, setEditing] = useState<ContentRow | null>(null)
   const [creating, setCreating] = useState(false)
@@ -216,15 +206,15 @@ export function ContentWorkspace() {
 
   // Vista "Esta semana": solo piezas gestionables del workspace (manual +
   // planificador importado), no el árbol de páginas stub de Notion.
-  const weekKey = `/api/content-workspace?managed_only=1&content_account=${contentAccount}&content_kind=feed&start=${start}&end=${end}&limit=200`
+  const weekKey = `/api/content-workspace?managed_only=1&content_kind=feed&start=${start}&end=${end}&limit=200`
   const { data: weekData, isLoading: weekLoading, mutate: mutateWeek } = useSWR<ApiResponse>(
     view === "semana" ? weekKey : null, fetcher,
   )
 
   // Ventana operativa manual: solo cambia cuando edición confirma que el próximo
   // bloque está listo. No depende del calendario ni modifica filas.
-  const recordingWindow = PAUL_RECORDING_WINDOW
-  const recordingKey = `/api/content-workspace?managed_only=1&content_account=PAUL&content_kind=feed&start=${recordingWindow.start}&end=${recordingWindow.end}&limit=200`
+  const recordingWindow = RECORDING_WINDOW
+  const recordingKey = `/api/content-workspace?managed_only=1&content_kind=feed&start=${recordingWindow.start}&end=${recordingWindow.end}&limit=200`
   const { data: recordingData, isLoading: recordingLoading, mutate: mutateRecording } = useSWR<ApiResponse>(
     view === "grabar" ? recordingKey : null, fetcher,
   )
@@ -236,17 +226,11 @@ export function ContentWorkspace() {
   const [libQuery, setLibQuery] = useState("")
   const targetContentAssetId = searchParams.get("content_asset_id")
   useEffect(() => {
-    if (isCristianRestricted) {
-      if (view === "grabar") setView("semana")
-      return
-    }
     if (searchParams.get("source") !== "testimonios") return
-    // EXPOSURE opera una sola cuenta: cualquier content_account pedido cae en la misma vista.
     setView("biblioteca")
-    setContentAccount("PAUL")
     setLibQuery(targetContentAssetId ? "" : "TESTIMONIO")
-  }, [isCristianRestricted, searchParams, targetContentAssetId, view])
-  const libParams = new URLSearchParams({ managed_only: "1", content_account: contentAccount, content_kind: "feed", limit: "300" })
+  }, [searchParams, targetContentAssetId])
+  const libParams = new URLSearchParams({ managed_only: "1", content_kind: "feed", limit: "300" })
   if (targetContentAssetId) libParams.set("content_asset_id", targetContentAssetId)
   if (libAngle) libParams.set("angle", libAngle)
   if (libAssignee.length) libParams.set("assigned_to", libAssignee.join(","))
@@ -300,11 +284,11 @@ export function ContentWorkspace() {
   const [markingRecordedId, setMarkingRecordedId] = useState<string | null>(null)
   const recordingRows = useMemo(() => {
     return (recordingData?.rows || []).filter((row) => {
-      return isPaulReel(row) && row.status !== "grabado" && RECORDING_ASSIGNEES.includes(row.assigned_to || "")
+      return isReel(row) && row.status !== "grabado" && RECORDING_ASSIGNEES.includes(row.assigned_to || "")
     }).sort((a, b) => `${a.planned_at || ""}-${Number(a.metadata?.slot || 0)}`.localeCompare(`${b.planned_at || ""}-${Number(b.metadata?.slot || 0)}`))
   }, [recordingData?.rows])
   const editingRows = useMemo(
-    () => (recordingData?.rows || []).filter((row) => isPaulReel(row) && RECORDING_ASSIGNEES.includes(row.assigned_to || "") && ["grabado", "edicion"].includes(row.status)),
+    () => (recordingData?.rows || []).filter((row) => isReel(row) && RECORDING_ASSIGNEES.includes(row.assigned_to || "") && ["grabado", "edicion"].includes(row.status)),
     [recordingData?.rows],
   )
   const recordingGroups = useMemo(() => ({
@@ -393,10 +377,10 @@ export function ContentWorkspace() {
         <span className="rounded-xl bg-fuchsia-400 px-4 py-2.5 text-xs font-black text-zinc-950">CONTENIDO EXPOSURE</span>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className={cn("grid w-full max-w-3xl gap-1.5 rounded-2xl border border-white/10 bg-white/[.035] p-1.5 sm:w-auto", isCristianRestricted ? "grid-cols-3" : "grid-cols-4")}>
+        <div className="grid w-full max-w-3xl grid-cols-4 gap-1.5 rounded-2xl border border-white/10 bg-white/[.035] p-1.5 sm:w-auto">
           <button onClick={() => setView("semana")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "semana" ? "bg-white text-zinc-950 shadow dark:bg-white/[.14] dark:text-white" : "text-muted-foreground hover:bg-white/[.06]")}>Esta semana</button>
           <button onClick={() => setView("stories")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "stories" ? "bg-fuchsia-500 text-white shadow" : "text-muted-foreground hover:bg-white/[.06]")}>Calendario Stories</button>
-          {!isCristianRestricted && <button onClick={() => { setContentAccount("PAUL"); setWeekOffset(0); setView("grabar") }} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "grabar" ? "bg-red-500 text-white shadow shadow-red-500/25" : "text-muted-foreground hover:bg-white/[.06]")}><Play className="mr-1 inline h-3.5 w-3.5" />Grabar ya</button>}
+          <button onClick={() => { setWeekOffset(0); setView("grabar") }} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "grabar" ? "bg-red-500 text-white shadow shadow-red-500/25" : "text-muted-foreground hover:bg-white/[.06]")}><Play className="mr-1 inline h-3.5 w-3.5" />Grabar ya</button>
           <button onClick={() => setView("biblioteca")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "biblioteca" ? "bg-white text-zinc-950 shadow dark:bg-white/[.14] dark:text-white" : "text-muted-foreground hover:bg-white/[.06]")}>Biblioteca / Calendario</button>
         </div>
         {view === "stories" ? null : canCreateOrDelete ? (
@@ -438,13 +422,13 @@ export function ContentWorkspace() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Buscar en título o guion…" className="pl-9" value={libQuery} onChange={(e) => setLibQuery(e.target.value)} />
           </div>
-          <MultiSelectFilter values={libAssignee} options={contentAccount === "PAUL" ? RESPONSABLE_OPTIONS : CRIS_RESPONSABLE_OPTIONS} onChange={setLibAssignee} />
+          <MultiSelectFilter values={libAssignee} options={RESPONSABLE_OPTIONS} onChange={setLibAssignee} />
           <MultiSelectFilter values={libStatus} options={STATUS_OPTIONS} onChange={setLibStatus} />
         </div>
       )}
 
       {view === "stories" ? (
-        <StoriesCalendar account={contentAccount} canEdit={canCreateOrDelete} />
+        <StoriesCalendar canEdit={canCreateOrDelete} />
       ) : view === "grabar" && !isLoading ? (
         <div className="space-y-4">
           <div className="rounded-[24px] border border-red-500/20 bg-gradient-to-br from-red-500/10 via-black/20 to-fuchsia-500/10 p-4 sm:p-5">
@@ -510,10 +494,10 @@ export function ContentWorkspace() {
       ) : (
         <div className="space-y-4">
           {grouped.map(([dateKey, items]) => {
-            const paulReels = contentAccount === "PAUL" ? items.filter(isPaulReel) : []
-            const editingItems = contentAccount === "PAUL" ? items.filter((row) =>
+            const reels = items.filter(isReel)
+            const editingItems = items.filter((row) =>
               ["VOLUMEN", "CARRUSEL", "TESTIMONIO"].includes(contentPieceKind(row)),
-            ) : []
+            )
             return (
             <div key={dateKey} className="rounded-[22px] border border-white/10 bg-white/[.03] p-4">
               <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-white/50">
@@ -521,28 +505,22 @@ export function ContentWorkspace() {
                 {dateKey === "sin-fecha" ? "Sin fecha" : formatDay(dateKey)}
                 {dateKey !== "sin-fecha" && <span className="normal-case tracking-normal text-white/30">· {formatWeekLabel(dateKey)}</span>}
               </div>
-              {contentAccount === "PAUL" ? (
-                <div className="space-y-3">
-                  <section className="rounded-2xl border border-white/10 bg-black/20">
-                    <div className="px-4 py-3 text-xs font-black uppercase tracking-wider text-white/60">
-                      EDICIÓN · {editingItems.filter((r) => contentPieceKind(r) === "VOLUMEN").length} Volumen · {editingItems.filter((r) => contentPieceKind(r) === "CARRUSEL").length} Carruseles · {editingItems.filter((r) => contentPieceKind(r) === "TESTIMONIO").length} Testimonio
-                    </div>
-                    <div className="grid gap-2.5 border-t border-white/10 p-3 md:grid-cols-2 xl:grid-cols-3">
-                      {editingItems.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} />)}
-                    </div>
-                  </section>
-                  <div>
-                    <p className="mb-2 px-1 text-xs font-black uppercase tracking-wider text-fuchsia-300">ALEX · {paulReels.length} reels para grabar</p>
-                    <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-                      {paulReels.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} detailed />)}
-                    </div>
+              <div className="space-y-3">
+                <section className="rounded-2xl border border-white/10 bg-black/20">
+                  <div className="px-4 py-3 text-xs font-black uppercase tracking-wider text-white/60">
+                    EDICIÓN · {editingItems.filter((r) => contentPieceKind(r) === "VOLUMEN").length} Volumen · {editingItems.filter((r) => contentPieceKind(r) === "CARRUSEL").length} Carruseles · {editingItems.filter((r) => contentPieceKind(r) === "TESTIMONIO").length} Testimonio
+                  </div>
+                  <div className="grid gap-2.5 border-t border-white/10 p-3 md:grid-cols-2 xl:grid-cols-3">
+                    {editingItems.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} />)}
+                  </div>
+                </section>
+                <div>
+                  <p className="mb-2 px-1 text-xs font-black uppercase tracking-wider text-fuchsia-300">ALEX · {reels.length} reels para grabar</p>
+                  <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                    {reels.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} detailed />)}
                   </div>
                 </div>
-              ) : (
-                <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-                  {items.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} />)}
-                </div>
-              )}
+              </div>
             </div>
           )})}
         </div>
@@ -573,7 +551,6 @@ export function ContentWorkspace() {
           formatOptions={formatOptionsData?.formats || []}
           onClose={() => setCreating(false)}
           onSave={(payload) => saveRow(null, payload)}
-          contentAccount={contentAccount}
         />
       )}
     </div>
@@ -591,7 +568,7 @@ function ContentCalendarCard({ row, onOpen, detailed = false }: { row: ContentRo
         {row.format && <Badge variant="outline" className="text-white/55">{row.format}</Badge>}
         <Badge variant="outline" className={cn("ml-auto gap-1", meta.tone)}><StatusIcon className="h-3 w-3" />{meta.label}</Badge>
       </div>
-      {(row.metadata?.content_account !== "PAUL" || contentPieceKind(row) !== "ESTRATEGIA") && <p className="line-clamp-2 text-sm font-bold leading-5">{row.title}</p>}
+      {contentPieceKind(row) !== "ESTRATEGIA" && <p className="line-clamp-2 text-sm font-bold leading-5">{row.title}</p>}
       {detailed && (
         <div className="space-y-2 text-xs text-white/55">
           <div className="whitespace-pre-line break-words rounded-xl border border-white/10 bg-white/[.03] p-2.5">{row.script_text || "Bullets pendientes"}</div>
@@ -653,7 +630,7 @@ function RecordingPieceDialog({ row, busy, canEdit, onClose, onRecorded }: { row
 }
 
 function ContentEditDialog({
-  row, formatOptions, onClose, onSave, onDelete, forceReadOnly = false, allowGenerator = true, contentAccount = "PAUL",
+  row, formatOptions, onClose, onSave, onDelete, forceReadOnly = false, allowGenerator = true,
 }: {
   row: ContentRow | null
   formatOptions: string[]
@@ -662,10 +639,8 @@ function ContentEditDialog({
   onDelete?: () => void
   forceReadOnly?: boolean
   allowGenerator?: boolean
-  contentAccount?: "CRIS" | "PAUL"
 }) {
   const readOnly = forceReadOnly || (!!row && !isManaged(row.source_key))
-  const isPaul = contentAccount === "PAUL" || row?.metadata?.content_account === "PAUL"
   const initialStage = String(row?.metadata?.funnel_stage || "")
   const [formatOpen, setFormatOpen] = useState(false)
   const [formatQuery, setFormatQuery] = useState("")
@@ -676,7 +651,7 @@ function ContentEditDialog({
     angle: row?.angle || "",
     format: row?.format || "",
     platform: row?.platform || "",
-    assigned_to: row?.assigned_to || (isPaul ? "SIN ASIGNAR" : ""),
+    assigned_to: row?.assigned_to || "SIN ASIGNAR",
     status: row?.status || "idea",
     planned_at: row?.planned_at?.slice(0, 10) || "",
     awareness_level: row?.awareness_level || "",
@@ -705,8 +680,8 @@ function ContentEditDialog({
     setFormatOpen(false)
   }
   const chooseAwarenessLevel = (level: string) => {
-    if (!row && isPaul && !form.format && typeof window !== "undefined") {
-      const storageKey = `content-format-rotation:paul:${level}`
+    if (!row && !form.format && typeof window !== "undefined") {
+      const storageKey = `content-format-rotation:${level}`
       const cursor = Number.parseInt(window.localStorage.getItem(storageKey) || "0", 10) || 0
       const suggestion = formatSuggestionAt(level, cursor)
       setForm((current) => ({ ...current, awareness_level: level, format: suggestion || current.format }))
@@ -720,8 +695,8 @@ function ContentEditDialog({
   const isCarousel = /CARRUSEL/i.test(form.format)
   const isTestimony = /TESTIMONIO/i.test(form.format)
   const isNicheVideo = /MOFU|BOFU/.test(form.funnel_stage) || /MOFU|BOFU/i.test(form.format)
-  const statusOptions = row && isPaulReel(row) ? PAUL_REEL_STATUS_OPTIONS : STATUS_OPTIONS
-  const reel = !!row && isPaulReel(row)
+  const statusOptions = row && isReel(row) ? REEL_STATUS_OPTIONS : STATUS_OPTIONS
+  const reel = !!row && isReel(row)
   const payload = (status = form.status) => ({
     title: reel ? automaticTitle(form.angle, form.title, form.planned_at) : form.title,
     angle: noAngle ? "" : form.angle,
@@ -729,7 +704,6 @@ function ContentEditDialog({
     status, planned_at: form.planned_at, awareness_level: form.awareness_level,
     script_text: form.script_text, insight_notes: form.insight_notes, cta: form.cta, source_url: form.source_url,
     funnel_stage: isVolume ? "TOFU" : (isTestimony ? "" : form.funnel_stage),
-    content_account: contentAccount,
   })
 
   async function generateScript() {
@@ -748,7 +722,7 @@ function ContentEditDialog({
           format: form.format,
           funnel_stage: form.funnel_stage,
           awareness_level: form.awareness_level,
-          assigned_to: form.assigned_to || (isPaul ? "SIN ASIGNAR" : "ALEX"),
+          assigned_to: form.assigned_to || "SIN ASIGNAR",
           source_url: form.source_url,
         }),
       })
@@ -758,7 +732,7 @@ function ContentEditDialog({
         ...current,
         title: automaticTitle(current.angle, output.title || current.title, current.planned_at),
         format: current.format || output.format || "Talking Head",
-        assigned_to: current.assigned_to || (isPaul ? "SIN ASIGNAR" : "ALEX"),
+        assigned_to: current.assigned_to || "SIN ASIGNAR",
         status: "guion_listo",
         awareness_level: output.awareness_level || current.awareness_level,
         script_text: output.script_text || current.script_text,
@@ -909,7 +883,7 @@ function ContentEditDialog({
               <Label>Responsable</Label>
               <Select disabled={readOnly} value={form.assigned_to} onValueChange={set("assigned_to")}>
                 <SelectTrigger><SelectValue placeholder="SIN ASIGNAR" /></SelectTrigger>
-                <SelectContent>{(isPaul ? RESPONSABLE_OPTIONS : CRIS_RESPONSABLE_OPTIONS).map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                <SelectContent>{RESPONSABLE_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>

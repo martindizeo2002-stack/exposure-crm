@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
-import { canAccessApi, canAccessPage, effectiveCRMRole, homeForRole, isCristianContentOnly } from "@/lib/role-access"
+import { canAccessApi, canAccessPage, effectiveCRMRole, homeForRole } from "@/lib/role-access"
 
 // Estas rutas tienen autenticacion propia y no dependen de una sesion web:
 // - ingest/* valida x-ingest-key dentro de cada handler.
@@ -100,19 +100,8 @@ export async function middleware(request: NextRequest) {
   const member = await approvedMember(user.email)
   if (member.configurationError) return pathname.startsWith("/api/") ? apiError("No se pudo validar el acceso", 503) : NextResponse.redirect(new URL("/pendiente", request.url))
   if (!member.ok) return pathname.startsWith("/api/") ? apiError("Acceso pendiente o no autorizado", 403) : NextResponse.redirect(new URL("/pendiente", request.url))
-  if (pathname.startsWith("/api/") && !canAccessApi(pathname, member.role, request.method, user.email)) return apiError("Tu cuenta no tiene acceso a este módulo", 403)
-  if (!pathname.startsWith("/api/") && !canAccessPage(pathname, member.role, user.email)) return NextResponse.redirect(new URL(homeForRole(member.role, user.email), request.url))
-
-  // Cuenta B puede consultar el Home, pero las APIs comerciales quedan
-  // forzadas del lado servidor a Cuenta de Cris. No depende del selector ni
-  // de parámetros manipulables en el navegador.
-  if (isCristianContentOnly(user.email) && ["/api/metricas", "/api/home-ceo-profit"].includes(pathname)) {
-    const restrictedUrl = request.nextUrl.clone()
-    restrictedUrl.searchParams.set("account", "cris")
-    const restrictedResponse = NextResponse.rewrite(restrictedUrl)
-    restrictedResponse.headers.set("Cache-Control", "private, no-store, max-age=0")
-    return restrictedResponse
-  }
+  if (pathname.startsWith("/api/") && !canAccessApi(pathname, member.role, request.method)) return apiError("Tu cuenta no tiene acceso a este módulo", 403)
+  if (!pathname.startsWith("/api/") && !canAccessPage(pathname, member.role)) return NextResponse.redirect(new URL(homeForRole(member.role), request.url))
 
   // Las pantallas siguen usando el layout del dashboard para redirigir al
   // login. Mantener esa responsabilidad fuera del middleware evita que la

@@ -71,7 +71,7 @@ El CRM guarda el contacto, lo vincula por Instagram/teléfono a la persona del p
 Archivo: `supabase/migrations/20260911000001_tipos_pendientes.sql`. Se aplicó con `python scripts/aplicar-sql.py <archivo>` (host directo de la base con la contraseña de `exposure-crm-secrets\db-password.txt`; el pooler tarda unos minutos en aceptar una contraseña nueva). Para SQL suelto: `python scripts/sql.py "select …"`.
 
 Qué arregló:
-1. `plan_pago_items.pago_id` pasa a texto (el esquema reconstruido lo dejó uuid y el código de Paul lo compara como texto). Antes, cargar un pago que no da acceso (Fee, Cuota) desde la pantalla tiraba "operator does not exist: uuid = text". Después de aplicarla se corrigió el histórico: el acceso lo decide el concepto y se borraron 34 "clientes" que solo habían pagado un Fee.
+1. `plan_pago_items.pago_id` pasa a texto (el esquema reconstruido lo dejó uuid y el código de la plantilla lo compara como texto). Antes, cargar un pago que no da acceso (Fee, Cuota) desde la pantalla tiraba "operator does not exist: uuid = text". Después de aplicarla se corrigió el histórico: el acceso lo decide el concepto y se borraron 34 "clientes" que solo habían pagado un Fee.
 2. `fecha_agenda` / `fecha_closer` con hora.
 3. Conceptos de EXPOSURE que dan acceso: Venta Nueva, Adentro en Seguimiento, Adentro en Seguimiento y Post Fee, Completó PIF, Venta Interna, Venta Nueva Interna, Upsell (Agency).
 4. "Adentro en Seguimiento y Post Fee" deja de contarse como fee al cargar el plan.
@@ -82,7 +82,7 @@ Qué arregló:
 
 - [x] Aplicar la migración.
 - [ ] Probar el espejo con el sheet real y sacar la primera corrida.
-- [ ] Adaptador iClosed → agendas (necesita la API key; el código de Paul ya está en `/api/iclosed-sync`).
+- [ ] Adaptador iClosed → agendas (necesita la API key; el código de la plantilla ya está en `/api/iclosed-sync`).
 - [ ] Stripe → pagos automáticos (decidir: directo o vía Zapier).
 - [ ] Instagram Graph cuando Meta apruebe la app.
 - [ ] Supabase → Authentication → URL Configuration: Site URL `https://exposure-crm-nu.vercel.app` (solo para "Entrar con link al mail").
@@ -91,7 +91,7 @@ Qué arregló:
 
 - `💰 PAGOS JUNIO`, fila del 19/06 (Adentro en Seguimiento y Post Fee, "Cuota 1 (Agency)", USD 500): no tiene nombre de cliente, no se importó. Ponele el nombre y lo cargo.
 - `💰 PAGOS FEB`: 25 filas tienen el nombre en la columna "Fecha Alta" (columnas corridas). Se importaron igual, pero al espejo le conviene que estén en su lugar.
-- Los pagos de Marcos, Tony, Paul y Bener quedaron afuera (no son closers propios), como acordamos.
+- Los pagos de Marcos, Tony y del dueño de la plantilla quedaron afuera (closers de la maqueta). Bener es closer real desde julio, pero todavía no tiene pagos cargados en ninguna pestaña del sheet (revisado el 11/09).
 
 ## 8 · Conectar tu Instagram al CRM (5 minutos, en Meta Business)
 
@@ -115,7 +115,7 @@ Meta solo hace falta para cuentas de terceros.
 - **Formatos** (`/contenido/formatos`): ya no es una tabla fija. Calcula agendas, presentadas, calificadas, cierres y cash del día 1 por tipo de
   pieza (reel, carrusel, historia, webinar, ads, nuevo seguidor), por pieza concreta (el tag de ManyChat) y por canal. Fuente: `agendas`
   cruzadas con ManyChat. Ventana 30/90/180/365 días.
-- **Testimonios** (`/testimonios`): banco real (Supabase), sin cuentas de Paul.
+- **Testimonios** (`/testimonios`): banco real (Supabase), una sola cuenta de contenido.
 - **Sistema IA** (Centro de mando, Agentes, Tareas, Agenda, Herramientas, Analítica, Contenido IA, Memoria): es la maqueta de Exposure OS con
   datos inventados (`components/exposure/data.ts`). Ahora lleva el aviso "Maqueta" en cada pantalla y el grupo del menú se llama
   "Sistema IA · maqueta". Conectarlo de verdad es un proyecto aparte: definir qué hace cada agente y con qué datos.

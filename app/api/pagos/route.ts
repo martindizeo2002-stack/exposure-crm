@@ -113,7 +113,7 @@ async function syncAgendaFromPayment(sb: ReturnType<typeof getSupabase>, b: any)
 
     // La RPC atómica ya resolvió la identidad canónica. Usarla primero evita
     // depender de cómo escribió el closer el nombre (Javier vs Javier Alejandro,
-    // Christian vs Cuenta B, etc.).
+    // Cristian vs Cristian Lescano, etc.).
     if (!match && b.person_id) {
       const { data } = await sb.from("agendas")
         .select("id")

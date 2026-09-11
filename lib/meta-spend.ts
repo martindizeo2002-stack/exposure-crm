@@ -1,5 +1,3 @@
-import type { BusinessAccount } from "@/lib/business-account"
-
 type MetaInsight = { spend?: string }
 type SpendResult = { spend: number; available: boolean; source: "meta" | "mercury" | "unavailable"; estimated: boolean }
 
@@ -31,15 +29,13 @@ async function getMercuryMetaSpend(start: string, end: string): Promise<SpendRes
   }
 }
 
-async function getAccountMetaSpend(start: string, end: string, businessAccount: BusinessAccount): Promise<SpendResult> {
-  const isPaul = businessAccount === "paul"
-  const token = isPaul
-    ? process.env.META_ADS_PAUL_ACCESS_TOKEN
-    : (process.env.META_ADS_ACCESS_TOKEN || process.env.META_CAPI_ACCESS_TOKEN)
-  const account = isPaul
-    ? (process.env.META_ADS_PAUL_ACCOUNT_ID || "act_1933840537319187")
-    : (process.env.META_ADS_ACCOUNT_ID || "act_928250435983613")
-  if (!token) return getMercuryMetaSpend(start, end)
+// EXPOSURE opera una sola cuenta de Meta Ads (@alexmcarrera). Token y cuenta
+// salen del entorno, sin valores por defecto: si falta alguno, se usa el
+// respaldo estimado de Mercury.
+export async function getMetaSpend(start: string, end: string): Promise<SpendResult> {
+  const token = process.env.META_ADS_ACCESS_TOKEN || process.env.META_CAPI_ACCESS_TOKEN
+  const account = process.env.META_ADS_ACCOUNT_ID
+  if (!token || !account) return getMercuryMetaSpend(start, end)
 
   const params = new URLSearchParams({
     fields: "spend",
@@ -61,18 +57,4 @@ async function getAccountMetaSpend(start: string, end: string, businessAccount: 
   } catch {
     return getMercuryMetaSpend(start, end)
   }
-}
-
-export async function getMetaSpend(start: string, end: string, businessAccount?: BusinessAccount | null): Promise<SpendResult> {
-  if (businessAccount) return getAccountMetaSpend(start, end, businessAccount)
-  const [paul, cris] = await Promise.all([
-    getAccountMetaSpend(start, end, "paul"),
-    getAccountMetaSpend(start, end, "cris"),
-  ])
-  if (paul.source === "meta" && cris.source === "meta") {
-    return { spend: Math.round((paul.spend + cris.spend) * 100) / 100, available: true, source: "meta", estimated: false }
-  }
-  // Nunca sumar dos respaldos de Mercury: ambos representan el mismo débito
-  // bancario general. Si Meta no está completo, usar un solo respaldo.
-  return getMercuryMetaSpend(start, end)
 }

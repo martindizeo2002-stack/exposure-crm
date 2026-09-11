@@ -34,7 +34,7 @@ export function CRMTourButton({
 
   useEffect(() => {
     // Sólo para dar una pista visual sutil en el primer uso (nunca bloquea
-    // ni abre el tour solo; Cuenta A pidió "disponible para repetir, no
+    // ni abre el tour solo; se pidió "disponible para repetir, no
     // intrusivo" — así que nunca se auto-abre, sólo se resalta el botón).
     try {
       if (!window.localStorage.getItem(TOUR_SEEN_KEY)) setPulsing(true)

@@ -15,7 +15,7 @@ function getSupabaseClient() {
 
 // Strikes son visibles solo para CEO/Contaduria; el equipo (closers/setters)
 // nunca debe ver strikes propios ni ajenos. En preview la sesion se fuerza a
-// rol CEO (revision de Cuenta A/Lisan), asi que se sirve igual que produccion.
+// rol CEO (revisión del CEO), asi que se sirve igual que produccion.
 async function requireManager(): Promise<boolean> {
   if (isPreviewRuntime()) return true
   try {
