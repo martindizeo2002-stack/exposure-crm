@@ -205,6 +205,8 @@ function callType(m: any) {
     || title.includes("bienvenida") || title.includes("kickoff")
     || title.includes("primer call") || title.includes("primera call")
   ) return "onboarding"
+  // reuniones internas del equipo (daily, reporte semanal) no son llamadas de venta aunque digan "ventas"
+  if (title.includes("daily") || title.includes("reunion de equipo") || title.includes("reporte semanal")) return "other"
   if (
     haystack.includes("venta") || haystack.includes("closer") || haystack.includes("auditoria")
     || CLOSERS_NOMBRE_COMPLETO.some((closer) => haystack.includes(closer))
@@ -369,6 +371,7 @@ async function runSync(request: Request) {
           // no abortar el enlace por identidad con un error de tipo.
           await sb.from("crm_call_records").update({
             person_id: personId,
+            agenda_id: exact.kind === "agenda" && exact.record?.id ? exact.record.id : null,  // agendas.id es uuid en esta base (migración aplicada)
             match_method: "link_fathom",
             match_confidence: 1,
             updated_at: new Date().toISOString(),
@@ -477,6 +480,7 @@ async function runSync(request: Request) {
         const { error: callErr } = await sb.from("crm_call_records").upsert({
           recording_id: recordingId,
           person_id: personId,
+          agenda_id: !x.needsReview && x.agenda?.id ? x.agenda.id : null,  // uuid en esta base
           call_type: callType(x.meeting),
           occurred_at: occurredAt,
           fathom_url: x.meeting.share_url || x.meeting.url || null,

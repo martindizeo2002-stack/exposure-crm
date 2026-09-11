@@ -50,5 +50,5 @@ export function nombreCanonico(value: unknown): string {
 
 // Nombres completos de closers conocidos, en minúsculas y sin tildes, para
 // reconocer llamadas de venta en Fathom por el título o los participantes.
-// FALTA: apellidos de Cristian, Tobias y Kenneth.
-export const CLOSERS_NOMBRE_COMPLETO = ["alex carrera", "nahuel carballo"]
+// Cristian Lescano y Bener Salvo salen de los títulos de Fathom (11/09). FALTA: apellidos de Tobias y Kenneth.
+export const CLOSERS_NOMBRE_COMPLETO = ["alex carrera", "nahuel carballo", "cristian lescano", "bener salvo"]
