@@ -2472,23 +2472,26 @@ const A3 = derivar(agregar(u3)), A3ant = derivar(agregar(u3ant));
   const meta = D.marca.metaMensual;
   const ult = M[M.length-1];
   const proy = esParcial(ult) ? ult.cobrado / diasDe(ult) * ult.diasTotal : ult.cobrado;
-  /* proyección inversa: para llegar a la meta, cuántos leads hacen falta */
-  const valorLead = A3.leads ? A3.cobrado / A3.leads : 0;
-  const leadsMeta = valorLead ? meta / valorLead : 0;
-  const leadsHoy  = A3.leads / 3;
+  /* proyección inversa: para llegar a la meta, cuántas agendas (llamadas) hacen falta.
+     Se razona por agendas y no por conversaciones de ManyChat: una conversación vale centavos
+     y el número queda absurdo; una agenda tiene un valor real (cobrado ÷ agendas). */
+  const valorAgenda = A3.agendas ? A3.cobrado / A3.agendas : 0;
+  const agendasMeta = valorAgenda ? meta / valorAgenda : 0;
+  const agendasHoy  = A3.agendas / 3;
+  const leadsMeta   = A3.tasaAgenda ? agendasMeta / (A3.tasaAgenda/100) : 0;
   secc("proyeccion", "Qué hace falta para llegar a la meta",
     "El camino inverso: se parte de la meta mensual de <b>"+money(meta)+"</b> (la que fijaste vos, no una proyección) y se calcula hacia atrás "
     + "con las tasas reales de los últimos 90 días.",
     "Por mes",
     '<div class="g3">'
-    + mini(miles(leadsMeta), "Leads por mes que hacen falta")
-    + mini(miles(leadsHoy), "Los que entran hoy", leadsHoy >= leadsMeta ? "var(--ok)" : "var(--warn)")
-    + mini((leadsHoy >= leadsMeta ? "+" : "−") + miles(Math.abs(leadsMeta - leadsHoy)),
-        leadsHoy >= leadsMeta ? "De sobra" : "Faltan cada mes", leadsHoy >= leadsMeta ? "var(--ok)" : "var(--bad)")
-    + mini(miles(leadsMeta * A3.tasaAgenda/100), "Agendas por mes")
-    + mini((leadsMeta * A3.tasaAgenda/100 * A3.showRate/100 * A3.tasaCalif/100 * A3.tasaCierre/100).toFixed(1).replace(".",","),
+    + mini(miles(agendasMeta), "Agendas por mes que hacen falta")
+    + mini(miles(agendasHoy), "Las que entran hoy", agendasHoy >= agendasMeta ? "var(--ok)" : "var(--warn)")
+    + mini((agendasHoy >= agendasMeta ? "+" : "−") + miles(Math.abs(agendasMeta - agendasHoy)),
+        agendasHoy >= agendasMeta ? "De sobra" : "Faltan cada mes", agendasHoy >= agendasMeta ? "var(--ok)" : "var(--bad)")
+    + mini(miles(leadsMeta), "Conversaciones que implican, con la tasa de agenda de hoy")
+    + mini((agendasMeta * A3.showRate/100 * A3.tasaCalif/100 * A3.tasaCierre/100).toFixed(1).replace(".",","),
         "Ventas por mes, con las tasas de hoy")
-    + mini(money(valorLead), "Lo que vale hoy cada conversación", "var(--c1)")
+    + mini(money(valorAgenda), "Lo que vale hoy cada agenda", "var(--c1)")
     + "</div>");
 
   /* tres escenarios sobre el mismo motor */
