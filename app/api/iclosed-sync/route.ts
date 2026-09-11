@@ -159,10 +159,15 @@ export async function POST(request: Request) {
           || (Number.isFinite(callAt.getTime()) && callAt.getTime() >= Date.now() - 60 * 60 * 1000)
         const closer = hostName(call)
         const fechaCloser = callWallTime(call)
+        // misma persona (teléfono o nombre) con llamada el mismo día = la misma agenda (el sheet y iClosed
+        // pueden diferir en minutos o zona horaria)
         const duplicate = (agendas || []).find((row: any) => {
           const sameIdentity = (phone && normPhone(row.telefono) === phone)
             || String(row.nombre || "").trim().toLowerCase() === String(call.inviteeName || "").trim().toLowerCase()
-          return sameIdentity && String(row.fecha_closer || "").slice(0, 16) === String(fechaCloser || "").slice(0, 16)
+          const dia = String(fechaCloser || "").slice(0, 10)
+          const diaRow = String(row.fecha_closer || row.fecha_agenda || "").slice(0, 10)
+          const cerca = dia && diaRow && Math.abs(new Date(dia).getTime() - new Date(diaRow).getTime()) <= 86400000
+          return sameIdentity && cerca
         })
         if (!duplicate && recent && fechaCloser && call.inviteeName) {
           const extracted = answerFields(call)

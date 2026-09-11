@@ -5,9 +5,9 @@ import { nombreCanonico } from "@/lib/equipo"
 export function canonicalCloserName(value: unknown) {
   const raw = String(value || "").trim()
   if (!raw) return raw
-  const first = raw.split(/\s+/)[0]
-  const canonical = nombreCanonico(raw)
-  return canonical && canonical !== first ? canonical : raw
+  // nombreCanonico devuelve el primer nombre normalizado ("Cristian Lescano" → "Cristian", "Nawe" → "Nahuel");
+  // el CRM identifica a los closers por ese primer nombre
+  return nombreCanonico(raw) || raw
 }
 
 // La plantilla original ruteaba S/A/B a un closer y C/D a otro. EXPOSURE no
