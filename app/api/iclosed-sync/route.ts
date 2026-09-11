@@ -105,15 +105,25 @@ export async function POST(request: Request) {
     // iClosed no devuelve un orden estable: el subconjunto cambia según
     // `limit`, por lo que consultar solo limit=100 omite reservas recientes.
     // Cruzar varias ventanas y deduplicar por call ID evita perder agendas.
-    const windows = [20, 50, 99]
+    // La API de iClosed de EXPOSURE pagina de forma estable y limita la tasa (429 con ráfagas):
+    // una sola ventana de 50, páginas en serie y un reintento corto si devuelve 429.
+    const windows = [50]
     const requests = ["UPCOMING", "PAST"].flatMap((eventType) => windows.flatMap((limit) =>
       Array.from({ length: pageCount }, (_, index) => ({ eventType, limit, page: startPage + index })),
     ))
-    const batches = await Promise.all(requests.map(async ({ eventType, limit, page }) => {
-      const response = await fetch(`${API}?eventType=${eventType}&limit=${limit}&page=${page}`, { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" })
+    const batches: any[][] = []
+    for (const { eventType, limit, page } of requests) {
+      let response = await fetch(`${API}?eventType=${eventType}&limit=${limit}&page=${page}`, { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" })
+      if (response.status === 429) {
+        await new Promise((r) => setTimeout(r, 2500))
+        response = await fetch(`${API}?eventType=${eventType}&limit=${limit}&page=${page}`, { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" })
+      }
       if (!response.ok) throw new Error(`iClosed HTTP ${response.status}`)
-      return (await response.json())?.data?.eventCalls || []
-    }))
+      const lote = (await response.json())?.data?.eventCalls || []
+      batches.push(lote)
+      if (lote.length < limit) break  // no hay más páginas de este tipo
+      await new Promise((r) => setTimeout(r, 400))
+    }
     const calls: any[] = [...new Map(
       batches.flat().map((call: any) => [String(call.id || call.callId), call]),
     ).values()]
