@@ -7,7 +7,7 @@ function AgentTag({ name }: { name: string }) {
   const k = byName(name) ?? (name === 'Comercial' ? ('comercial' as const) : undefined)
   if (!k)
     return (
-      <span className="text-[12.5px]" style={{ color: '#8a857e' }}>
+      <span className="text-[12.5px]" style={{ color: 'var(--color-faint)' }}>
         {name}
       </span>
     )
@@ -54,7 +54,7 @@ export default function Herramientas_() {
                   {t.name}
                 </div>
               </div>
-              <span className="text-[12.5px] flex-1 truncate" style={{ color: '#6a655e' }}>
+              <span className="text-[12.5px] flex-1 truncate" style={{ color: 'var(--color-mute)' }}>
                 {t.desc}
               </span>
               <span className="flex-none flex justify-end" style={{ width: 185 }}>
@@ -78,7 +78,7 @@ export default function Herramientas_() {
                   <div className="text-[14px] leading-none" style={{ fontWeight: 500 }}>
                     {t.name}
                   </div>
-                  <div className="mt-2.5 text-[12.5px] leading-none" style={{ color: '#6a655e' }}>
+                  <div className="mt-2.5 text-[12.5px] leading-none" style={{ color: 'var(--color-mute)' }}>
                     {t.desc}
                   </div>
                 </div>
@@ -90,7 +90,7 @@ export default function Herramientas_() {
 
         <Card className="px-7 py-6">
           <CardHead title="Cómo funciona" sub="Reglas del sistema" />
-          <p className="mt-4 text-[13px] leading-[1.6]" style={{ color: '#5e5a54' }}>
+          <p className="mt-4 text-[13px] leading-[1.6]" style={{ color: 'var(--color-ink2)' }}>
             Los agentes usan las herramientas automáticas sin preguntar. Todo lo que sale hacia un
             cliente o cambia el pipeline pasa antes por ti.
           </p>

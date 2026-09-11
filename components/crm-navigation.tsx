@@ -17,10 +17,11 @@ import {
   BarChart3, Bell, BellRing, Calendar, ChartSpline, ChevronDown, CircleDollarSign, Clapperboard, FileText, Gauge, GraduationCap, LayoutGrid, ListChecks, Network, PhoneCall, Users, Wrench,
   Eye, LogOut, Menu, Monitor, Moon, Palette, Radar, RotateCcw, Search, Settings2, Sparkles, Sun, Trophy, Type, UserRound,
   UsersRound, Volume2, WalletCards, ShieldCheck, MessageSquareQuote,
+  Wallet, Target, Kanban, CalendarRange, Compass, Coins, Mic, Layers,
 } from "lucide-react"
 
-export type GroupName = "General" | "Ventas" | "Producto" | "Marketing" | "Operaciones" | "Sistema IA"
-export const GROUP_ORDER: GroupName[] = ["General", "Ventas", "Producto", "Marketing", "Operaciones", "Sistema IA"]
+export type GroupName = "General" | "Panel del negocio" | "Ventas" | "Producto" | "Marketing" | "Operaciones" | "Sistema IA"
+export const GROUP_ORDER: GroupName[] = ["General", "Panel del negocio", "Ventas", "Producto", "Marketing", "Operaciones", "Sistema IA"]
 export type NavItem = {
   label: string
   href: string
@@ -47,10 +48,28 @@ const ramps = {
   tutorial: { from: "#d9dae2", via: "#9b9daa", to: "#5b5d68", glow: "#9b9daa73" },
   ajustes: { from: "#cfd3dd", via: "#7e8492", to: "#454a55", glow: "#7e849273" },
   sistema: { from: "#eadcae", via: "#c8a95d", to: "#7d5f22", glow: "#c8a95d8c" },
+  panel: { from: "#d6d4ff", via: "#8f8cff", to: "#4642b3", glow: "#8f8cff8c" },
 } satisfies Record<string, Ramp>
+
+const PANEL_ROLES = ["CEO", "Sales Manager", "Manager MKT", "Contaduria"]
 
 export const modules: NavItem[] = [
   { label: "Home", href: "/", icon: Gauge, match: ["/"], ramp: ramps.home, group: "General", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria", "CSM"] },
+  // ── Panel del negocio: el dashboard de Agustín Ruppel adentro del CRM ──
+  // (public/panel/index.html). Doce páginas: el flujo de leads desde que
+  // entran al embudo hasta la cobranza, más JARVIS y el generador de carruseles.
+  { label: "Resumen del mes", href: "/panel/resumen", icon: Wallet, match: ["/panel/resumen"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "El embudo", href: "/panel/embudo", icon: Target, match: ["/panel/embudo"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "Pipeline", href: "/panel/pipeline", icon: Kanban, match: ["/panel/pipeline"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "Cómo viene el año", href: "/panel/anio", icon: CalendarRange, match: ["/panel/anio"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "El equipo", href: "/panel/equipo", icon: Users, match: ["/panel/equipo"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "Últimas llamadas", href: "/panel/llamadas", icon: PhoneCall, match: ["/panel/llamadas"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "De dónde salen", href: "/panel/fuentes", icon: Compass, match: ["/panel/fuentes"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "El contenido", href: "/panel/contenido", icon: Clapperboard, match: ["/panel/contenido"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "Cobranzas", href: "/panel/cobranzas", icon: Coins, match: ["/panel/cobranzas"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "Hacia dónde va", href: "/panel/proyeccion", icon: Trophy, match: ["/panel/proyeccion"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "Service JARVIS", href: "/panel/agentes", icon: Mic, match: ["/panel/agentes"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "Generador de carruseles", href: "/panel/carrusel", icon: Layers, match: ["/panel/carrusel"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
   { label: "Agendas", href: "/ventas", icon: UsersRound, match: ["/ventas", "/pipeline", "/centro-agendas"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria"] },
   { label: "Seguimientos", href: "/seguimientos", icon: BellRing, match: ["/seguimientos"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer"] },
   { label: "Pagos", href: "/pagos", icon: CircleDollarSign, match: ["/pagos", "/carga-pagos", "/todos-pagos"], ramp: ramps.pagos, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria", "CSM"] },
@@ -77,7 +96,7 @@ export const modules: NavItem[] = [
 ]
 
 export const groupColors: Record<GroupName | "Ayuda", string> = {
-  General: "#8a857e", Ventas: "#8fd96f", Producto: "#e0b45c",
+  General: "#8a857e", "Panel del negocio": "#8f8cff", Ventas: "#8fd96f", Producto: "#e0b45c",
   Marketing: "#6ba6e8", Operaciones: "#9b8fe0", "Sistema IA": "#c8a95d", Ayuda: "#7c7c86",
 }
 

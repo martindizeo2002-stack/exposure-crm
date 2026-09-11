@@ -69,15 +69,15 @@ function Grafico() {
       </div>
 
       <div className="flex items-center gap-6 mt-5">
-        <span className="flex items-center gap-2 text-[12px]" style={{ color: '#6a655e' }}>
+        <span className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--color-mute)' }}>
           <span style={{ width: 9, height: 9, borderRadius: 2, background: 'rgba(20,16,8,0.16)' }} />
           Visualizaciones
         </span>
-        <span className="flex items-center gap-2 text-[12px]" style={{ color: '#6a655e' }}>
-          <span style={{ width: 11, height: 2, borderRadius: 99, background: '#9c7a37' }} />
+        <span className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--color-mute)' }}>
+          <span style={{ width: 11, height: 2, borderRadius: 99, background: 'var(--color-gold-dk)' }} />
           Leads generados
         </span>
-        <span className="ml-auto text-[12px]" style={{ color: '#9c7a37' }}>
+        <span className="ml-auto text-[12px]" style={{ color: 'var(--color-gold-dk)' }}>
           +18,4% este mes
         </span>
       </div>
@@ -98,7 +98,7 @@ export default function Analitica() {
               <div className="text-[13px] leading-none" style={{ fontWeight: 520 }}>
                 CMO
               </div>
-              <div className="mt-2 text-[11.5px] leading-none" style={{ color: '#8a857e' }}>
+              <div className="mt-2 text-[11.5px] leading-none" style={{ color: 'var(--color-faint)' }}>
                 Analiza esta página
               </div>
             </div>
@@ -140,14 +140,14 @@ export default function Analitica() {
                 className="py-3.5"
                 style={{ borderTop: i ? '1px solid rgba(0,0,0,0.07)' : 'none' }}
               >
-                <div className="text-[13.5px] leading-[1.35]" style={{ color: '#1a1a1a', fontWeight: 450 }}>
+                <div className="text-[13.5px] leading-[1.35]" style={{ color: 'var(--color-ink)', fontWeight: 450 }}>
                   {c.title}
                 </div>
                 <div className="mt-2.5 flex items-center gap-5">
-                  <span className="text-[12px]" style={{ color: '#6a655e' }}>
+                  <span className="text-[12px]" style={{ color: 'var(--color-mute)' }}>
                     {c.views} visualizaciones
                   </span>
-                  <span className="text-[12px]" style={{ color: '#9c7a37' }}>
+                  <span className="text-[12px]" style={{ color: 'var(--color-gold-dk)' }}>
                     {c.leads} leads
                   </span>
                 </div>
@@ -165,10 +165,10 @@ export default function Analitica() {
                 className="flex items-start gap-4 py-3.5"
                 style={{ borderTop: i ? '1px solid rgba(0,0,0,0.07)' : 'none' }}
               >
-                <span className="text-[13px] leading-[1.4] flex-1" style={{ color: '#33302b' }}>
+                <span className="text-[13px] leading-[1.4] flex-1" style={{ color: 'var(--color-ink2)' }}>
                   “{h.label}”
                 </span>
-                <span className="val text-[15px] flex-none" style={{ color: '#9c7a37' }}>
+                <span className="val text-[15px] flex-none" style={{ color: 'var(--color-gold-dk)' }}>
                   {h.lift}
                 </span>
               </div>
@@ -182,10 +182,10 @@ export default function Analitica() {
             {MEJORES_ANGULOS.map((a) => (
               <div key={a.label} className="py-[11px]">
                 <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[12.5px]" style={{ color: '#33302b' }}>
+                  <span className="text-[12.5px]" style={{ color: 'var(--color-ink2)' }}>
                     {a.label}
                   </span>
-                  <span className="val text-[13px]" style={{ color: a.pct > 25 ? '#9c7a37' : '#5e5a54' }}>
+                  <span className="val text-[13px]" style={{ color: a.pct > 25 ? 'var(--color-gold-dk)' : 'var(--color-ink2)' }}>
                     {a.pct}%
                   </span>
                 </div>

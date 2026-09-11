@@ -4,9 +4,9 @@ import { AGENTS, GRUPOS, TAREAS } from '@/components/exposure/data'
 import { AgentBadge, Bar, Card, CardHead, IDENTITY, PageHead, SectionTitle, Stat, byName } from '@/components/exposure/ui'
 
 const MARK = [
-  { icon: Circle, color: '#8a857e' },
-  { icon: CircleDot, color: '#9c7a37' },
-  { icon: Check, color: '#a9a49b' },
+  { icon: Circle, color: 'var(--color-faint)' },
+  { icon: CircleDot, color: 'var(--color-gold-dk)' },
+  { icon: Check, color: 'var(--color-faint2)' },
 ]
 
 /** carga por agente, derivada de las tareas abiertas */
@@ -64,7 +64,7 @@ export default function Tareas() {
               <SectionTitle
                 className="mb-3.5"
                 right={
-                  <span className="text-[12px]" style={{ color: '#8a857e' }}>
+                  <span className="text-[12px]" style={{ color: 'var(--color-faint)' }}>
                     {items.length}
                   </span>
                 }
@@ -92,13 +92,13 @@ export default function Tareas() {
                     <div className="min-w-0">
                       <div
                         className="text-[13.5px] leading-[1.4]"
-                        style={{ color: gi === 2 ? '#6a655e' : '#1a1a1a' }}
+                        style={{ color: gi === 2 ? 'var(--color-mute)' : 'var(--color-ink)' }}
                       >
                         {t.t}
                       </div>
                       <div className="mt-2.5 flex items-center gap-2">
                         <AgentDot name={t.agent} />
-                        <span className="text-[12px] leading-none" style={{ color: '#8a857e' }}>
+                        <span className="text-[12px] leading-none" style={{ color: 'var(--color-faint)' }}>
                           {t.agent}
                         </span>
                       </div>
@@ -123,7 +123,7 @@ export default function Tareas() {
               >
                 <div className="flex items-center gap-2.5">
                   <AgentBadge agent={c.id} size={24} />
-                  <span className="text-[12.5px] truncate" style={{ color: '#5e5a54' }}>
+                  <span className="text-[12.5px] truncate" style={{ color: 'var(--color-ink2)' }}>
                     {c.name}
                   </span>
                 </div>
@@ -140,7 +140,7 @@ export default function Tareas() {
 
         <Card gold lit className="px-7 py-7">
           <CardHead title="Prioridad del día" sub="Definida por el CEO a las 16:06" />
-          <p className="mt-5 text-[15px] leading-[1.5]" style={{ color: '#141414' }}>
+          <p className="mt-5 text-[15px] leading-[1.5]" style={{ color: 'var(--color-ink)' }}>
             Conseguir más leads calificados es la restricción del negocio hoy.
           </p>
 

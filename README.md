@@ -71,6 +71,45 @@ figure con ese rol en `team_members`. Si se quiere limitar por nombre, cargar `C
 **Las pantallas de Sistema IA muestran datos ficticios** (`components/exposure/data.ts`): son la maqueta
 de la capa de agentes, todavía sin conectar al CRM.
 
+## Panel del negocio (el dashboard de Agustín Ruppel, adentro del CRM)
+
+El grupo **"Panel del negocio"** del menú abre las doce páginas del panel
+`exposure-dashboard` (github.com/Agustin-Ruppel/exposure-dashboard): Resumen del mes,
+El embudo (el flujo de leads desde que entran hasta la venta), Pipeline, Cómo viene el año,
+El equipo, Últimas llamadas, De dónde salen, El contenido, Cobranzas, Hacia dónde va,
+Service JARVIS y el Generador de carruseles.
+
+| Pieza | Dónde |
+|---|---|
+| El panel tal cual (HTML autosuficiente, miniaturas, estilos) | `public/panel/` — se abre embebido (`?embed=1`: sin su sidebar, el menú es el raíl del CRM) |
+| Rutas del CRM | `/panel/<pagina>` → `app/(dashboard)/panel/[pagina]/page.tsx` + `components/panel-negocio.tsx` |
+| Sus números | `/api/panel/datos` (`app/api/panel/datos/route.ts`) genera el `datos.js` a partir de las tablas del CRM con `lib/panel-negocio.ts` |
+| Acceso | CEO, Sales Manager, Manager MKT y Contaduría (`lib/role-access.ts`) |
+
+**De dónde salen los números.** El panel solo recibe conteos y montos crudos; las tasas,
+deltas y la proyección las calcula él. `lib/panel-negocio.ts` arma cada bloque desde
+`agendas`, `pagos` (cash collected con `lib/cash-collected.ts`, facturado con `lib/revenue.ts`),
+`cuotas`, `clientes` y `metricas_manual` (nuevos_leads / conversaciones_asignadas).
+**Mientras el CRM esté vacío** (cero agendas y cero pagos) o Supabase falle, se sirve el
+`datos.js` de demostración que trae el panel, con su sello "datos de demostración".
+Lo que el CRM no mide no se inventa: "El contenido" y los reels quedan vacíos y el panel
+esconde esas páginas; los setters sin conversaciones cargadas muestran "—" en vez de una tasa.
+La meta mensual y el precio base salen de `PANEL_META_MENSUAL` y `PANEL_PRECIO_BASE` en
+`.env.local` (por defecto 50.000 y 1.300).
+
+Para actualizar el panel a una versión nueva del repo de Agustín: copiar `index.html`, `datos.js`,
+`miniaturas/` y `estilos/` a `public/panel/` y volver a aplicar los cuatro retoques de la copia
+(el `<script src="/api/panel/datos">`, la tolerancia a `contenido` vacío, las tasas de setters
+sin denominador y el bloque "modo embebido" + "puente con el CRM" al final).
+
+## Tema oscuro futurista
+
+El CRM arranca en modo oscuro con la paleta del panel: fondo negro azulado con grilla de puntos,
+tarjetas de grafito y las señales violeta / verde / ámbar / rojo / cian / magenta. Los tokens
+están en el bloque `.dark` de `app/globals.css`; lo que cambia de forma (tarjetas, tablas,
+formularios, portada, raíl) en `components/exposure/tema-futurista.css`. El tema claro
+(papel cálido y oro de Exposure OS) sigue disponible desde Personalización.
+
 ## Integraciones y crons
 
 Vacías hasta configurarlas en `.env.local`: ManyChat, Fathom, iClosed, Meta Ads, Mercury, OpenAI.

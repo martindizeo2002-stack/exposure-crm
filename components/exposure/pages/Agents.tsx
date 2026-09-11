@@ -50,7 +50,7 @@ export default function Agentes({
                   </div>
                 </div>
               </div>
-              <p className="mt-4.5 text-[13.5px] leading-[1.55]" style={{ color: '#5e5a54', marginTop: 18 }}>
+              <p className="mt-4.5 text-[13.5px] leading-[1.55]" style={{ color: 'var(--color-ink2)', marginTop: 18 }}>
                 Define prioridades, distribuye trabajo y conecta toda la información del sistema.
               </p>
             </div>
@@ -121,13 +121,13 @@ export default function Agentes({
                 </div>
                 <p
                   className="relative mt-3 text-[13px] leading-[1.5]"
-                  style={{ color: '#6a655e', minHeight: 58 }}
+                  style={{ color: 'var(--color-mute)', minHeight: 58 }}
                 >
                   {a.desc}
                 </p>
                 <div className="relative mt-4 flex items-end justify-between">
                   <Stat value={a.metric.value} label={a.metric.label} size={24} color={id.color} />
-                  <span className="text-[11.5px] pb-[3px]" style={{ color: '#a9a49b' }}>
+                  <span className="text-[11.5px] pb-[3px]" style={{ color: 'var(--color-faint2)' }}>
                     {a.role}
                   </span>
                 </div>
@@ -152,7 +152,7 @@ export default function Agentes({
               className="row-hover flex items-center gap-4 px-7"
               style={{ height: 50, borderTop: i ? '1px solid rgba(0,0,0,0.06)' : 'none' }}
             >
-              <span className="mono text-[12px] flex-none" style={{ color: '#a9a49b', width: 42 }}>
+              <span className="mono text-[12px] flex-none" style={{ color: 'var(--color-faint2)', width: 42 }}>
                 {r.t}
               </span>
               <span
@@ -164,7 +164,7 @@ export default function Agentes({
                   flex: 'none',
                 }}
               />
-              <span className="text-[14px] flex-1 truncate" style={{ color: '#1a1a1a' }}>
+              <span className="text-[14px] flex-1 truncate" style={{ color: 'var(--color-ink)' }}>
                 {r.m}
               </span>
             </div>
@@ -198,7 +198,7 @@ export default function Agentes({
               </div>
             </div>
           </div>
-          <p className="relative mt-5 text-[13px] leading-[1.55]" style={{ color: '#6a655e' }}>
+          <p className="relative mt-5 text-[13px] leading-[1.55]" style={{ color: 'var(--color-mute)' }}>
             {active.desc}
           </p>
           <div className="relative mt-6">

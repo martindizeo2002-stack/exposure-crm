@@ -15,7 +15,7 @@ export default function Contenido() {
               <div className="text-[13px] leading-none" style={{ fontWeight: 520 }}>
                 CMO
               </div>
-              <div className="mt-2 text-[11.5px] leading-none" style={{ color: '#8a857e' }}>
+              <div className="mt-2 text-[11.5px] leading-none" style={{ color: 'var(--color-faint)' }}>
                 Produce esta página
               </div>
             </div>
@@ -54,16 +54,16 @@ export default function Contenido() {
               style={{ height: 64, borderTop: '1px solid rgba(0,0,0,0.07)' }}
             >
               <div className="min-w-0 flex-1">
-                <div className="text-[13.5px] leading-none truncate" style={{ color: '#1a1a1a' }}>
+                <div className="text-[13.5px] leading-none truncate" style={{ color: 'var(--color-ink)' }}>
                   {c.title}
                 </div>
-                <div className="mt-2.5 text-[12px] leading-none truncate" style={{ color: '#8a857e' }}>
+                <div className="mt-2.5 text-[12px] leading-none truncate" style={{ color: 'var(--color-faint)' }}>
                   {c.angle}
                 </div>
               </div>
               <span
                 className="val text-[15px] flex-none"
-                style={{ color: c.score >= 88 ? '#9c7a37' : '#5e5a54' }}
+                style={{ color: c.score >= 88 ? 'var(--color-gold-dk)' : 'var(--color-ink2)' }}
               >
                 {c.score}
               </span>
@@ -80,10 +80,10 @@ export default function Contenido() {
             {MEJORES_ANGULOS.map((a) => (
               <div key={a.label} className="py-[11px]">
                 <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[12.5px]" style={{ color: '#33302b' }}>
+                  <span className="text-[12.5px]" style={{ color: 'var(--color-ink2)' }}>
                     {a.label}
                   </span>
-                  <span className="val text-[13px]" style={{ color: a.pct > 25 ? '#9c7a37' : '#5e5a54' }}>
+                  <span className="val text-[13px]" style={{ color: a.pct > 25 ? 'var(--color-gold-dk)' : 'var(--color-ink2)' }}>
                     {a.pct}%
                   </span>
                 </div>
@@ -113,10 +113,10 @@ export default function Contenido() {
             ].map(([k, v]) => (
               <div key={k as string} className="py-3">
                 <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[12.5px]" style={{ color: '#33302b' }}>
+                  <span className="text-[12.5px]" style={{ color: 'var(--color-ink2)' }}>
                     {k as string}
                   </span>
-                  <span className="val text-[13px]" style={{ color: (v as number) > 50 ? '#9c7a37' : '#5e5a54' }}>
+                  <span className="val text-[13px]" style={{ color: (v as number) > 50 ? 'var(--color-gold-dk)' : 'var(--color-ink2)' }}>
                     {v as number}%
                   </span>
                 </div>
@@ -128,12 +128,12 @@ export default function Contenido() {
 
         <Card className="px-6 py-6">
           <CardHead title="Lo que más funciona" sub="Aprendizaje del sistema" />
-          <p className="mt-4 text-[13px] leading-[1.6]" style={{ color: '#5e5a54' }}>
+          <p className="mt-4 text-[13px] leading-[1.6]" style={{ color: 'var(--color-ink2)' }}>
             Las piezas que explican un problema antes de proponer una solución generan casi el doble
             de leads calificados que las demás.
           </p>
           <div className="mt-5 flex items-center gap-3">
-            <span className="text-[12.5px]" style={{ color: '#8a857e' }}>
+            <span className="text-[12.5px]" style={{ color: 'var(--color-faint)' }}>
               Fuente
             </span>
             <span

@@ -45,8 +45,8 @@ export const STATUS_ES: Record<Status, string> = {
 }
 
 const TONE: Record<Status, string> = {
-  working: '#9c7a37',
-  waiting: '#8a857e',
+  working: 'var(--color-gold-dk)',
+  waiting: 'var(--color-faint)',
   idle: '#b3ada3',
 }
 
@@ -59,7 +59,7 @@ export function Dot({
   size?: number
   color?: string
 }) {
-  const c = color ?? (status === 'working' ? '#c8a95d' : status === 'waiting' ? '#a9a49b' : '#cfc9bf')
+  const c = color ?? (status === 'working' ? '#c8a95d' : status === 'waiting' ? 'var(--color-faint2)' : '#cfc9bf')
   return (
     <span
       className={status === 'working' ? 'pulse' : ''}
@@ -171,7 +171,7 @@ export function CardHead({
     <div className="flex items-start justify-between gap-4">
       <div className="flex items-center gap-2.5 min-w-0">
         {icon && (
-          <span className="flex-none" style={{ color: '#9c7a37' }}>
+          <span className="flex-none" style={{ color: 'var(--color-gold-dk)' }}>
             {icon}
           </span>
         )}
@@ -183,7 +183,7 @@ export function CardHead({
             {title}
           </div>
           {sub && (
-            <div className="mt-[9px] text-[12.5px] leading-none truncate" style={{ color: '#8a857e' }}>
+            <div className="mt-[9px] text-[12.5px] leading-none truncate" style={{ color: 'var(--color-faint)' }}>
               {sub}
             </div>
           )}
@@ -201,7 +201,7 @@ export function PageHead({ title, sub, right }: { title: string; sub: string; ri
         <h1 className="text-[29px] leading-none" style={{ fontWeight: 600, letterSpacing: '-0.03em' }}>
           {title}
         </h1>
-        <p className="mt-3.5 text-[14px] leading-none" style={{ color: '#6a655e' }}>
+        <p className="mt-3.5 text-[14px] leading-none" style={{ color: 'var(--color-mute)' }}>
           {sub}
         </p>
       </div>
@@ -228,10 +228,10 @@ export function Stat({
 }) {
   return (
     <div style={{ textAlign: align }}>
-      <div className="val" style={{ fontSize: size, color: color ?? (gold ? '#9c7a37' : '#141414') }}>
+      <div className="val" style={{ fontSize: size, color: color ?? (gold ? 'var(--color-gold-dk)' : 'var(--color-ink)') }}>
         {value}
       </div>
-      <div className="mt-[10px] text-[12px] leading-none" style={{ color: '#8a857e' }}>
+      <div className="mt-[10px] text-[12px] leading-none" style={{ color: 'var(--color-faint)' }}>
         {label}
       </div>
     </div>
@@ -283,8 +283,8 @@ export function Tag({
     : gold
       ? { background: 'rgba(200,169,93,0.16)', color: '#8f6f2e' }
       : dark
-        ? { background: '#1a1a1a', color: '#f4f1ea' }
-        : { background: 'rgba(20,16,8,0.05)', color: '#5e5a54' }
+        ? { background: 'var(--color-pill)', color: '#f4f1ea' }
+        : { background: 'var(--color-soft)', color: 'var(--color-ink2)' }
   return (
     <span
       className="inline-flex items-center rounded-[7px] px-2 py-[5px] text-[11.5px] leading-none"
@@ -311,9 +311,9 @@ export function Bar({
     ? color
     : gold
       ? 'linear-gradient(90deg,#c8a95d,#9c7a37)'
-      : 'rgba(20,16,8,0.22)'
+      : 'var(--color-faint2)'
   return (
-    <div style={{ height: h, width: '100%', background: 'rgba(20,16,8,0.07)', borderRadius: 99 }}>
+    <div style={{ height: h, width: '100%', background: 'var(--color-line)', borderRadius: 99 }}>
       <div
         style={{
           height: '100%',
@@ -385,7 +385,7 @@ export function IconBox({
         borderRadius: radius,
         background: active ? 'rgba(200,169,93,0.14)' : 'rgba(20,16,8,0.05)',
         boxShadow: active ? '0 0 0 1px rgba(200,169,93,0.32)' : 'none',
-        color: active ? '#9c7a37' : '#8a857e',
+        color: active ? 'var(--color-gold-dk)' : 'var(--color-faint)',
       }}
     >
       {children}
@@ -413,7 +413,7 @@ export function Spark({
     h - 3 - ((d - min) / span) * (h - 8),
   ])
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')
-  const c = gold ? '#c8a95d' : '#8a857e'
+  const c = gold ? '#c8a95d' : 'var(--color-faint)'
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       <path

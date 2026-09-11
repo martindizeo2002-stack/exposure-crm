@@ -2,6 +2,7 @@
 @import 'tw-animate-css';
 @import 'driver.js/dist/driver.css';
 @import '../components/exposure/exposure.css';
+@import '../components/exposure/tema-futurista.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -47,45 +48,70 @@
   --color-ink: #141414; --color-ink2: #5e5a54; --color-mute: #6a655e; --color-faint: #8a857e; --color-faint2: #a9a49b;
   --color-gold: #c8a95d; --color-gold-lt: #dec27c; --color-gold-dk: #9c7a37;
   --color-line: rgba(0, 0, 0, 0.07); --color-line2: rgba(0, 0, 0, 0.12);
+  --color-pill: #1a1a1a; --color-pill-fg: #f7f5f0;
+  /* raíl de navegación */
+  --rail-bg: linear-gradient(180deg, #171717 0%, #131313 55%, #101010 100%);
+  --rail-shadow: 1px 0 0 rgba(0, 0, 0, 0.16), 14px 0 44px rgba(20, 16, 8, 0.10);
+  --rail-fg: #c8c4bc; --rail-fg-2: #a19d95; --rail-fg-strong: #f7f5f0;
+  --rail-muted: #8b877f; --rail-muted-2: #6f6b64; --rail-icon: #7d7972; --rail-warn: #e5a4a4;
+  --rail-item: rgba(255, 255, 255, 0.045); --rail-item-on: rgba(255, 255, 255, 0.055);
+  --rail-accent: #dec27c; --rail-accent-glow: rgba(222, 194, 124, 0.6); --rail-accent-ring: rgba(200, 169, 93, 0.35);
+  --rail-avatar: linear-gradient(160deg, #2a2419, #141414);
+  /* las señales del panel: violeta, verde, ámbar, rojo, cian, magenta */
+  --neon-violet: #8f8cff; --neon-green: #1cce79; --neon-amber: #f4a437; --neon-red: #f94144;
+  --neon-cyan: #00bbe2; --neon-magenta: #df59d7; --neon-teal: #00c6bd;
 }
 
 .dark {
-  --background: #121212;
-  --foreground: #f4f1ea;
-  --card: #1a1a1a;
-  --card-foreground: #f4f1ea;
-  --popover: #1a1a1a;
-  --popover-foreground: #f4f1ea;
-  --primary: #dec27c;
-  --primary-foreground: #141414;
-  --secondary: #232323;
-  --secondary-foreground: #f4f1ea;
-  --muted: #232323;
-  --muted-foreground: #a9a49b;
-  --accent: rgba(200, 169, 93, 0.18);
-  --accent-foreground: #dec27c;
-  --destructive: oklch(0.637 0.237 25.331);
+  /* ── Tema oscuro futurista: la paleta del Panel del negocio ─────────
+     negro azulado, grafito para las tarjetas, violeta como acento y las
+     señales verde / ámbar / rojo / cian / magenta para los estados. */
+  --background: #0b0d14;
+  --foreground: #edeef2;
+  --card: #12141d;
+  --card-foreground: #edeef2;
+  --popover: #12141d;
+  --popover-foreground: #edeef2;
+  --primary: #8f8cff;
+  --primary-foreground: #0b0d14;
+  --secondary: #181b25;
+  --secondary-foreground: #edeef2;
+  --muted: #181b25;
+  --muted-foreground: #8b8f9c;
+  --accent: rgba(143, 140, 255, 0.16);
+  --accent-foreground: #c3c1ff;
+  --destructive: #f94144;
   --destructive-foreground: #ffffff;
   --border: rgba(255, 255, 255, 0.09);
   --input: rgba(255, 255, 255, 0.12);
-  --ring: #dec27c;
-  --chart-1: #dec27c;
-  --chart-2: #2fb79a;
-  --chart-3: #3ba8f0;
-  --chart-4: #7c5cfa;
-  --chart-5: #f2794c;
-  --sidebar: #0f0f0f;
-  --sidebar-foreground: #c8c4bc;
-  --sidebar-primary: #dec27c;
-  --sidebar-primary-foreground: #141414;
-  --sidebar-accent: rgba(255, 255, 255, 0.055);
-  --sidebar-accent-foreground: #f7f5f0;
+  --ring: #8f8cff;
+  --chart-1: #8f8cff;
+  --chart-2: #1cce79;
+  --chart-3: #f4a437;
+  --chart-4: #00bbe2;
+  --chart-5: #df59d7;
+  --sidebar: #0a0c13;
+  --sidebar-foreground: #c3c6d6;
+  --sidebar-primary: #8f8cff;
+  --sidebar-primary-foreground: #0b0d14;
+  --sidebar-accent: rgba(143, 140, 255, 0.12);
+  --sidebar-accent-foreground: #f4f5fa;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #dec27c;
-  --sidebar-muted: #8b877f;
-  --color-page: #121212; --color-card-warm: #1c1b18; --color-soft: #232323; --color-soft2: #2a2a2a;
-  --color-ink: #f4f1ea; --color-ink2: #c8c4bc; --color-mute: #a9a49b; --color-faint: #8a857e; --color-faint2: #6f6b64;
-  --color-line: rgba(255, 255, 255, 0.09); --color-line2: rgba(255, 255, 255, 0.14);
+  --sidebar-ring: #8f8cff;
+  --sidebar-muted: #7d8299;
+  --color-page: #0b0d14; --color-card-warm: #151824; --color-soft: #181b25; --color-soft2: #1f2331;
+  --color-rail: #0a0c13; --color-rail2: #12141d; --color-rail3: #181b25;
+  --color-ink: #edeef2; --color-ink2: #c3c6d6; --color-mute: #8b8f9c; --color-faint: #7d8299; --color-faint2: #5f6479;
+  --color-gold: #f4a437; --color-gold-lt: #ffc46a; --color-gold-dk: #f4a437;
+  --color-line: rgba(255, 255, 255, 0.08); --color-line2: rgba(255, 255, 255, 0.13);
+  --color-pill: #262a3a; --color-pill-fg: #f4f5fa;
+  --rail-bg: rgba(10, 12, 19, 0.86);
+  --rail-shadow: 1px 0 0 rgba(255, 255, 255, 0.06), 14px 0 44px rgba(0, 0, 0, 0.45);
+  --rail-fg: #c3c6d6; --rail-fg-2: #9a9eb3; --rail-fg-strong: #f4f5fa;
+  --rail-muted: #7d8299; --rail-muted-2: #5f6479; --rail-icon: #6f7489; --rail-warn: #ff8f94;
+  --rail-item: rgba(255, 255, 255, 0.045); --rail-item-on: rgba(143, 140, 255, 0.12);
+  --rail-accent: #8f8cff; --rail-accent-glow: rgba(143, 140, 255, 0.65); --rail-accent-ring: rgba(143, 140, 255, 0.45);
+  --rail-avatar: linear-gradient(160deg, #24275a, #12141d);
 }
 
 @theme inline {
@@ -159,10 +185,11 @@
     overflow-x: hidden;
   }
   ::selection { background: rgba(200, 169, 93, 0.26); }
+  .dark ::selection { background: rgba(143, 140, 255, 0.35); }
 }
 
 @layer utilities {
-  .glass { @apply border border-black/[.055] bg-white shadow-[0_1px_2px_rgba(20,16,8,0.03),0_10px_30px_rgba(20,16,8,0.035)] dark:border-black/[.055] dark:bg-white; }
+  .glass { @apply border border-black/[.055] bg-white shadow-[0_1px_2px_rgba(20,16,8,0.03),0_10px_30px_rgba(20,16,8,0.035)] dark:border-white/[.08] dark:bg-card; }
   .surface { @apply rounded-2xl border border-black/[.06] bg-card shadow-sm shadow-black/[.025] transition-all duration-300 dark:border-white/[.08]; }
   .surface-hover { @apply hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/[.06]; }
   .page-enter { animation: page-enter .45s cubic-bezier(.2,.8,.2,1) both; }
@@ -188,26 +215,26 @@
   .crm-large-text body { letter-spacing: .005em; }
   .crm-spacious main table td, .crm-spacious main table th { padding-top: 1rem; padding-bottom: 1rem; }
   .crm-spacious main [data-slot="input"], .crm-spacious main [data-slot="select-trigger"] { min-height: 3rem; }
-  .premium-panel { @apply rounded-[18px] border border-black/[.055] bg-white shadow-[0_1px_2px_rgba(20,16,8,0.03),0_10px_30px_rgba(20,16,8,0.04)] transition-all duration-300 dark:border-white/[.08] dark:bg-white; }
+  .premium-panel { @apply rounded-[18px] border border-black/[.055] bg-white shadow-[0_1px_2px_rgba(20,16,8,0.03),0_10px_30px_rgba(20,16,8,0.04)] transition-all duration-300 dark:border-white/[.08] dark:bg-card; }
   .premium-panel:hover { box-shadow: 0 20px 55px rgb(0 0 0 / .09); }
-  .metal-icon { @apply border border-black/[.055] bg-gradient-to-br from-white via-zinc-100 to-zinc-300 text-zinc-700 shadow-lg shadow-black/10 dark:border-black/[.055] dark:from-zinc-500 dark:via-zinc-700 dark:to-zinc-900 dark:text-white; }
-  main [data-slot="card"] { @apply relative overflow-hidden rounded-[18px] border-black/[.055] bg-white shadow-[0_1px_2px_rgba(20,16,8,0.03),0_10px_30px_rgba(20,16,8,0.04)] transition-all duration-300 dark:border-white/[.08] dark:bg-white; }
+  .metal-icon { @apply border border-black/[.055] bg-gradient-to-br from-white via-zinc-100 to-zinc-300 text-zinc-700 shadow-lg shadow-black/10 dark:border-white/[.08] dark:from-zinc-500 dark:via-zinc-700 dark:to-zinc-900 dark:text-white; }
+  main [data-slot="card"] { @apply relative overflow-hidden rounded-[18px] border-black/[.055] bg-white shadow-[0_1px_2px_rgba(20,16,8,0.03),0_10px_30px_rgba(20,16,8,0.04)] transition-all duration-300 dark:border-white/[.08] dark:bg-card; }
   main [data-slot="card"]::before { content: ""; @apply pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-90; }
   main [data-slot="card"]:hover { transform: translateY(-2px); box-shadow: 0 22px 48px rgb(0 0 0 / .075); }
   main [data-slot="button"] { @apply rounded-xl font-semibold shadow-sm transition-all duration-200; }
   main [data-slot="button"]:hover { @apply -translate-y-0.5 shadow-md; }
   main [data-slot="button"]:active { transform: scale(.98); }
-  main [data-slot="input"], main [data-slot="textarea"], main [data-slot="select-trigger"] { @apply min-h-11 rounded-xl border-black/[.07] bg-white px-3.5 shadow-inner shadow-black/[.025] transition-all duration-200 dark:border-black/[.055] dark:bg-white; }
-  main [data-slot="input"]:hover, main [data-slot="textarea"]:hover, main [data-slot="select-trigger"]:hover { @apply border-black/15 bg-white dark:border-black/[.055] dark:bg-white; }
-  main [data-slot="input"]:focus, main [data-slot="textarea"]:focus, main [data-slot="select-trigger"]:focus { @apply bg-white shadow-lg shadow-[#c8a95d]/10 dark:bg-white; }
-  [data-slot="select-content"], [data-slot="dropdown-menu-content"], [data-slot="popover-content"] { @apply rounded-2xl border-black/[.055] bg-white p-1.5 shadow-2xl shadow-black/15 dark:border-black/[.055] dark:bg-zinc-950/90; }
+  main [data-slot="input"], main [data-slot="textarea"], main [data-slot="select-trigger"] { @apply min-h-11 rounded-xl border-black/[.07] bg-white px-3.5 shadow-inner shadow-black/[.025] transition-all duration-200 dark:border-white/[.08] dark:bg-card; }
+  main [data-slot="input"]:hover, main [data-slot="textarea"]:hover, main [data-slot="select-trigger"]:hover { @apply border-black/15 bg-white dark:border-white/[.08] dark:bg-card; }
+  main [data-slot="input"]:focus, main [data-slot="textarea"]:focus, main [data-slot="select-trigger"]:focus { @apply bg-white shadow-lg shadow-[#c8a95d]/10 dark:bg-card; }
+  [data-slot="select-content"], [data-slot="dropdown-menu-content"], [data-slot="popover-content"] { @apply rounded-2xl border-black/[.055] bg-white p-1.5 shadow-2xl shadow-black/15 dark:border-white/[.08] dark:bg-zinc-950/90; }
   [data-slot="select-item"], [data-slot="dropdown-menu-item"] { @apply my-0.5 rounded-xl px-3 py-2.5 transition-colors; }
   [data-slot="dialog-overlay"] { @apply bg-zinc-950/55 ; }
   /* Overflow belongs to the dialog component/instance. Setting it on this
      higher-specificity selector disables overflow-y-auto in every modal. */
-  [data-slot="dialog-content"] { @apply rounded-[18px] border-black/[.055] bg-white shadow-2xl shadow-black/25 dark:border-black/[.055] dark:bg-zinc-950/88; }
+  [data-slot="dialog-content"] { @apply rounded-[18px] border-black/[.055] bg-white shadow-2xl shadow-black/25 dark:border-white/[.08] dark:bg-zinc-950/88; }
   main table { @apply overflow-hidden rounded-2xl; }
-  main table thead { @apply bg-zinc-950/[.035] dark:bg-white; }
+  main table thead { @apply bg-zinc-950/[.035] dark:bg-card; }
   main table th { @apply h-12 text-[10px] font-semibold uppercase tracking-[.09em] text-muted-foreground; }
   main table tbody tr { @apply border-b-black/[.045] transition-all duration-200 dark:border-b-white/[.055]; }
   main table tbody tr:hover { @apply bg-[#c8a95d]/[.07] dark:bg-[#c8a95d]/[.10]; }
@@ -215,7 +242,7 @@
   .crm-section-title { @apply flex items-center gap-3 text-lg font-semibold tracking-tight; }
   .crm-section-title::before { content: ""; @apply h-7 w-1 rounded-full bg-gradient-to-b from-[#c8a95d] to-[#9c7a37] shadow-md shadow-[#c8a95d]/25; }
   .crm-module-page { @apply mx-auto w-full max-w-[1700px] space-y-5 px-4 py-5 sm:px-6 sm:py-6 lg:px-8; }
-  .crm-hero { @apply relative flex flex-col gap-5 overflow-hidden rounded-[18px] border border-black/[.055] bg-zinc-950 px-5 py-5 text-white shadow-2xl shadow-black/15 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-black/[.055]; }
+  .crm-hero { @apply relative flex flex-col gap-5 overflow-hidden rounded-[18px] border border-black/[.055] bg-zinc-950 px-5 py-5 text-white shadow-2xl shadow-black/15 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/[.08]; }
   .crm-hero::before { content: ""; @apply pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-[#c8a95d]/25 blur-3xl; }
   .crm-hero::after { content: ""; @apply pointer-events-none absolute -bottom-20 left-1/3 h-40 w-80 rounded-full bg-[#c8a95d]/10 blur-3xl; }
   .crm-hero h1 { @apply mt-1 text-2xl font-semibold tracking-[-.04em] text-white sm:text-3xl; }
@@ -223,13 +250,13 @@
   .crm-eyebrow { @apply flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.12em] text-white/45; }
   .crm-hero-copy { @apply mt-1 max-w-2xl text-xs leading-relaxed text-white/50 sm:text-sm; }
   .crm-kpis { @apply grid grid-cols-2 gap-3 lg:grid-cols-4; }
-  .crm-stat { @apply relative overflow-hidden rounded-[18px] border border-black/[.055] bg-white p-4 shadow-[0_1px_2px_rgba(20,16,8,0.03),0_8px_24px_rgba(20,16,8,0.04)] transition duration-300 hover:-translate-y-0.5 hover:shadow-xl dark:border-white/[.08] dark:bg-white; }
+  .crm-stat { @apply relative overflow-hidden rounded-[18px] border border-black/[.055] bg-white p-4 shadow-[0_1px_2px_rgba(20,16,8,0.03),0_8px_24px_rgba(20,16,8,0.04)] transition duration-300 hover:-translate-y-0.5 hover:shadow-xl dark:border-white/[.08] dark:bg-card; }
   .crm-stat::after { content: ""; @apply pointer-events-none absolute inset-x-5 bottom-0 h-px bg-gradient-to-r from-transparent via-[#c8a95d]/55 to-transparent; }
   .crm-stat-label { @apply text-[10px] font-semibold uppercase tracking-[.09em] text-muted-foreground; }
   .crm-stat-value { @apply mt-1 text-xl font-semibold tracking-tight tabular-nums sm:text-2xl; }
   .crm-stat-detail { @apply mt-1 truncate text-[10px] text-muted-foreground; }
-  .crm-toolbar { @apply flex flex-col gap-3 rounded-[18px] border border-black/[.055] bg-white p-3 shadow-[0_1px_2px_rgba(20,16,8,0.03),0_8px_24px_rgba(20,16,8,0.035)] sm:flex-row sm:items-end sm:justify-between dark:border-white/[.08] dark:bg-white; }
-  .crm-data-panel { @apply overflow-hidden rounded-[18px] border border-black/[.055] bg-white shadow-[0_1px_2px_rgba(20,16,8,0.03),0_10px_30px_rgba(20,16,8,0.04)] dark:border-white/[.08] dark:bg-white; }
+  .crm-toolbar { @apply flex flex-col gap-3 rounded-[18px] border border-black/[.055] bg-white p-3 shadow-[0_1px_2px_rgba(20,16,8,0.03),0_8px_24px_rgba(20,16,8,0.035)] sm:flex-row sm:items-end sm:justify-between dark:border-white/[.08] dark:bg-card; }
+  .crm-data-panel { @apply overflow-hidden rounded-[18px] border border-black/[.055] bg-white shadow-[0_1px_2px_rgba(20,16,8,0.03),0_10px_30px_rgba(20,16,8,0.04)] dark:border-white/[.08] dark:bg-card; }
   .crm-data-panel-header { @apply flex flex-col gap-3 border-b border-black/[.055] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-white/[.06]; }
   .crm-empty { @apply flex min-h-48 flex-col items-center justify-center px-6 py-12 text-center; }
   .crm-scroll-shell { @apply overflow-auto; scrollbar-width: thin; scrollbar-color: rgb(161 161 170 / .45) transparent; }

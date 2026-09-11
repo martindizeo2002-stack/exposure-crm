@@ -18,7 +18,7 @@ import { AgentBadge, Card, Label, PageHead, Stats, Tag, type AgentKey } from '@/
 
 /* jerarquía: hub con color de identidad · memoria principal oscura · apoyo gris claro */
 const FILL: Record<Tier, string> = { hub: '#c8a95d', mid: '#403c35', small: '#c9c2b6' }
-const LBL: Record<Tier, string> = { hub: '#1a1a1a', mid: '#3d3a35', small: '#8a857e' }
+const LBL: Record<Tier, string> = { hub: 'var(--color-ink)', mid: 'var(--color-ink2)', small: 'var(--color-faint)' }
 
 /** insignia del agente dueño de cada clúster */
 const CLUSTER_AGENT: Partial<Record<Cluster, AgentKey>> = {
@@ -69,16 +69,16 @@ export default function MemoriaCompartida() {
           <div className="flex items-center gap-6 pb-1">
             <div className="text-right">
               <div className="val text-[20px]">{NODES.length}</div>
-              <div className="mt-[7px] text-[11.5px]" style={{ color: '#8a857e' }}>
+              <div className="mt-[7px] text-[11.5px]" style={{ color: 'var(--color-faint)' }}>
                 recuerdos
               </div>
             </div>
             <span style={{ width: 1, height: 34, background: 'rgba(0,0,0,0.09)' }} />
             <div className="text-right">
-              <div className="val text-[20px]" style={{ color: '#9c7a37' }}>
+              <div className="val text-[20px]" style={{ color: 'var(--color-gold-dk)' }}>
                 {EDGES.length}
               </div>
-              <div className="mt-[7px] text-[11.5px]" style={{ color: '#8a857e' }}>
+              <div className="mt-[7px] text-[11.5px]" style={{ color: 'var(--color-faint)' }}>
                 conexiones
               </div>
             </div>
@@ -98,7 +98,7 @@ export default function MemoriaCompartida() {
                   className="inline-flex items-center gap-2 rounded-[7px] px-2.5 py-[6px] text-[11px]"
                   style={{
                     background: on ? `${CLUSTER_ACCENT[c]}1a` : 'rgba(20,16,8,0.045)',
-                    color: on ? CLUSTER_ACCENT[c] : '#6a655e',
+                    color: on ? CLUSTER_ACCENT[c] : 'var(--color-mute)',
                     fontWeight: on ? 550 : 450,
                   }}
                 >
@@ -180,7 +180,8 @@ export default function MemoriaCompartida() {
                     key={i}
                     d={`M${A.x},${A.y} Q${cx},${cy} ${B.x},${B.y}`}
                     fill="none"
-                    stroke={live ? CLUSTER_ACCENT[node.cluster] : '#141414'}
+                    stroke={live ? CLUSTER_ACCENT[node.cluster] : undefined}
+                    style={live ? undefined : { stroke: 'var(--color-ink)' }}
                     strokeWidth={live ? 1 : 0.5}
                     opacity={live ? 0.5 : e.strong ? 0.16 : 0.085}
                   />
@@ -242,8 +243,7 @@ export default function MemoriaCompartida() {
                           x={n.x}
                           y={n.y + r + 12}
                           textAnchor="middle"
-                          fill={isSel ? CLUSTER_ACCENT[n.cluster] : LBL[n.tier]}
-                          style={{ fontSize: n.tier === 'mid' ? 10.5 : 9.5 }}
+                          style={{ fontSize: n.tier === 'mid' ? 10.5 : 9.5, fill: isSel ? CLUSTER_ACCENT[n.cluster] : LBL[n.tier] }}
                         >
                           {n.label}
                         </text>
@@ -270,12 +270,12 @@ export default function MemoriaCompartida() {
                 style={{
                   width: 30,
                   height: 30,
-                  background: '#ffffff',
+                  background: 'var(--color-card)',
                   boxShadow: '0 1px 3px rgba(20,16,8,0.10)',
-                  color: '#5e5a54',
+                  color: 'var(--color-ink2)',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#9c7a37')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#5e5a54')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-gold-dk)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-ink2)')}
               >
                 {b.i}
               </button>
@@ -300,7 +300,7 @@ export default function MemoriaCompartida() {
               </div>
               {clusterAgent && <AgentBadge agent={clusterAgent} size={40} active />}
             </div>
-            <p className="mt-4 text-[13.5px] leading-[1.55]" style={{ color: '#5e5a54' }}>
+            <p className="mt-4 text-[13.5px] leading-[1.55]" style={{ color: 'var(--color-ink2)' }}>
               {f.desc}
             </p>
             {node.tier === 'hub' && (
@@ -330,11 +330,11 @@ export default function MemoriaCompartida() {
 
           <div className="px-6 py-5" style={{ borderTop: '1px solid rgba(0,0,0,0.075)' }}>
             <Label>Último aprendizaje</Label>
-            <p className="mt-3.5 text-[13.5px] leading-[1.55]" style={{ color: '#1a1a1a' }}>
+            <p className="mt-3.5 text-[13.5px] leading-[1.55]" style={{ color: 'var(--color-ink)' }}>
               “{f.aprendizaje}”
             </p>
             <div className="mt-4 flex items-center gap-2">
-              <span className="text-[12px]" style={{ color: '#8a857e' }}>
+              <span className="text-[12px]" style={{ color: 'var(--color-faint)' }}>
                 Fuente
               </span>
               <span className="text-[12.5px]" style={{ color: accent, fontWeight: 500 }}>
@@ -375,7 +375,7 @@ export default function MemoriaCompartida() {
               <span className="mono text-[11.5px] flex-none" style={{ color: '#9a958d' }}>
                 {r.t}
               </span>
-              <span className="text-[12.5px] flex-1 truncate" style={{ color: '#5e5a54' }}>
+              <span className="text-[12.5px] flex-1 truncate" style={{ color: 'var(--color-ink2)' }}>
                 {r.m}
               </span>
             </div>

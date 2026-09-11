@@ -29,7 +29,7 @@ export default function CentroDeMando({
         <h1 className="text-[29px] leading-none" style={{ fontWeight: 600, letterSpacing: '-0.03em' }}>
           Centro de Mando
         </h1>
-        <p className="mt-3.5 text-[14px] leading-none" style={{ color: '#6a655e' }}>
+        <p className="mt-3.5 text-[14px] leading-none" style={{ color: 'var(--color-mute)' }}>
           Todo tu equipo de IA operando desde un mismo lugar.
         </p>
       </div>
@@ -57,7 +57,7 @@ export default function CentroDeMando({
                 Todo funcionando correctamente
               </div>
             </div>
-            <p className="mt-4 text-[13.5px] leading-none" style={{ color: '#6a655e' }}>
+            <p className="mt-4 text-[13.5px] leading-none" style={{ color: 'var(--color-mute)' }}>
               5 agentes coordinados por un único sistema.
             </p>
           </div>
@@ -91,7 +91,7 @@ export default function CentroDeMando({
                 <Tag accent={ceoId.color}>Dirección</Tag>
                 <State status="working" size={12.5} color={ceoId.color} />
               </div>
-              <p className="mt-4 text-[13.5px] leading-[1.5] max-w-[540px]" style={{ color: '#5e5a54' }}>
+              <p className="mt-4 text-[13.5px] leading-[1.5] max-w-[540px]" style={{ color: 'var(--color-ink2)' }}>
                 Define prioridades y coordina el trabajo del resto de los agentes.
               </p>
             </div>
@@ -111,7 +111,7 @@ export default function CentroDeMando({
       <SectionTitle
         className="mb-4"
         right={
-          <span className="text-[12.5px]" style={{ color: '#8a857e' }}>
+          <span className="text-[12.5px]" style={{ color: 'var(--color-faint)' }}>
             4 especialistas
           </span>
         }
@@ -148,12 +148,12 @@ export default function CentroDeMando({
               >
                 {a.name}
               </div>
-              <p className="mt-3 text-[13px] leading-[1.45]" style={{ color: '#6a655e', minHeight: 38 }}>
+              <p className="mt-3 text-[13px] leading-[1.45]" style={{ color: 'var(--color-mute)', minHeight: 38 }}>
                 {a.short}
               </p>
               <div className="mt-5 flex items-end justify-between">
                 <Stat value={a.metric.value} label={a.metric.label} size={24} color={id.color} />
-                <span className="text-[11.5px] pb-[3px]" style={{ color: '#a9a49b' }}>
+                <span className="text-[11.5px] pb-[3px]" style={{ color: 'var(--color-faint2)' }}>
                   {a.role}
                 </span>
               </div>
@@ -166,7 +166,7 @@ export default function CentroDeMando({
       <SectionTitle
         className="mb-4"
         right={
-          <span className="text-[12.5px]" style={{ color: '#8a857e' }}>
+          <span className="text-[12.5px]" style={{ color: 'var(--color-faint)' }}>
             Hoy
           </span>
         }
@@ -183,11 +183,11 @@ export default function CentroDeMando({
               className="row-hover flex items-center gap-4 px-7"
               style={{ height: 51, borderTop: i ? '1px solid rgba(0,0,0,0.06)' : 'none' }}
             >
-              <span className="mono text-[12px] flex-none" style={{ color: '#a9a49b', width: 42 }}>
+              <span className="mono text-[12px] flex-none" style={{ color: 'var(--color-faint2)', width: 42 }}>
                 {r.t}
               </span>
               {key && <AgentBadge agent={key} size={28} />}
-              <span className="text-[14px] flex-1 truncate" style={{ color: '#1a1a1a' }}>
+              <span className="text-[14px] flex-1 truncate" style={{ color: 'var(--color-ink)' }}>
                 {r.m}
               </span>
               {id && <Tag accent={id.color}>{r.who}</Tag>}

@@ -3,9 +3,9 @@ import { AGENDA } from '@/components/exposure/data'
 import { Bar, Card, CardHead, Dot, IDENTITY, PageHead, Stat, byName } from '@/components/exposure/ui'
 
 const STATE_COLOR: Record<string, string> = {
-  Completado: '#8a857e',
-  'En curso': '#9c7a37',
-  Pendiente: '#6a655e',
+  Completado: 'var(--color-faint)',
+  'En curso': 'var(--color-gold-dk)',
+  Pendiente: 'var(--color-mute)',
 }
 
 /* línea del día: progreso dorado + hitos. sin ticks de terminal. */
@@ -46,8 +46,8 @@ function Dia() {
                   width: live ? 13 : 9,
                   height: live ? 13 : 9,
                   borderRadius: 99,
-                  background: done || live ? '#c8a95d' : '#ffffff',
-                  border: `2px solid ${done || live ? '#ffffff' : 'rgba(20,16,8,0.18)'}`,
+                  background: done || live ? 'var(--color-gold)' : 'var(--color-card)',
+                  border: `2px solid ${done || live ? 'var(--color-card)' : 'var(--color-line2)'}`,
                   boxShadow: live
                     ? '0 0 0 4px rgba(200,169,93,0.22)'
                     : '0 1px 2px rgba(20,16,8,0.12)',
@@ -62,7 +62,7 @@ function Dia() {
         />
         <div
           className="absolute text-[11px]"
-          style={{ left: `${(now / 24) * 100}%`, top: -14, color: '#9c7a37', transform: 'translateX(-50%)' }}
+          style={{ left: `${(now / 24) * 100}%`, top: -14, color: 'var(--color-gold-dk)', transform: 'translateX(-50%)' }}
         >
           Ahora
         </div>
@@ -119,19 +119,19 @@ export default function Agenda_() {
             className="row-hover flex items-center gap-5 px-7"
             style={{ height: 60, borderTop: i ? '1px solid rgba(0,0,0,0.07)' : 'none' }}
           >
-            <span className="mono text-[13px] flex-none" style={{ color: '#5e5a54', width: 46 }}>
+            <span className="mono text-[13px] flex-none" style={{ color: 'var(--color-ink2)', width: 46 }}>
               {s.t}
             </span>
             <Dot status={s.state === 'En curso' ? 'working' : s.state === 'Pendiente' ? 'waiting' : 'idle'} size={5} />
             <span
               className="text-[13.5px] flex-1 truncate"
-              style={{ color: s.state === 'Completado' ? '#6a655e' : '#1a1a1a' }}
+              style={{ color: s.state === 'Completado' ? 'var(--color-mute)' : 'var(--color-ink)' }}
             >
               {s.label}
             </span>
             <span className="flex items-center gap-2 flex-none" style={{ width: 165 }}>
               <AgentDot name={s.agent} />
-              <span className="text-[12.5px] truncate" style={{ color: '#8a857e' }}>
+              <span className="text-[12.5px] truncate" style={{ color: 'var(--color-faint)' }}>
                 {s.agent}
               </span>
             </span>
@@ -151,7 +151,7 @@ export default function Agenda_() {
           <div className="mt-4 text-[17px] leading-none" style={{ fontWeight: 550, letterSpacing: '-0.02em' }}>
             Ventana de seguimientos
           </div>
-          <p className="mt-3.5 text-[13px] leading-[1.5]" style={{ color: '#5e5a54' }}>
+          <p className="mt-3.5 text-[13px] leading-[1.5]" style={{ color: 'var(--color-ink2)' }}>
             El Agente Comercial preparó 27 mensajes y espera tu aprobación para enviarlos.
           </p>
           <div className="mt-5 flex items-start" style={{ gap: 44 }}>
@@ -171,15 +171,15 @@ export default function Agenda_() {
             ].map(([k, v, sub]) => (
               <div key={k as string} className="py-3">
                 <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[12.5px]" style={{ color: '#33302b' }}>
+                  <span className="text-[12.5px]" style={{ color: 'var(--color-ink2)' }}>
                     {k as string}
                   </span>
-                  <span className="val text-[13px]" style={{ color: (v as number) > 90 ? '#9c7a37' : '#5e5a54' }}>
+                  <span className="val text-[13px]" style={{ color: (v as number) > 90 ? 'var(--color-gold-dk)' : 'var(--color-ink2)' }}>
                     {v as number}%
                   </span>
                 </div>
                 <Bar pct={v as number} gold={(v as number) > 90} h={4} />
-                <div className="mt-2.5 text-[11.5px]" style={{ color: '#8a857e' }}>
+                <div className="mt-2.5 text-[11.5px]" style={{ color: 'var(--color-faint)' }}>
                   {sub as string}
                 </div>
               </div>

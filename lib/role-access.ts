@@ -27,6 +27,7 @@ const SALES_OPERATIONS = ["CEO", "Sales Manager", "Manager MKT", "Setter", "Clos
 
 const pageRules: Array<[string, CRMRole[]]> = [
   ["/sistema", CRM_ROLES as unknown as CRMRole[]],
+  ["/panel", [...OPERATIONS, "Contaduria"]],   // Panel del negocio (páginas y su index.html)
   ["/sales-game-preview", ["CEO"]],
   ["/accesos", ["CEO"]],
   ["/operaciones-tecnicas", ["CEO"]],
@@ -66,6 +67,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
 ]
 
 const apiRules: Array<[string, CRMRole[]]> = [
+  ["/api/panel", [...OPERATIONS, "Contaduria"]],  // datos del Panel del negocio
   ["/api/security/activity", CRM_ROLES as unknown as CRMRole[]],
   ["/api/operations-health", ["CEO"]],
   ["/api/growth-command", OPERATIONS],
