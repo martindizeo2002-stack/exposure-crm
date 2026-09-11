@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { authorizePreviewSync } from "@/lib/integration-auth"
 
-export const maxDuration = 60
+export const maxDuration = 300
 export const dynamic = "force-dynamic"
 
 // Vercel (plan hobby) permite pocos crons y solo diarios: este único cron dispara todas las
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic"
 const RUTAS: Array<{ ruta: string; requiere?: string }> = [
   { ruta: "/api/manychat-sync", requiere: "MANYCHAT_API_KEY" },
   { ruta: "/api/iclosed-sync", requiere: "ICLOSED_API_KEY" },
-  { ruta: "/api/fathom-sync", requiere: "FATHOM_API_KEY" },
+  { ruta: "/api/fathom-sync?days=7&limit=10", requiere: "FATHOM_API_KEY" },
   { ruta: "/api/fathom-show-reconcile", requiere: "FATHOM_API_KEY" },
   { ruta: "/api/operations-refresh" },
   { ruta: "/api/sheet-sync", requiere: "GOOGLE_SERVICE_ACCOUNT_JSON" },
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   const resultados = await Promise.all(RUTAS.map(async ({ ruta, requiere }) => {
     if (requiere && !process.env[requiere]) return { ruta, estado: "salteada", motivo: `falta ${requiere}` }
     const controlador = new AbortController()
-    const timer = setTimeout(() => controlador.abort(), 50_000)
+    const timer = setTimeout(() => controlador.abort(), 280_000)
     try {
       const r = await fetch(`${base}${ruta}`, { headers: { Authorization: `Bearer ${secreto}` }, cache: "no-store", signal: controlador.signal })
       const cuerpo = await r.text()

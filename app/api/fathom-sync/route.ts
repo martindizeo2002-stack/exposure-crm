@@ -5,7 +5,7 @@ import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { createSupabaseServer } from "@/lib/supabase-server"
 import { CLOSERS_NOMBRE_COMPLETO } from "@/lib/equipo"
 
-export const maxDuration = 60
+export const maxDuration = 300  // Fluid compute: cada llamada se analiza con Claude y 60 s no alcanzan
 
 const FATHOM_URL = "https://api.fathom.ai/external/v1/meetings"
 const CLAUDE_URL = "https://api.anthropic.com/v1/messages"
