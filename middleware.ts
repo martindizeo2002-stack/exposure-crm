@@ -7,7 +7,7 @@ import { canAccessApi, canAccessPage, effectiveCRMRole, homeForRole, isCristianC
 // - *-sync valida CRON_SECRET dentro de cada handler.
 function hasIndependentAuth(pathname: string, method: string) {
   return pathname.startsWith("/api/ingest/")
-    || ["/api/fathom-sync", "/api/fathom-show-reconcile", "/api/manychat-sync", "/api/iclosed-sync", "/api/lead-scoring-sync", "/api/operations-refresh", "/api/finance-monthly-refresh", "/api/sheet-sync", "/api/cron-diario"].includes(pathname)
+    || ["/api/fathom-sync", "/api/fathom-show-reconcile", "/api/manychat-sync", "/api/iclosed-sync", "/api/lead-scoring-sync", "/api/operations-refresh", "/api/finance-monthly-refresh", "/api/sheet-sync", "/api/sheet-pull", "/api/cron-diario"].includes(pathname)
     || (method === "POST" && (pathname === "/api/cuotas" || pathname === "/api/strikes"))
 }
 

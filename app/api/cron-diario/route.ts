@@ -14,6 +14,7 @@ const RUTAS: Array<{ ruta: string; requiere?: string }> = [
   { ruta: "/api/fathom-show-reconcile", requiere: "FATHOM_API_KEY" },
   { ruta: "/api/operations-refresh" },
   { ruta: "/api/sheet-sync", requiere: "GOOGLE_SERVICE_ACCOUNT_JSON" },
+  { ruta: "/api/sheet-pull", requiere: "GOOGLE_SERVICE_ACCOUNT_JSON" },
 ]
 
 export async function GET(request: Request) {
