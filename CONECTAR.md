@@ -10,7 +10,9 @@ Las claves van en `.env.local` (y en Vercel). Nunca al repo. Copia de respaldo e
 | ~~1~~ ✅ | Contraseña de la base de Supabase | Alex la pasó el 11/09 (04:20). Está en `exposure-crm-secrets\db-password.txt`. La migración `20260911000001` ya se aplicó (sección 5). | Fees y cuotas desde la pantalla, avisos al sheet. |
 | ~~2~~ ✅ | JSON de la cuenta de servicio de Google | `crm-exposure@original-nation-395419.iam.gserviceaccount.com`, guardado en `exposure-crm-secrets\google-service-account.json` y cargado en Vercel. El sheet ya está compartido con esa cuenta. | Espejo CRM → sheet (sección 4). |
 | 3 | **API key de iClosed** | iClosed → Settings → Integrations / API | Que cada agenda entre sola al pipeline (hoy se cargan del sheet o a mano). |
-| 4 | **API key de Anthropic** | console.anthropic.com → API Keys | La sincronización con Fathom (show / no show real, motivo de no cierre) la exige; también el análisis de llamadas y el asistente interno. |
+| ~~4~~ ✅ | API key de Anthropic | Alex la pasó el 11/09 (04:50). Cargada en `.env.local`, en el respaldo y en Vercel. | Fathom (show / no show real), análisis de llamadas, asistente. |
+| 5 | **¿Bener es closer del equipo?** | Aparece en 34 agendas de septiembre. Hoy se lo cuenta como closer propio (después de junio) y no tiene usuario. | Leaderboards y usuario. |
+| 6 | **Duración de cada programa** | IA Partner y Agency Pro figuran con 4 meses, Content con 3 (sacados del sheet, no de una definición). Están en `lib/programas.ts`. | Fecha de baja automática y "alumnos activos". |
 
 ## 1 · Lo que ya está conectado
 
@@ -38,12 +40,12 @@ Las claves van en `.env.local` (y en Vercel). Nunca al repo. Copia de respaldo e
 | Meta Ads | `META_ADS_ACCESS_TOKEN`, `META_ADS_ACCOUNT_ID` | ✅ |
 | Google Sheets | `GOOGLE_SERVICE_ACCOUNT_JSON` (base64 del JSON), `GOOGLE_SHEET_ID` (`1mLpa1gGCgN29LYt8ul7egX-M5Paej9TY6N7NydND-9w`) | ✅ |
 | iClosed | `ICLOSED_API_KEY` | ⏳ |
-| Anthropic | `ANTHROPIC_API_KEY` | ⏳ la pide Fathom |
+| Anthropic | `ANTHROPIC_API_KEY` | ✅ |
 | Instagram Graph | `IG_ACCESS_TOKEN` + `IG_BUSINESS_ID` | ⏳ depende de la verificación de la app de Meta |
 
-## 3 · ManyChat → CRM en tiempo real (lo hacés vos, 5 minutos)
+## 3 · ManyChat → CRM en tiempo real (5 minutos, en la pantalla de ManyChat)
 
-El CRM ya tiene el endpoint. Hay que decirle a ManyChat que le avise cada vez que un contacto nuevo entra por una keyword (o cuando se le pone el tag de agendado).
+El CRM ya tiene el endpoint. ManyChat no permite crear automatizaciones por API: el paso "External Request" solo se agrega desde su editor de automatizaciones, por eso queda de tu lado (o lo hacemos juntos en una llamada de 5 minutos).
 
 1. ManyChat → **Automation** → abrí el flujo de la keyword (por ejemplo "PARTNER") → agregá un paso **Actions → External Request** al final.
 2. Request type: **POST**. URL: `https://exposure-crm-nu.vercel.app/api/manychat-sync`.
