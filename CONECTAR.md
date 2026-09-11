@@ -59,7 +59,7 @@ El CRM guarda el contacto, lo vincula por Instagram/teléfono a la persona del p
 
 ## 4 · Espejo CRM → Google Sheet (cómo funciona)
 
-- Es de **una sola dirección**: lo que se carga o cambia en el CRM se escribe en el sheet. Lo que escribas a mano en el sheet no vuelve al CRM.
+- Va en las dos direcciones: lo que se carga o cambia en el CRM se escribe en el sheet al instante, y **los pagos que se escriben a mano en la pestaña del mes entran al CRM cada 10 minutos** (`/api/sheet-pull`; necesitan concepto, nombre y monto). Las agendas siguen entrando por iClosed.
 - Cada pago va a `💰 PAGOS <MES>` (columnas E a W: mes, fechas, cliente, teléfono, concepto, operación, closer, setter, calificación, CC USD, CC ARS, comprobante, PPP, fuente, contenido, medio de pago, tipo de cambio). Cada agenda va a `📆 AGENDAS <MES>` (columnas A a AJ, en el orden de tu cabecera).
 - Las 775 filas importadas ya están mapeadas a su fila original: si un closer marca show o cerró en el CRM, se actualiza **esa misma fila** del sheet.
 - Lo nuevo se agrega en la primera fila libre de la pestaña del mes. La pestaña sin mes (`💰 PAGOS`, `📆 AGENDAS`) es la del mes en curso. Si no existe pestaña para un mes, el CRM duplica la última y la llama `💰 PAGOS OCTUBRE` (avisame si preferís crearlas vos).
