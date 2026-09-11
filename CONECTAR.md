@@ -23,7 +23,7 @@ Las claves van en `.env.local` (y en Vercel). Nunca al repo. Copia de respaldo e
 - [x] **ManyChat** — clave probada; 78.204 contactos leídos con sus tags → `crm_integration_assets`, cruce con las agendas por Instagram, conversaciones nuevas por mes y setter en `metricas_manual`.
 - [x] **Panel del negocio** — lee del CRM (agendas, pagos, clientes, métricas).
 - [x] **Calendly** — token probado. Solo tiene activo el evento "1-1 con Alex (Exposure)" (clientes, no ventas); sin webhooks.
-- [x] **Fathom** — clave y secreto de webhook cargados.
+- [x] **Fathom** — funcionando desde el 11/09 (05:05): lee las grabaciones (26 en 30 días), las transcribe y las analiza con Claude (`crm_call_records`), las enlaza a la agenda por el link de Fathom y clasifica las llamadas de venta por título ("Lead x Exposure", Cristian Lescano, Bener Salvo…). Cron cada 30 min. La conciliación de show / no show solo toca agendas "sin resultado" (`show = null`): hoy son 309 históricas sin estado.
 - [x] **Stripe** — clave restringida cargada (solo lectura).
 - [x] **Meta Ads** — token y cuenta `act_…` cargados. El token todavía no ve la página ni el Instagram.
 - [x] **Clave de ingesta** (`CRM_INGEST_KEY`) y **secreto de crons** (`CRON_SECRET`).
