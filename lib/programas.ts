@@ -1,11 +1,10 @@
-// Catalogo de Programas y sus Operaciones preconfiguradas, usado en Carga de
-// Pagos (selector en cascada Programa -> Operacion). Cada operacion define el
-// total del plan (usado en el mensaje PPP) y el programa define la duracion
-// (usada para calcular Fecha de Baja).
+// Catálogo de programas de EXPOSURE (11/09/2026). Alimenta el selector de "Cargar pago",
+// la duración para calcular fecha_baja y el total del contrato. Las etiquetas históricas
+// (tal como están escritas en el sheet CRM CENTRAL 2026) se reconocen en OPERACIONES_HISTORICAS.
+// Duraciones marcadas [CONFIRMAR] salen del sheet (alta → baja = 4 meses) y no de una definición del negocio.
+export type ProgramaId = "ia_partner" | "agency" | "agency_pro" | "content" | "circulo"
 
-export type ProgramaId = "consulting" | "mastermind" | "accion"
-
-export type OperacionCatalogo = { label: string; total: number }
+export type OperacionCatalogo = { label: string; total: number; meses?: number }
 
 export type ProgramaDef = {
   id: ProgramaId
@@ -17,46 +16,109 @@ export type ProgramaDef = {
 
 export const PROGRAMAS: ProgramaDef[] = [
   {
-    id: "consulting",
-    nombreCompleto: "CRM Base Consulting",
-    nombreCorto: "Consulting",
-    duracionMeses: 4,
+    id: "ia_partner",
+    nombreCompleto: "IA Partner",
+    nombreCorto: "IA Partner",
+    duracionMeses: 4, // [CONFIRMAR]
     operaciones: [
-      { label: "Consulting | $1,800 PIF", total: 1800 },
-      { label: "Consulting | $2,450 PP", total: 2450 },
-      { label: "Consulting | $2,300 PP", total: 2300 },
-      { label: "Consulting | $1,800 PP", total: 1800 },
+      { label: "IA PARTNER | $1300 PIF", total: 1300 },
+      { label: "IA PARTNER | $1300 PP", total: 1300 },
+      { label: "IA PARTNER | $2000 PP", total: 2000 },
     ],
   },
   {
-    id: "mastermind",
-    nombreCompleto: "CRM Base Mastermind",
-    nombreCorto: "Mastermind",
-    duracionMeses: 6,
-    operaciones: [{ label: "Mastermind | $3,500 PIF", total: 3500 }],
+    id: "agency",
+    nombreCompleto: "Exposure Agency",
+    nombreCorto: "Agency",
+    duracionMeses: 4,
+    operaciones: [
+      { label: "Agency | $1300 PIF", total: 1300 },
+      { label: "Agency | $1800 (PP)", total: 1800 },
+      { label: "Agency | 3 Pagos (650 + 650 + 500)", total: 1800 },
+      { label: "Agency | $1600 PIF", total: 1600 },
+      { label: "Agency | $2000 PP", total: 2000 },
+      { label: "Agency 8 meses | $800 PIF", total: 800, meses: 8 },
+      { label: "Agency 8 meses | $1100 PIF", total: 1100, meses: 8 },
+    ],
   },
   {
-    id: "accion",
-    nombreCompleto: "CRM Base Acción",
-    nombreCorto: "Acción",
-    duracionMeses: 3,
-    operaciones: [{ label: "Acción | $530 PIF", total: 530 }],
+    id: "agency_pro",
+    nombreCompleto: "Exposure Agency Pro",
+    nombreCorto: "Agency Pro",
+    duracionMeses: 4, // [CONFIRMAR]
+    operaciones: [
+      { label: "Agency Pro | $2300 PIF", total: 2300 },
+      { label: "Agency Pro | $3000 PIF", total: 3000 },
+      { label: "Agency Pro | $4000 PP", total: 4000 },
+      { label: "Agency Pro | 3 cuotas", total: 2300 },
+      { label: "Upsell | Agency Pro $1700", total: 1700 },
+    ],
+  },
+  {
+    id: "content",
+    nombreCompleto: "Exposure Content",
+    nombreCorto: "Content",
+    duracionMeses: 3, // [CONFIRMAR]
+    operaciones: [
+      { label: "Content | $500 PIF", total: 500 },
+      { label: "Content | $600 (PP)", total: 600 },
+      { label: "Content | $700 PP", total: 700 },
+      { label: "Content | $800 PP", total: 800 },
+    ],
+  },
+  {
+    id: "circulo",
+    nombreCompleto: "Círculo Privado",
+    nombreCorto: "Círculo",
+    duracionMeses: 12,
+    operaciones: [
+      { label: "Círculo Privado | $1300 PIF", total: 1300 },
+      { label: "Círculo | 1 año | $1800", total: 1800 },
+    ],
   },
 ]
 
+// Etiquetas tal cual aparecen en los pagos importados del sheet (no se ofrecen en el selector).
 const OPERACIONES_HISTORICAS: Array<{ programaId: ProgramaId; operacion: OperacionCatalogo }> = [
-  { programaId: "consulting", operacion: { label: "Consulting | $1,700 PIF", total: 1700 } },
-  { programaId: "consulting", operacion: { label: "Consulting | $1,700 PP", total: 1700 } },
+  { programaId: "ia_partner", operacion: { label: "IA PARTNER - PIF", total: 1300 } },
+  { programaId: "ia_partner", operacion: { label: "IA PARTNER - 1300 PP", total: 1300 } },
+  { programaId: "ia_partner", operacion: { label: "IA PARTNER  - 1300 PP", total: 1300 } },
+  { programaId: "ia_partner", operacion: { label: "IA PARTNER 2000 PP", total: 2000 } },
+  { programaId: "agency", operacion: { label: "Agency | $1300 (PIF)", total: 1300 } },
+  { programaId: "agency", operacion: { label: "Cuota 1 (Agency)", total: 1800 } },
+  { programaId: "agency", operacion: { label: "Agency 2K", total: 2000 } },
+  { programaId: "agency", operacion: { label: "Agency 1600 pif", total: 1600 } },
+  { programaId: "agency", operacion: { label: "Agency 1600 PIF", total: 1600 } },
+  { programaId: "agency_pro", operacion: { label: "Agency PRO | $3000 (PIF)", total: 3000 } },
+  { programaId: "agency_pro", operacion: { label: "Agency pro 4K", total: 4000 } },
+  { programaId: "agency_pro", operacion: { label: "Agency pro (3 cuotas)", total: 2300 } },
+  { programaId: "agency_pro", operacion: { label: "Upsell (Agency pro 1700)", total: 1700 } },
+  { programaId: "content", operacion: { label: "Content (700) PP", total: 700 } },
+  { programaId: "content", operacion: { label: "Content | $500 (DIFERIDO)", total: 500 } },
+  { programaId: "circulo", operacion: { label: "Upsell - Círculo Privado ($1300 PIF)", total: 1300 } },
+  { programaId: "circulo", operacion: { label: "Circulo | 1 año | 1800", total: 1800 } },
 ]
 
 export function buscarPrograma(id: ProgramaId | string | null | undefined): ProgramaDef | undefined {
   return PROGRAMAS.find((p) => p.id === id)
 }
 
-// Busca a que Programa/Operacion pertenece un string de operacion ya guardado
-// (ej el campo `operacion` de un plan/pago existente). Devuelve null si no
-// matchea ninguna operacion del catalogo actual (planes viejos con strings
-// de operacion que ya no estan en este catalogo).
+function normalizar(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim()
+}
+
+// Programa al que pertenece una operación escrita a mano ("Agency pro 4K", "IA PARTNER - PIF"…).
+export function programaPorTexto(operacionLabel: string | null | undefined): ProgramaDef | undefined {
+  const s = normalizar(operacionLabel || "")
+  if (!s) return undefined
+  if (s.includes("partner")) return buscarPrograma("ia_partner")
+  if (s.includes("circulo")) return buscarPrograma("circulo")
+  if (s.includes("agency pro") || /\bpro\b/.test(s)) return buscarPrograma("agency_pro")
+  if (s.includes("agency")) return buscarPrograma("agency")
+  if (s.includes("content")) return buscarPrograma("content")
+  return undefined
+}
+
 export function buscarProgramaPorOperacion(
   operacionLabel: string | null | undefined,
 ): { programa: ProgramaDef; operacionDef: OperacionCatalogo } | null {
@@ -73,24 +135,36 @@ export function buscarProgramaPorOperacion(
   return null
 }
 
-// Resuelve nombre de programa + duracion + total a partir de un string de
-// operacion guardado, con fallback (suma de filas) para planes viejos que no
-// matcheen el catalogo actual.
+// Meses de una operación: override de la etiqueta ("8 meses", "1 año") o la duración del programa.
+export function mesesDeOperacion(operacionLabel: string | null | undefined): number | null {
+  const match = buscarProgramaPorOperacion(operacionLabel)
+  if (match?.operacionDef.meses != null) return match.operacionDef.meses
+  const s = normalizar(operacionLabel || "")
+  const meses = s.match(/(\d+)\s*meses/)
+  if (meses) return Number(meses[1])
+  if (/\b1 ano\b/.test(s)) return 12
+  const programa = match?.programa || programaPorTexto(operacionLabel)
+  return programa?.duracionMeses ?? null
+}
+
 export function resolverInfoPrograma(
   operacionLabel: string | null | undefined,
   filasFallback: { monto: number }[],
 ): { nombrePrograma: string; duracionLabel: string | null; total: number } {
   const match = buscarProgramaPorOperacion(operacionLabel)
   if (match) {
+    const meses = mesesDeOperacion(operacionLabel)
     return {
       nombrePrograma: match.programa.nombreCompleto,
-      duracionLabel: match.programa.duracionMeses != null ? `${match.programa.duracionMeses} Meses` : null,
+      duracionLabel: meses != null ? `${meses} Meses` : null,
       total: match.operacionDef.total,
     }
   }
+  const porTexto = programaPorTexto(operacionLabel)
+  const meses = mesesDeOperacion(operacionLabel)
   return {
-    nombrePrograma: operacionLabel || "",
-    duracionLabel: null,
+    nombrePrograma: porTexto ? porTexto.nombreCompleto : operacionLabel || "",
+    duracionLabel: meses != null ? `${meses} Meses` : null,
     total: filasFallback.reduce((s, f) => s + (f.monto || 0), 0),
   }
 }

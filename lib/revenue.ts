@@ -93,12 +93,12 @@ export function contractValueFromOperation(operation: string | null | undefined,
     const total = sumOfParts[1].split("+").map(x => moneyNumber(x.trim()) || 0).reduce((a, b) => a + b, 0)
     if (total) return total
   }
-  const thousands = value.match(/(\d+(?:[.,]\d+)?)\s*k/i)
+  const thousands = value.match(/(\d+(?:[.,]\d+)?)\s*k\b/i)
   if (thousands) {
     const amount = moneyNumber(thousands[1])
     if (amount) return amount * 1000
   }
-  const bare = Array.from(value.matchAll(/(?<![\d.,])(\d{3,5})(?![\d.,]*\s*(?:%|meses|mes|cuotas|pagos|x|año))/gi))
+  const bare = Array.from(value.matchAll(/(?<![\d.,])(\d{3,5})(?![\d.,]*\s*(?:%|meses|mes|cuotas|pagos|x\b|año))/gi))
     .map(m => Number(m[1])).filter(n => n >= 300 && n <= 20000)
   if (bare.length) return Math.max(...bare)
 

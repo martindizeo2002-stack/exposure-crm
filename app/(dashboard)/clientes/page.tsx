@@ -107,11 +107,13 @@ function getEtapa(c: Cliente): Etapa {
   return "entrega_activa"
 }
 
-function programa(c: Cliente): "Acción" | "Consulting" | "Mastermind" | "Sin definir" {
+function programa(c: Cliente): "IA Partner" | "Agency Pro" | "Agency" | "Content" | "Círculo" | "Sin definir" {
   const value = norm(c.operacion_original || "")
-  if (value.includes("mastermind")) return "Mastermind"
-  if (value.includes("consulting")) return "Consulting"
-  if (value.includes("accion") || value.includes("downsell")) return "Acción"
+  if (value.includes("partner")) return "IA Partner"
+  if (value.includes("circulo")) return "Círculo"
+  if (value.includes("agency pro") || /pro/.test(value)) return "Agency Pro"
+  if (value.includes("agency")) return "Agency"
+  if (value.includes("content")) return "Content"
   return "Sin definir"
 }
 
@@ -303,10 +305,8 @@ function EditModal({ cliente, onClose }: { cliente: Cliente; onClose: () => void
 
           <div className="col-span-2 rounded-xl border border-blue-500/15 bg-blue-500/5 p-3 text-xs text-muted-foreground">
             <span className="font-semibold text-foreground">Entregables según programa:</span>{" "}
-            {programa(form) === "Acción" && "1 call corta de plan de acción con CSM; sin coaching privado ni acceso a grupos."}
-            {programa(form) === "Consulting" && "3 calls 1:1 con CSM, seguimiento inicial y acceso a comunidad/Skool."}
-            {programa(form) === "Mastermind" && "3 calls 1:1 con CSM, calls con Cuenta A y Cuenta B, seguimiento inicial y acceso a comunidad/Skool."}
-            {programa(form) === "Sin definir" && "Definí la operación original para mostrar los entregables correctos."}
+            {programa(form) !== "Sin definir" && `${programa(form)}: onboarding, calls 1:1 con CSM y acceso a la comunidad según el programa (falta cargar el detalle de entregables por programa).`}
+            {programa(form) === "Sin definir" && "Definí la operación original para mostrar el programa."}
           </div>
 
           <div className="col-span-2 border-t border-border pt-3 mt-1">
