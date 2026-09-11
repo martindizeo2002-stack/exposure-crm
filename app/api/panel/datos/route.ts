@@ -58,7 +58,7 @@ export async function GET() {
       todas<Record<string, unknown>>((a, b) => sb.from("pagos")
         .select("fecha,cliente,tipo,operacion,ppp,closer,setter,fuente,monto")
         .gte("fecha", desdeIso)
-        .is("fecha_baja", null)
+        .is("voided_at", null)  // fecha_baja en EXPOSURE es el fin del programa, no una anulación
         .order("fecha", { ascending: false })
         .range(a, b)),
       todas<Record<string, unknown>>((a, b) => sb.from("cuotas")
