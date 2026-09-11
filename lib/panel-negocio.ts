@@ -20,6 +20,7 @@ export type AgendaPanel = {
   id?: number | string | null
   nombre?: string | null
   fecha_agenda?: string | null
+  fecha_closer?: string | null
   fecha_lead?: string | null
   fecha_tc?: string | null
   closer?: string | null
@@ -93,8 +94,15 @@ export type DatosPanel = {
   meses: Array<{
     mes: string; facturado: number; cobrado: number; leads: number; agendas: number
     presentadas: number; calificadas: number; cierres: number; ads: number; alumnos: number
+    // agendas = llamadas con fecha de llamada en el mes · vencidas = ya ocurrieron · pendientes = todavía no
+    // presentadas / noShow / sinDato reparten las vencidas según el show cargado (true / false / null)
+    vencidas: number; pendientes: number; noShow: number; sinDato: number
     dias?: number; diasTotal?: number
   }>
+  // todas las agendas del mes en curso, una por fila, para la vista "todas / pendientes / sin resultado"
+  agendasMes: Array<{ fecha: string; lead: string; closer: string; setter: string; fuente: string; segmento: string; estado: string; show: boolean | null; cerro: boolean; pendiente: boolean; calificado: boolean }>
+  // el mes en curso por segmento de origen (Webinar, Orgánico, Ads, Outbound…)
+  segmentos: Array<{ segmento: string; agendas: number; vencidas: number; pendientes: number; presentadas: number; noShow: number; sinDato: number; calificadas: number; cierres: number }>
   closers: Array<{ nombre: string; presentadas: number; calificadas: number; cierres: number; cobrado: number }>
   setters: Array<{ nombre: string; inbound: number; fups: number; agendas: number }>
   fuentes: Array<{ nombre: string; leads: number; agendas: number; cierres: number }>
@@ -152,6 +160,17 @@ export function canalDe(fuente: string | null | undefined): string {
   return limpio(fuente)
 }
 
+// Segmento de origen de una agenda (para comparar webinar vs orgánico).
+export function segmentoDe(fuente: string | null | undefined): string {
+  const f = minus(fuente)
+  if (!f) return "Sin fuente"
+  if (/webinar|masterclass|clase/.test(f)) return "Webinar"
+  if (/ads|anuncio|frio|rmkt/.test(f)) return "Ads"
+  if (/outbound|prospecci/.test(f)) return "Outbound"
+  if (/instagram|ig |reel|story|historia|carrusel|bio|manychat|dm|bienvenida|referid|youtube|tiktok|producto/.test(f)) return "Orgánico"
+  return "Otro"
+}
+
 // Mes de una fila de metricas_manual: "2026-09", "Septiembre 2026", una
 // semana ISO "2026-W37" o una fecha; si no hay nada, el mes de created_at.
 function mesMetrica(m: MetricaPanel): string | null {
@@ -182,7 +201,8 @@ export function armarDatosPanel(e: EntradaPanel): DatosPanel {
   const en3 = (k: string | null) => !!k && ultimos3.has(k)
 
   // ── meses ──
-  const filas = meses.map((mes) => ({ mes, facturado: 0, cobrado: 0, leads: 0, agendas: 0, presentadas: 0, calificadas: 0, cierres: 0, ads: 0, alumnos: 0 }))
+  const filas = meses.map((mes) => ({ mes, facturado: 0, cobrado: 0, leads: 0, agendas: 0, presentadas: 0, calificadas: 0, cierres: 0, ads: 0, alumnos: 0, vencidas: 0, pendientes: 0, noShow: 0, sinDato: 0 }))
+  const fechaLlamada = (a: AgendaPanel) => fecha(a.fecha_closer) || fecha(a.fecha_agenda)
   const pagosPorMes = new Map<string, PagoPanel[]>()
   for (const p of e.pagos) {
     const k = mesDe(p.fecha)
@@ -197,12 +217,19 @@ export function armarDatosPanel(e: EntradaPanel): DatosPanel {
     if (i >= 0) filas[i].facturado += newSalesRevenue(lista)
   }
   for (const a of agendas) {
-    const i = idx(mesDe(a.fecha_agenda))
+    const d = fechaLlamada(a)
+    const i = idx(d ? claveMes(d) : mesDe(a.fecha_agenda))
     if (i >= 0) {
       filas[i].agendas++
-      if (a.show) {
-        filas[i].presentadas++
-        if (esCalificada(a)) filas[i].calificadas++
+      const vencida = !d || d <= hoy
+      if (!vencida) filas[i].pendientes++
+      else {
+        filas[i].vencidas++
+        if (a.show === true) {
+          filas[i].presentadas++
+          if (esCalificada(a)) filas[i].calificadas++
+        } else if (a.show === false) filas[i].noShow++
+        else filas[i].sinDato++
       }
     }
     if (a.cerro) {
@@ -371,6 +398,40 @@ export function armarDatosPanel(e: EntradaPanel): DatosPanel {
 
   const redondear = <T extends { cobrado: number }>(x: T) => ({ ...x, cobrado: Math.round(x.cobrado * 100) / 100 })
 
+  // ── agendas del mes en curso (todas, con su estado de show) y corte por segmento ──
+  const mesActual = claveMes(hoy)
+  const agendasMes: DatosPanel["agendasMes"] = agendas
+    .map((a) => ({ a, d: fechaLlamada(a) }))
+    .filter(({ a, d }) => (d ? claveMes(d) : mesDe(a.fecha_agenda)) === mesActual)
+    .sort((x, y) => (x.d?.getTime() || 0) - (y.d?.getTime() || 0))
+    .map(({ a, d }) => ({
+      fecha: d ? `${isoDia(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}` : "",
+      lead: limpio(a.nombre) || "Sin nombre",
+      closer: closerDe(a.closer),
+      setter: limpio(a.setter) || "—",
+      fuente: limpio(a.fuente) || "Sin fuente",
+      segmento: segmentoDe(a.fuente),
+      estado: limpio(a.estado) || "",
+      show: a.show === true ? true : a.show === false ? false : null,
+      cerro: Boolean(a.cerro),
+      pendiente: !!d && d > hoy,
+      calificado: esCalificada(a),
+    }))
+  const segmentos = new Map<string, DatosPanel["segmentos"][number]>()
+  for (const x of agendasMes) {
+    if (!segmentos.has(x.segmento)) segmentos.set(x.segmento, { segmento: x.segmento, agendas: 0, vencidas: 0, pendientes: 0, presentadas: 0, noShow: 0, sinDato: 0, calificadas: 0, cierres: 0 })
+    const sgm = segmentos.get(x.segmento)!
+    sgm.agendas++
+    if (x.pendiente) sgm.pendientes++
+    else {
+      sgm.vencidas++
+      if (x.show === true) { sgm.presentadas++; if (x.calificado) sgm.calificadas++ }
+      else if (x.show === false) sgm.noShow++
+      else sgm.sinDato++
+    }
+    if (x.cerro) sgm.cierres++
+  }
+
   return {
     marca: {
       nombre: e.marca?.nombre || "EXPOSURE",
@@ -388,5 +449,7 @@ export function armarDatosPanel(e: EntradaPanel): DatosPanel {
     pipeline,
     cuotas,
     llamadas,
+    agendasMes,
+    segmentos: [...segmentos.values()].sort((x, y) => y.agendas - x.agendas),
   }
 }
