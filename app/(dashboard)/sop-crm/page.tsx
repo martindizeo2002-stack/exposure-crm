@@ -24,7 +24,7 @@ const roles = [
   ["Closer", "Completa la llamada y seguimiento el mismo día. La IA y Fathom aportan evidencia, no reemplazan su carga."],
   ["Setter", "Completa fuente/UTM/ManyChat, asignación y scoring. S/A/B es calificada; nunca pisa manual con shadow."],
   ["Precaller (pausado)", "Desde agosto de 2026 el paso está oculto por el experimento sin precaller. El histórico se conserva para reactivarlo sin perder datos."],
-  ["CSM / Tony", "Completa formulario, contrato, accesos, onboarding, objetivos/dolores, T1–T4, accionables y upsell."],
+  ["CSM", "Completa formulario, contrato, accesos, onboarding, objetivos/dolores, T1–T4, accionables y upsell."],
   ["Contenido · Cuenta B / Valen", "Pestaña Semanal: cargan/editan fecha, responsable, guion, formato y ángulo (reemplaza Notion). Pestaña Métricas: leen tasas con N y cobertura explícita."],
 ]
 
@@ -93,7 +93,7 @@ export default function SopCrmPage() {
           <Rule title="Tablero semanal" text="Agendas por origen, scoring S/A/B/C/D, presentadas, ventas, Revenue y Cash Collected por closer en la semana en curso, con avance vs objetivo semanal prorrateado de la meta mensual (USD 50k) y ritmo necesario para las semanas restantes. Todo desde agendas/pagos/planes_pago, con numerador y denominador explícitos." />
           <Rule title="Conflictos de identidad" text="Cola de revisión de colisiones teléfono/Instagram/email (tabla crm_identity_conflicts, solo lectura). Nunca se fusiona automáticamente por nombre; la resolución final la hace una persona con evidencia." />
           <Rule title="Asistente interno" text="Responde 5 consultas deterministas sin IA generativa ni web: teléfono de una persona, ángulos con más leads S, brecha vs meta mensual, mejor mes histórico de Cash Collected, y métricas propias por rol. Cada respuesta trae su fuente/fórmula o dice explícitamente que no hay evidencia suficiente. Consultas globales solo CEO/Contaduría; closers/setters solo ven sus propias métricas. Nunca escribe datos." />
-          <Rule title="Avatares del equipo (Leaderboard)" text="Marcos, Tomás y Santy tienen foto real en /equipo (tarjetas y tablas de closers/setters). El resto del equipo sigue mostrando iniciales; agregar una foto nueva es subir el archivo a public/avatars y sumar la entrada en TEAM_AVATARS." />
+          <Rule title="Avatares del equipo (Leaderboard)" text="El equipo se muestra con iniciales en /equipo (tarjetas y tablas de closers/setters). Agregar una foto es subir el archivo a public/avatars y sumar la entrada en TEAM_AVATARS." />
           <Rule title="Contenido · espacio semanal" text="La pestaña Semanal en /contenido-angulos reúne Esta semana + Biblioteca/Calendario, con detalle por pieza (guion, insight, responsable, ángulo, formato y estado). El planificador histórico de Notion está importado en el CRM. La pestaña Métricas y ángulos concentra la lectura de resultados." />
           <Rule title="Trazabilidad de ángulos" text="Solo se crea persona→ángulo cuando la fuente lo nombra explícitamente (por ejemplo, Recurso = GAME) o una señal estructurada trae primary_angle con evidencia. CTA, título, fecha, palabra parecida o nombre de persona no alcanzan. Sin prueba queda Sin ángulo." />
         </div>

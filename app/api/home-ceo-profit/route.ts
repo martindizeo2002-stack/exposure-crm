@@ -3,6 +3,7 @@ import { effectiveCRMRole } from "@/lib/role-access"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { createSupabaseServer } from "@/lib/supabase-server"
 import { buildAccountAttributor, type BusinessAccount } from "@/lib/business-account"
+import { BECCPP_TYPES, FECCPP_TYPES } from "@/lib/commission-scheme"
 
 export async function GET(request: Request) {
   const session = await createSupabaseServer()
@@ -65,7 +66,8 @@ export async function GET(request: Request) {
     }
   }
   const softwareCost = softwareRows.reduce((sum, row) => sum + Number(row.monto_usd || 0), 0)
-  const installmentConcept = (concept: string) => concept.startsWith("Cuota") || concept === "Completó PIF + Acceso Total Consulting" || concept === "Completa Total (Post Venta)" || concept === "Completa Total + Acceso Acción" || concept === "Completa Total y Finaliza Pago"
+  // Cuotas pendientes de un plan (FE o BE). Un "Completó PIF" no es cuota.
+  const installmentConcept = (concept: string) => concept.startsWith("Cuota") || FECCPP_TYPES.has(concept) || BECCPP_TYPES.has(concept)
   const pendingItems = (plans || []).flatMap((plan: any) => plan.plan_pago_items || [])
     .filter((item: any) => item.estado === "pendiente" && !item.pago_id && installmentConcept(String(item.concepto || "")))
   const pendingInstallments = pendingItems.reduce((sum: number, item: any) => sum + Number(item.monto || 0), 0)

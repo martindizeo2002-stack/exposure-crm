@@ -13,7 +13,7 @@ type Message = { role: "user" | "assistant"; text: string; evidence?: Record<str
 
 const EXAMPLES = [
   "¿Cuánto revenue y cash collected llevamos este mes?",
-  "Cruzame las llamadas de Marcos con sus cierres y decime su tasa.",
+  "Cruzame las llamadas de Nahuel con sus cierres y decime su tasa.",
   "¿Qué clientes tienen cuotas vencidas y quién es el closer?",
   "¿Qué ángulos trajeron más leads S este año?",
 ]

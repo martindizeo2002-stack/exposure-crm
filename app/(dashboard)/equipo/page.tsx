@@ -35,7 +35,7 @@ type SetterData = {
   is_top: boolean; next_target: number; next_rate: number; personal_goal: number | null
 }
 type LeaderboardData = {
-  closers: CloserData[]; setters: SetterData[]; csm_cc: number; csm_comision: number
+  closers: CloserData[]; setters: SetterData[]; csm_nombres?: string[]; csm_cc: number; csm_comision: number
   team_cc_total: number; team_cc_pond?: number
   team_feccu: number; team_feccpp: number; team_beccu: number
 }
@@ -83,19 +83,11 @@ function RankIcon({ index }: { index: number }) {
   return <span className="text-sm font-medium text-muted-foreground">{index + 1}</span>
 }
 
-// Fotos de perfil aprobadas por Cuenta A para el equipo (marcos/tomas/santy).
-// Fuera de estos tres, se sigue mostrando el fallback con iniciales.
-// OJO: los NOMBRES de archivo en public/avatars no coinciden con la persona
-// real que aparece en la foto (mezclados desde la carga original). Confirmado
-// por Cuenta A 23/07: marcos.png = cara de Santy, tomas.png = cara de Marcos,
-// santy.png = cara de Tomás. Se corrige acá el mapeo (persona -> archivo con
-// SU cara real), sin tocar/renombrar los archivos.
-const TEAM_AVATARS: Record<string, string> = {
-  marcos: "/avatars/tomas.png",
-  tomas: "/avatars/santy.png",
-  santi: "/avatars/marcos.png",
-  lolo: "/avatars/lolo.jpg",
-}
+// Fotos de perfil del equipo: clave = primer nombre en minúsculas sin tildes,
+// valor = archivo en public/avatars. Los archivos que hay hoy en esa carpeta
+// son del equipo de la plantilla original, así que EXPOSURE arranca sin fotos
+// (fallback con iniciales) hasta que se suban las propias.
+const TEAM_AVATARS: Record<string, string> = {}
 function avatarSrc(nombre: string): string | undefined {
   const first = nombre.trim().split(/\s+/)[0]
     .toLowerCase()
@@ -321,6 +313,9 @@ export default function EquipoPage() {
   const setters = raw?.setters || []
   const csmCc = raw?.csm_cc ?? 0
   const csmComision = raw?.csm_comision ?? 0
+  // El CSM sale de team_members (rol "CSM") vía /api/leaderboard.
+  const csmNombre = raw?.csm_nombres?.[0] || "Sin CSM asignado"
+  const csmInitials = raw?.csm_nombres?.[0] ? raw.csm_nombres[0].slice(0, 2).toUpperCase() : "CS"
   const teamCCTotal = raw?.team_cc_total ?? raw?.team_cc_pond ?? 0
   const goalBuckets = [
     { label: "FECCU", value: raw?.team_feccu ?? 0, goal: 60000, color: "from-violet-600 to-fuchsia-400" },
@@ -618,10 +613,10 @@ export default function EquipoPage() {
           <CardContent>
             <div className="flex items-center gap-4">
               <Avatar className="h-12 w-12 border-2 border-border">
-                <AvatarFallback className="bg-primary/10 text-primary font-semibold">TO</AvatarFallback>
+                <AvatarFallback className="bg-primary/10 text-primary font-semibold">{csmInitials}</AvatarFallback>
               </Avatar>
               <div>
-                <p className="font-semibold">Tony</p>
+                <p className="font-semibold">{csmNombre}</p>
                 <p className="text-xs text-muted-foreground">Customer Success Manager</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   CC Backend: <span className="font-medium text-foreground">{lbLoading ? "..." : csmCc > 0 ? fUSD(csmCc) : "—"}</span>

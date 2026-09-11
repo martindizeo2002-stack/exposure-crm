@@ -1,6 +1,9 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-import { applyStrikes, closerTopTarget, closerUnlockedRate, frontendCohort, setterUnlockedRate, withinSetterWindow } from "@/lib/commission-scheme"
+import { applyStrikes, BECCU_TYPES, closerTopTarget, closerUnlockedRate, FECCU_TYPES, frontendCohort, setterUnlockedRate, withinSetterWindow } from "@/lib/commission-scheme"
+import { FEE_TIPOS } from "@/lib/cash-collected"
+import { FRONT_END_SALE_TYPES } from "@/lib/revenue"
+import { CEO, nombreCanonico } from "@/lib/equipo"
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -9,43 +12,36 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-// CC Nuevo: cash de CLIENTE NUEVO. Las ventas internas/upsell (cliente que ya pagó) NO cuentan acá.
-const CC_NUEVO_TIPOS = new Set([
-  "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)",
-  "Completó PIF", "Completó PIF (Post Fee)",
-  "Fee", "Refuerzo de Fee",
-  "Adentro en Seguimiento", "Adentro en Seguimiento y Post Fee",
-])
+// CC Nuevo: cash de CLIENTE NUEVO (front end: fee + venta que da acceso).
+// Las ventas internas/upsell (cliente que ya pagó) NO cuentan acá.
+const CC_NUEVO_TIPOS = FECCU_TYPES
 
 // Unidades: solo adquisiciones de cliente NUEVO (no fees, no ventas internas/upsell a cliente existente)
-const UNIDAD_TIPOS = new Set([
-  "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)",
-  "Completó PIF", "Completó PIF (Post Fee)",
-])
+const UNIDAD_TIPOS = FRONT_END_SALE_TYPES
 
 // Se conserva el esquema histórico para no recalcular meses anteriores a
 // agosto de 2026 con reglas que todavía no existían.
 const LEGACY_CC_100 = new Set([
   "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)", "Venta Nueva Interna",
+  "Venta Nueva Interna (Post Fee)",
   "Venta Interna", "Completó PIF", "Completó PIF (Post Fee)", "Fee", "Fee Venta Interna",
   "Refuerzo de Fee", "Adentro en Seguimiento", "Adentro en Seguimiento y Post Fee",
+  "Upsell (Agency)", "Upsell /Agency)",
 ])
 const LEGACY_CC_50 = new Set([
   "Cuota", "Cuota 1", "Cuota 2", "Cuota 3", "Cuota 4", "Cuota 5", "Cuota 6", "Cuota 7", "Cuota 8",
+  "Cuota 9", "Cuota 10",
   "Cuota Venta Interna", "Completa Total (Post Venta)", "Completa Total y Finaliza Pago",
   "Completa Total + Acceso Acción",
   "Completó PIF + Acceso Total Consulting",
 ])
 
-// Ex-integrantes del equipo comercial: dejaron el equipo en junio 2026. Se
-// muestran hasta mayo (donde laburaron), y se ocultan de junio 2026 en
-// adelante. Demian ya no trabaja en el equipo (confirmado por Cuenta A 23/07) y
-// puede aparecer tanto en la tabla de closers como en la de setters segun el
-// mes/rol que haya tenido en la base, asi que el filtro se aplica a AMBAS
-// listas (antes solo excluia setters, por eso seguia colandose como closer).
-const SETTERS_FUERA = new Set(["Agus", "Luis", "Manu", "Demian"])
+// Ex-integrantes que haya que ocultar del ranking a partir de un mes dado.
+// En EXPOSURE los setters históricos (Lukas, Cesar, Santi, Andres) desaparecen
+// solos cuando no tienen actividad en el mes, así que no hace falta listarlos.
+const SETTERS_FUERA = new Set<string>()
 const SETTERS_FUERA_DESDE = "2026-06"
-const CLOSERS_FUERA = new Set(["Demian"])
+const CLOSERS_FUERA = new Set<string>()
 const CLOSERS_FUERA_DESDE = "2026-06"
 
 function getInitials(name: string): string {
@@ -57,32 +53,22 @@ function firstWord(name: string): string {
   return name.trim().split(/\s+/)[0]
 }
 
-const PERSONAL_MONTHLY_GOALS: Record<string, Record<string, number>> = {
-  "2026-09": { marcos: 35000, tomas: 30000, santi: 30000, lolo: 22000 },
-}
+// Metas personales por mes (clave = primer nombre en minúsculas, sin tildes).
+// EXPOSURE todavía no definió metas por persona: vacío hasta que Alex las fije.
+const PERSONAL_MONTHLY_GOALS: Record<string, Record<string, number>> = {}
 
 function personalMonthlyGoal(month: string, name: string): number | null {
   const key = firstWord(name).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
   return PERSONAL_MONTHLY_GOALS[month]?.[key] ?? null
 }
 
-// Conserva nombres canónicos cortos para distinguir a Yafé de Tommy.
 function stripAccents(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim()
 }
-const CANONICAL_NOMBRE: Record<string, string> = {
-  "tomas": "Yafé",
-  "yafe": "Yafé",
-  "tommy": "Tommy",
-  "ardu": "Tommy",
-  "marcos": "Marcos",
-  "tony": "Tony",
-  "demian": "Demian",
-  "santi": "Santi",
-}
+// Apodos del equipo (Nawe → Nahuel, Cris → Cristian, Ken → Kenneth,
+// Maxi → Maximo) viven en lib/equipo.ts.
 function canonical(name: string): string {
-  const first = firstWord(name)
-  return CANONICAL_NOMBRE[stripAccents(first)] || first
+  return nombreCanonico(name)
 }
 
 function isRealMember(name: string): boolean {
@@ -97,9 +83,9 @@ function paymentAccount(value: string | null | undefined): "paul" | "cristian" |
   return null
 }
 
-// Fees: mismo concepto que usa Carga de Pagos / Pipeline para "seña".
-const FEE_TIPOS = new Set(["Fee", "Refuerzo de Fee", "Fee Venta Interna"])
-const BECCU_TIPOS = new Set(["Fee Venta Interna", "Venta Nueva Interna"])
+// Fees (FEE_TIPOS, lib/cash-collected.ts): mismo concepto que usa Carga de
+// Pagos / Pipeline para "seña". Back end upfront: lib/commission-scheme.ts.
+const BECCU_TIPOS = BECCU_TYPES
 
 function round2(n: number) { return Math.round(n * 100) / 100 }
 
@@ -172,10 +158,15 @@ export async function GET(request: Request) {
     const [
       { data: agendas, error: aErr },
       { data: strikesData },
+      { data: csmMembers },
     ] = await Promise.all([
       sb.from("agendas").select("closer,setter,show,cerro,calificacion,estado").or("estado.is.null,estado.neq.Archivada manualmente").gte("fecha_agenda", start).lte("fecha_agenda", end),
       sb.from("strikes").select("nombre,count,updated_at"),
+      // El CSM sale de team_members (rol "CSM"): su cash cuenta como Back-End
+      // con comisión flat, no entra al ranking de closers.
+      sb.from("team_members").select("nombre").eq("rol", "CSM").eq("estado", "aprobado"),
     ])
+    const CSM_NOMBRES = new Set((csmMembers || []).map(m => canonical(m.nombre || "")).filter(Boolean))
     const { error: pErr } = pagosRes
     const pagos = (pagosRes.data || []).map((row) => ({
       ...row,
@@ -277,15 +268,10 @@ export async function GET(request: Request) {
     let teamFeccpp = 0
     let teamBeccu = 0
 
-    // Cuenta A también opera como closer. Debe permanecer visible en el ranking
-    // aun cuando en el mes seleccionado todavía no tenga pagos o llamadas.
-    closerMap.set("Cuenta A", { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
-    if (month === "2026-09") {
-      closerMap.set("Marcos", { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
-      closerMap.set("Yafé", { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
-      setterMap.set("Santi", { cc_nuevo: 0, cc_total: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0 })
-      setterMap.set("Lolo", { cc_nuevo: 0, cc_total: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0 })
-    }
+    // El CEO también cierra. Debe permanecer visible en el ranking aun cuando
+    // en el mes seleccionado todavía no tenga pagos o llamadas. El resto del
+    // equipo aparece solo con actividad real en el mes (ver filtros abajo).
+    closerMap.set(CEO, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
 
     for (const pago of pagos || []) {
       const closer = canonical(pago.closer || "")
@@ -308,7 +294,7 @@ export async function GET(request: Request) {
         ? setterWindow ? monto : 0
         : legacy100 ? monto : legacy50 ? monto * 0.5 : 0
 
-      if (closer === "Tony") { csmCc += monto; continue }
+      if (CSM_NOMBRES.has(closer)) { csmCc += monto; continue }
 
       if (isRealMember(closer)) {
         if (!closerMap.has(closer)) closerMap.set(closer, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_paul: 0, cc_cristian: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
@@ -402,7 +388,7 @@ export async function GET(request: Request) {
           comisiones: round2((uses2026Scheme ? d.commission_base : d.cc_ponderado) * rate),
         }
       })
-      .filter(c => isRealMember(c.nombre) && (c.nombre === "Cuenta A" || c.personal_goal || c.cc_total > 0 || c.llamadas > 0) && !(month >= CLOSERS_FUERA_DESDE && CLOSERS_FUERA.has(c.nombre)))
+      .filter(c => isRealMember(c.nombre) && (c.nombre === CEO || c.personal_goal || c.cc_total > 0 || c.llamadas > 0) && !(month >= CLOSERS_FUERA_DESDE && CLOSERS_FUERA.has(c.nombre)))
       .sort((a, b) => b.cc_total - a.cc_total || Number(Boolean(b.personal_goal)) - Number(Boolean(a.personal_goal)) || b.feccu - a.feccu)
 
     const setters = Array.from(setterMap.entries())
@@ -433,12 +419,13 @@ export async function GET(request: Request) {
       .filter(s => isRealMember(s.nombre) && (s.personal_goal || s.cc_total > 0 || s.agendas > 0) && !(month >= SETTERS_FUERA_DESDE && SETTERS_FUERA.has(s.nombre)))
       .sort((a, b) => b.cc_total - a.cc_total || b.feccu - a.feccu)
 
-    // CSM (Tony): 5% flat sobre CC Back-End (igual que el Sheets)
+    // CSM: 5% flat sobre CC Back-End (igual que el Sheets)
     const csmComision = round2(csmCc * 0.05)
 
     return NextResponse.json({
       closers,
       setters,
+      csm_nombres: [...CSM_NOMBRES],
       csm_cc: round2(csmCc),
       csm_comision: csmComision,
       team_cc_total: round2(teamCCTotal),

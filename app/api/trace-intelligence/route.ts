@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { SALES_ANGLES } from "@/lib/sales-angles"
+import { BECCPP_TYPES, BECCU_TYPES } from "@/lib/commission-scheme"
 import { createSupabaseServer } from "@/lib/supabase-server"
 import {
   BUYER_ARCHETYPES,
@@ -15,7 +16,9 @@ export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 type AnyRow = Record<string, any>
-const RETENTION_PAYMENT_TYPES = new Set(["Fee Venta Interna", "Venta Nueva Interna", "Venta Nueva Interna (Post Fee)", "Cuota Venta Interna", "Upsell", "Rollover"])
+// Cash de retención = back end (cliente existente): Venta Interna, Venta Nueva
+// Interna, Fee/Cuota Venta Interna, Upsell (Agency). Ver lib/commission-scheme.ts.
+const RETENTION_PAYMENT_TYPES = new Set([...BECCU_TYPES, ...BECCPP_TYPES, "Upsell", "Rollover"])
 
 async function allRows(fetchPage: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: any }>) {
   const rows: AnyRow[] = []

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
+import { CLOSERS_ACTIVOS, SETTERS_ACTIVOS, SETTERS_TODOS, settersPara } from "@/lib/equipo"
 import useSWR, { mutate } from "swr"
 import { DateFilter } from "@/components/date-filter"
 import { Button } from "@/components/ui/button"
@@ -87,11 +88,12 @@ const fetcher = async (url: string) => {
   return payload as Agenda[]
 }
 
-const CLOSERS = ["Tony","Yafé","Tommy","Sin Closer","Libre / Recontacto"]
-const SETTERS_FULL = ["Santi","Manu","Lolo","Sin Setter"]
-const SETTERS = ["Santi","Manu","Lolo","Sin Setter"]
-// Luis y Demian dejaron de setear desde junio 2026: solo en agendas de mayo o antes
-const settersFor = (d?: string | null) => (d && String(d).slice(0,7) <= "2026-05") ? SETTERS_FULL : SETTERS
+// Equipo de EXPOSURE (lib/equipo.ts). Los setters históricos (Andres, Santi,
+// Cesar, Lukas) solo se ofrecen en agendas con fecha hasta SETTERS_HISTORICOS_HASTA.
+const CLOSERS = [...CLOSERS_ACTIVOS, "Sin Closer", "Libre / Recontacto"]
+const SETTERS_FULL = [...SETTERS_TODOS, "Sin Setter"]
+const SETTERS = [...SETTERS_ACTIVOS, "Sin Setter"]
+const settersFor = (d?: string | null) => [...settersPara(d), "Sin Setter"]
 const CUENTA = ["@cristiansocial","@cuenta.principal"]
 const CALIFICACION = ["LEAD S","LEAD A","LEAD B","LEAD C","LEAD D"]
 const OCUPACION = ["Negocio","Empleado","Estudiante","No se le envió"]
@@ -1092,7 +1094,7 @@ export default function CentroAgendasPage() {
               <div className="p-4 bg-muted/30 border border-border rounded-lg grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 <FilterSel label="Closer" value={colFilters.closer} options={CLOSERS} onToggle={v => setFilt("closer", v)} onClear={() => clearFilt("closer")} />
                 <FilterSel label="Cuenta" value={colFilters.cuenta} options={CUENTA} onToggle={v => setFilt("cuenta", v)} onClear={() => clearFilt("cuenta")} />
-                <FilterSel label="Setter" value={colFilters.setter} options={SETTERS} onToggle={v => setFilt("setter", v)} onClear={() => clearFilt("setter")} />
+                <FilterSel label="Setter" value={colFilters.setter} options={SETTERS_FULL} onToggle={v => setFilt("setter", v)} onClear={() => clearFilt("setter")} />
                 <FilterSel label="Calificación" value={colFilters.calificacion} options={CALIFICACION} onToggle={v => setFilt("calificacion", v)} onClear={() => clearFilt("calificacion")} />
                 <FuenteFilter value={colFilters.fuente} onToggle={v => setFilt("fuente", v)} onClear={() => clearFilt("fuente")} />
                 <FilterSel label="Call Confirmer" value={colFilters.call_confirmer} options={CALL_CONFIRMER} onToggle={v => setFilt("call_confirmer", v)} onClear={() => clearFilt("call_confirmer")} />

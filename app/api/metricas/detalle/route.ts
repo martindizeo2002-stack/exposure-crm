@@ -1,5 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { BECCPP_TYPES, BECCU_TYPES, FECCPP_TYPES, FECCU_TYPES } from "@/lib/commission-scheme"
+import { ALL_SALE_TYPES, BACK_END_SALE_TYPES, CLOSED_IN_CALL_TYPES } from "@/lib/revenue"
+import { FEE_TIPOS, FRONT_END_FEE_TIPOS } from "@/lib/cash-collected"
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -24,24 +27,12 @@ const SEMANAS: Record<string, Array<[number, number]>> = {
   "2026-12": [[1,6],[7,13],[14,20],[21,27],[28,31]],
 }
 
-const FECCU_TIPOS = new Set([
-  "Fee", "Refuerzo de Fee",
-  "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)",
-  "Completó PIF (Post Fee)",
-])
-const FECCP_TIPOS = new Set([
-  "Completó PIF + Acceso Total Consulting",
-  "Completa Total (Post Venta)",
-  "Completa Total + Acceso Acción",
-  "Completa Total y Finaliza Pago",
-  "Cuota", "Cuota 1", "Cuota 2", "Cuota 3", "Cuota 4", "Cuota 5", "Cuota 6", "Cuota 7", "Cuota 8",
-])
-const BECCU_TIPOS = new Set(["Fee Venta Interna", "Venta Nueva Interna"])
-const BECCPP_TIPOS = new Set(["Cuota Venta Interna"])
-const CIERRES_TIPOS = new Set([
-  "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)",
-  "Completó PIF (Post Fee)", "Venta Nueva Interna",
-])
+// Conjuntos compartidos con app/api/metricas/route.ts (vocabulario de EXPOSURE).
+const FECCU_TIPOS = FECCU_TYPES
+const FECCP_TIPOS = FECCPP_TYPES
+const BECCU_TIPOS = BECCU_TYPES
+const BECCPP_TIPOS = BECCPP_TYPES
+const CIERRES_TIPOS = ALL_SALE_TYPES
 
 function getDateRange(mes: string, weekIdx: number): { start: string; end: string } {
   const [year, mon] = mes.split("-").map(Number)
@@ -61,9 +52,9 @@ function argentinaAgendaBoundary(date: string, end = false): string {
   return new Date(`${date}T${end ? "23:59:59" : "00:00:00"}-03:00`).toISOString().slice(0, 19)
 }
 
-// Para "cash collected por call": SOLO Fee y Venta Nueva (En Call) — los
-// unicos dos tipos que efectivamente pasan por una llamada.
-const CASH_POR_CALL_TIPOS = new Set(["Fee", "Venta Nueva (En Call)"])
+// Para "cash collected por call": SOLO Fee y Venta Nueva (cerrada en la
+// llamada) — los unicos tipos que efectivamente pasan por una llamada.
+const CASH_POR_CALL_TIPOS = new Set(["Fee", ...CLOSED_IN_CALL_TYPES])
 
 // Filtros de pagos por "card" de la pantalla de Métricas — deben coincidir
 // exactamente con las definiciones usadas en app/api/metricas/route.ts.
@@ -78,17 +69,17 @@ const PAGO_FILTERS: Record<string, (row: PagoRow) => boolean> = {
   feccp: r => !backend(r) && FECCP_TIPOS.has(r.tipo),
   beccu,
   beccpp,
-  fees: r => r.tipo === "Fee" || r.tipo === "Refuerzo de Fee",
-  cierres_be: r => r.tipo === "Venta Nueva Interna",
-  cierres_llamada: r => r.tipo === "Venta Nueva (En Call)",
-  cierres_seguimiento: r => r.tipo === "Venta Nueva (Post Fee)" || r.tipo === "Completó PIF (Post Fee)" || r.tipo === "Venta Nueva Interna",
+  fees: r => FRONT_END_FEE_TIPOS.has(r.tipo),
+  cierres_be: r => BACK_END_SALE_TYPES.has(r.tipo),
+  cierres_llamada: r => CLOSED_IN_CALL_TYPES.has(r.tipo),
+  cierres_seguimiento: r => CIERRES_TIPOS.has(r.tipo) && !CLOSED_IN_CALL_TYPES.has(r.tipo),
   cierres_totales: r => CIERRES_TIPOS.has(r.tipo),
   fe_total: r => !backend(r) && (FECCU_TIPOS.has(r.tipo) || FECCP_TIPOS.has(r.tipo)),
   be_total: backend,
   ingresos_totales: r => backend(r) || FECCU_TIPOS.has(r.tipo) || FECCP_TIPOS.has(r.tipo),
-  aov_dia1: r => r.tipo === "Venta Nueva (En Call)" || r.tipo === "Fee",
+  aov_dia1: r => CLOSED_IN_CALL_TYPES.has(r.tipo) || r.tipo === "Fee",
   aov_tc: r => CIERRES_TIPOS.has(r.tipo),
-  pagos_totales: r => CIERRES_TIPOS.has(r.tipo) || r.tipo === "Fee" || r.tipo === "Refuerzo de Fee" || r.tipo === "Fee Venta Interna",
+  pagos_totales: r => CIERRES_TIPOS.has(r.tipo) || FEE_TIPOS.has(r.tipo),
   unidades_cerradas: r => CIERRES_TIPOS.has(r.tipo),
 }
 

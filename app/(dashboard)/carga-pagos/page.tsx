@@ -22,11 +22,13 @@ import { PROGRAMAS, buscarPrograma, buscarProgramaPorOperacion, resolverInfoProg
 import { FuenteSelect } from "@/components/fuente-picker"
 import { CrmPageIntro } from "@/components/crm-ui"
 import { playSaleConfirmedSound } from "@/lib/crm-sounds"
+import { CLOSERS_ACTIVOS, SETTERS_ACTIVOS } from "@/lib/equipo"
 
 /* ======================= Constantes compartidas ======================= */
 
-const CLOSERS = ["Tony", "Yafé", "Tommy", "Sin closer"]
-const SETTERS = ["Santi", "Manu", "Lolo", "Sin Setter"]
+// Equipo de EXPOSURE (lib/equipo.ts): closers activos y setter actual.
+const CLOSERS = [...CLOSERS_ACTIVOS, "Sin closer"]
+const SETTERS = [...SETTERS_ACTIVOS, "Sin Setter"]
 const CALIFICACION = ["LEAD S", "LEAD A", "LEAD B", "LEAD C", "LEAD D"]
 const MEDIO_PAGO = ["Pesos", "Stripe", "USDT", "Efectivo USD", "Efectivo ARS", "Transferencia Bancaria USD", "Western Unión", "PayPal"]
 const NONE = "__NONE__"

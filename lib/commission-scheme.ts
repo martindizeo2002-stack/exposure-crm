@@ -1,3 +1,9 @@
+// Cohortes de comisión sobre `pagos.tipo` (vocabulario de EXPOSURE + etiquetas
+// heredadas de la plantilla original, que nunca aparecen en los datos propios).
+//   FECCU  = front end, cash upfront (fee + venta que da acceso)
+//   FECCPP = front end, cuotas del plan de pago
+//   BECCU  = back end (cliente existente), upfront
+//   BECCPP = back end, cuotas
 export const FECCU_TYPES = new Set([
   "Fee", "Refuerzo de Fee",
   "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)",
@@ -6,19 +12,36 @@ export const FECCU_TYPES = new Set([
 ])
 
 export const FECCPP_TYPES = new Set([
+  "Cuota", "Cuota 1", "Cuota 2", "Cuota 3", "Cuota 4", "Cuota 5",
+  "Cuota 6", "Cuota 7", "Cuota 8", "Cuota 9", "Cuota 10",
+  // Heredados de la plantilla original
   "Completó PIF + Acceso Total Consulting",
   "Completa Total (Post Venta)",
   "Completa Total + Acceso Acción",
   "Completa Total y Finaliza Pago",
-  "Cuota", "Cuota 1", "Cuota 2", "Cuota 3", "Cuota 4", "Cuota 5",
-  "Cuota 6", "Cuota 7", "Cuota 8", "Cuota 9", "Cuota 10",
 ])
 
+export const BECCU_TYPES = new Set([
+  "Fee Venta Interna", "Venta Nueva Interna", "Venta Interna",
+  "Upsell (Agency)", "Upsell /Agency)",
+  // Heredado de la plantilla original
+  "Venta Nueva Interna (Post Fee)",
+])
+
+export const BECCPP_TYPES = new Set(["Cuota Venta Interna"])
+
 export type FrontendCohort = "FECCU" | "FECCPP" | null
+export type BackendCohort = "BECCU" | "BECCPP" | null
 
 export function frontendCohort(tipo: string | null | undefined): FrontendCohort {
   if (FECCU_TYPES.has(tipo || "")) return "FECCU"
   if (FECCPP_TYPES.has(tipo || "")) return "FECCPP"
+  return null
+}
+
+export function backendCohort(tipo: string | null | undefined): BackendCohort {
+  if (BECCU_TYPES.has(tipo || "")) return "BECCU"
+  if (BECCPP_TYPES.has(tipo || "")) return "BECCPP"
   return null
 }
 

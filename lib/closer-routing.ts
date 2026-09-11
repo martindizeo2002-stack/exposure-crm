@@ -1,17 +1,18 @@
-export const CLOSER_YAFE = "Yafé"
-export const CLOSER_TOMMY = "Tommy"
+import { nombreCanonico } from "@/lib/equipo"
 
+// Normaliza el nombre del closer que llega de iClosed/ingest (apodos como
+// "Nawe" → "Nahuel"). Nombres desconocidos vuelven tal cual.
 export function canonicalCloserName(value: unknown) {
   const raw = String(value || "").trim()
-  const key = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-  if (["tomas ardu", "tomi", "tommy"].includes(key)) return CLOSER_TOMMY
-  if (["tomas yafe mola", "tomas yafe", "yafe"].includes(key)) return CLOSER_YAFE
-  return raw
+  if (!raw) return raw
+  const first = raw.split(/\s+/)[0]
+  const canonical = nombreCanonico(raw)
+  return canonical && canonical !== first ? canonical : raw
 }
 
-export function closerForScore(score: string | null | undefined) {
-  const tier = String(score || "").toUpperCase().replace("LEAD ", "").trim()
-  if (["S", "A", "B"].includes(tier)) return CLOSER_YAFE
-  if (["C", "D"].includes(tier)) return CLOSER_TOMMY
+// La plantilla original ruteaba S/A/B a un closer y C/D a otro. EXPOSURE no
+// tiene una regla de asignación por calificación definida: se respeta el
+// closer que traiga la agenda y no se asigna ninguno automáticamente.
+export function closerForScore(_score: string | null | undefined): string | null {
   return null
 }

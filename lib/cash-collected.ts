@@ -2,16 +2,37 @@
 // Collected). Única fuente de verdad compartida por tablero-semanal,
 // home-ceo-reconciliacion y el asistente interno, para que los tres nunca
 // diverjan en qué cuenta como "cobrado".
+//
+// Vocabulario de EXPOSURE (sheet CRM CENTRAL 2026) + etiquetas heredadas de la
+// plantilla original (inofensivas: nunca aparecen en los datos propios).
+// "Upsell /Agency)" es un typo del sheet por "Upsell (Agency)"; se aceptan los dos.
+
+// Fees (seña, sin acceso). Un fee es un tipo que EMPIEZA con "Fee" o es
+// "Refuerzo de Fee". Ojo: "Adentro en Seguimiento y Post Fee" NO es un fee.
+export const FEE_TIPOS = new Set(["Fee", "Refuerzo de Fee", "Fee Venta Interna"])
+export const FRONT_END_FEE_TIPOS = new Set(["Fee", "Refuerzo de Fee"])
+
+export function isFeeType(tipo: string | null | undefined): boolean {
+  const value = tipo || ""
+  return value.startsWith("Fee") || value === "Refuerzo de Fee"
+}
+
 export const CC_TIPOS = new Set([
-  "Fee", "Refuerzo de Fee", "Venta Nueva", "Venta Nueva (En Call)",
-  "Venta Nueva (Post Fee)", "Completó PIF (Post Fee)",
+  // Front end — cliente nuevo
+  "Fee", "Refuerzo de Fee",
+  "Venta Nueva", "Adentro en Seguimiento", "Adentro en Seguimiento y Post Fee", "Completó PIF",
+  "Cuota", "Cuota 1", "Cuota 2", "Cuota 3", "Cuota 4", "Cuota 5",
+  "Cuota 6", "Cuota 7", "Cuota 8", "Cuota 9", "Cuota 10",
+  // Back end — cliente existente
+  "Fee Venta Interna", "Venta Nueva Interna", "Venta Interna", "Cuota Venta Interna",
+  "Upsell (Agency)", "Upsell /Agency)",
+  // Heredados de la plantilla original
+  "Venta Nueva (En Call)", "Venta Nueva (Post Fee)", "Completó PIF (Post Fee)",
   "Completó PIF + Acceso Total Consulting",
   "Completa Total (Post Venta)",
   "Completa Total + Acceso Acción",
   "Completa Total y Finaliza Pago",
-  "Cuota", "Cuota 1", "Cuota 2", "Cuota 3", "Cuota 4", "Cuota 5",
-  "Cuota 6", "Cuota 7", "Cuota 8", "Cuota 9", "Cuota 10",
-  "Fee Venta Interna", "Venta Nueva Interna", "Cuota Venta Interna",
+  "Venta Nueva Interna (Post Fee)",
 ])
 
 export function isCashCollectedType(tipo: string | null | undefined): boolean {

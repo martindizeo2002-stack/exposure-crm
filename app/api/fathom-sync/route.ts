@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { beginIntegrationJob, finishIntegrationJob } from "@/lib/integration-observability"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { createSupabaseServer } from "@/lib/supabase-server"
+import { CLOSERS_NOMBRE_COMPLETO } from "@/lib/equipo"
 
 export const maxDuration = 60
 
@@ -206,8 +207,7 @@ function callType(m: any) {
   ) return "onboarding"
   if (
     haystack.includes("venta") || haystack.includes("closer") || haystack.includes("auditoria")
-    || haystack.includes("marcos carlomagno") || haystack.includes("tomas yafe")
-    || haystack.includes("tomás yafe") || haystack.includes("tony frati")
+    || CLOSERS_NOMBRE_COMPLETO.some((closer) => haystack.includes(closer))
   ) return "sales"
   return "other"
 }

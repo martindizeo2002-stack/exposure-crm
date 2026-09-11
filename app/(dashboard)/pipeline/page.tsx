@@ -21,6 +21,7 @@ import { Loader2, User, CalendarDays, Search, X, Phone, Mail, Instagram, Link2, 
 import type { Agenda } from "@/lib/supabase"
 import { useSession } from "@/components/session-provider"
 import { HelpHint } from "@/components/help-hint"
+import { FEE_TIPOS } from "@/lib/cash-collected"
 
 const fetcher = (url: string) => fetch(url, { cache: "no-store" }).then((r) => r.json())
 
@@ -68,8 +69,9 @@ function isNoPrecallerAgenda(a: Agenda) {
   return Boolean(raw && raw.slice(0, 10) >= NO_PRECALLER_FROM)
 }
 
-// Conceptos de pago que son "seña" (fee). Todo lo demas = entro al programa.
-const FEE_TIPOS = new Set(["Fee", "Refuerzo de Fee", "Fee Venta Interna"])
+// Conceptos de pago que son "seña" (fee) vienen de lib/cash-collected.ts
+// (Fee, Refuerzo de Fee, Fee Venta Interna). Todo lo demas = entro al programa.
+// Ojo: "Adentro en Seguimiento y Post Fee" NO es fee, es acceso.
 type Pays = Map<string, { hasFee: boolean; hasNonFee: boolean; hasPIF: boolean; hasPP: boolean; contenidoContestado: string | null }>
 
 // Dentro de "Cerrado": distingue a quien pago todo de una (PIF) de quien

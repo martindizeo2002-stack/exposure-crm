@@ -1,7 +1,10 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { getMetaSpend } from "@/lib/meta-spend"
-import { frontendCohort, withinSetterWindow } from "@/lib/commission-scheme"
+import { BECCPP_TYPES, BECCU_TYPES, FECCPP_TYPES, FECCU_TYPES, frontendCohort, withinSetterWindow } from "@/lib/commission-scheme"
+import { ALL_SALE_TYPES, BACK_END_SALE_TYPES, CLOSED_IN_CALL_TYPES, FRONT_END_SALE_TYPES } from "@/lib/revenue"
+import { FEE_TIPOS, FRONT_END_FEE_TIPOS } from "@/lib/cash-collected"
+import { nombreCanonico } from "@/lib/equipo"
 import { buildAccountAttributor, normalizeBusinessAccount, type BusinessAccount } from "@/lib/business-account"
 
 function getSupabase() {
@@ -30,51 +33,34 @@ const SEMANAS: Record<string, Array<[number, number]>> = {
 // Setters que ya no trabajan con el equipo — se excluyen de la tabla de
 // Setting (conversaciones asignadas) en los meses indicados, sin tocar las
 // agendas historicas reales (esos registros siguen intactos en la base).
-const SETTERS_EXCLUIDOS: Record<string, string[]> = {
-  "2026-06": ["Manu", "Agus", "Uriel"],
-  "2026-07": ["Manu"],
-}
+// En EXPOSURE los setters históricos (Lukas, Cesar, Santi, Andres) no tienen
+// conversaciones asignadas en los meses en que ya no setean, así que no hace
+// falta excluirlos a mano. Se deja el mecanismo por si hiciera falta.
+const SETTERS_EXCLUIDOS: Record<string, string[]> = {}
 // Personas que no son setters activos. Sus registros históricos permanecen
 // intactos para auditoría, pero nunca deben aparecer en la tabla de Setting.
-const SETTERS_NO_ACTIVOS = new Set(["Manu"])
+const SETTERS_NO_ACTIVOS = new Set<string>()
 
 // Closers que ya no son closers activos — se sacan de la tabla de Cash
 // Collected por Closer para siempre, sin tocar sus pagos/agendas historicos
 // (esos registros siguen intactos en la base, solo se ocultan de este cuadro).
-const CLOSERS_EXCLUIDOS = new Set(["paul"])
+// Claves en minúsculas y sin tildes (ver closerKey). El CEO de EXPOSURE cierra.
+const CLOSERS_EXCLUIDOS = new Set<string>()
 
 // Definición operativa confirmada: una agenda calificada es S, A o B.
 const CALIFS_AB = new Set(["LEAD S", "LEAD A", "LEAD B"])
 
-const FECCU_TIPOS = new Set([
-  "Fee", "Refuerzo de Fee",
-  "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)",
-  "Completó PIF (Post Fee)",
-])
-const FECCP_TIPOS = new Set([
-  "Completó PIF + Acceso Total Consulting",
-  "Completa Total (Post Venta)",
-  "Completa Total + Acceso Acción",
-  "Completa Total y Finaliza Pago",
-  "Cuota", "Cuota 1", "Cuota 2", "Cuota 3", "Cuota 4", "Cuota 5",
-  "Cuota 6", "Cuota 7", "Cuota 8", "Cuota 9", "Cuota 10",
-])
-const BECCU_TIPOS = new Set(["Fee Venta Interna", "Venta Nueva Interna"])
-const BECCPP_TIPOS = new Set(["Cuota Venta Interna"])
-const CIERRES_TIPOS = new Set([
-  "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)",
-  "Completó PIF (Post Fee)", "Venta Nueva Interna",
-])
-// Revenue contractual de ventas nuevas externas. Se conserva como métrica
-// separada, pero NO es la base del ROAS.
-const VENTA_NUEVA_EXTERNA = new Set([
-  "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)",
-  "Completó PIF", "Completó PIF (Post Fee)", "Fee", "Refuerzo de Fee",
-])
-// Para "cash collected por call": SOLO Fee y Venta Nueva (En Call) — los
-// unicos dos tipos que efectivamente pasan por una llamada. Refuerzo de Fee,
-// Post Fee, Completó PIF, cuotas y ventas internas se cobran sin una llamada
-// nueva, asi que no cuentan aca.
+// Conjuntos compartidos (lib/commission-scheme.ts, lib/revenue.ts,
+// lib/cash-collected.ts) con el vocabulario de EXPOSURE.
+const FECCU_TIPOS = FECCU_TYPES
+const FECCP_TIPOS = FECCPP_TYPES
+const BECCU_TIPOS = BECCU_TYPES
+const BECCPP_TIPOS = BECCPP_TYPES
+// Cierres = pagos que dan acceso (FE + BE). Un Fee no es cierre.
+const CIERRES_TIPOS = ALL_SALE_TYPES
+// Revenue contractual de ventas nuevas externas (front end: fee + venta que
+// da acceso). Se conserva como métrica separada, pero NO es la base del ROAS.
+const VENTA_NUEVA_EXTERNA = FECCU_TYPES
 const CALIFS_SABCD = ["S", "A", "B", "C", "D"]
 
 function r2(n: number) { return Math.round(n * 100) / 100 }
@@ -258,23 +244,22 @@ export async function GET(request: Request) {
     const calificadasOcurridas = callsOccurred.filter(x => CALIFS_AB.has(x.calificacion || ""))
     const calif_presentadas = calificadasOcurridas.filter(x => x.show === true).length
     const cierres = p.filter(x => CIERRES_TIPOS.has(x.tipo)).length
-    const cierres_fe = p.filter(x => CIERRES_TIPOS.has(x.tipo) && x.tipo !== "Venta Nueva Interna").length
-    const cierres_be = p.filter(x => x.tipo === "Venta Nueva Interna").length
-    // Cerro en la llamada original (En Call) vs cerro despues via seguimiento
-    // (Post Fee / Completo PIF / venta interna, que siempre se cierran aparte).
-    const cierres_llamada = p.filter(x => x.tipo === "Venta Nueva (En Call)").length
-    const cierres_seguimiento = p.filter(x =>
-      x.tipo === "Venta Nueva (Post Fee)" || x.tipo === "Completó PIF (Post Fee)" || x.tipo === "Venta Nueva Interna"
-    ).length
+    const cierres_fe = p.filter(x => FRONT_END_SALE_TYPES.has(x.tipo)).length
+    const cierres_be = p.filter(x => BACK_END_SALE_TYPES.has(x.tipo)).length
+    // Cerro en la llamada original (Venta Nueva) vs cerro despues via seguimiento
+    // (Adentro en Seguimiento / Completó PIF / venta interna, que siempre se
+    // cierran aparte).
+    const cierres_llamada = p.filter(x => CLOSED_IN_CALL_TYPES.has(x.tipo)).length
+    const cierres_seguimiento = p.filter(x => CIERRES_TIPOS.has(x.tipo) && !CLOSED_IN_CALL_TYPES.has(x.tipo)).length
 
     // PAGOS TOTALES vs UNIDADES CERRADAS: dos formas distintas de medir "tasa
     // de cierre". Pagos totales = Unidades Cerradas + Fees (fees SI cuentan
     // porque son el pago del día 1, ligado a la llamada) — pero NO cuotas,
     // que se cobran después sin que exista una llamada nueva ese período.
     // Unidades cerradas = solo gente que efectivamente entró al programa
-    // (Venta Nueva / Post Fee / Completó PIF / Interna), FE + BE combinados.
+    // (Venta Nueva / Adentro en Seguimiento / Completó PIF / Interna), FE + BE combinados.
     const unidades_cerradas = cierres
-    const PAGOS_TOTALES_TIPOS = new Set([...CIERRES_TIPOS, "Fee", "Refuerzo de Fee", "Fee Venta Interna"])
+    const PAGOS_TOTALES_TIPOS = new Set([...CIERRES_TIPOS, ...FEE_TIPOS])
     const pagos_totales = p.filter(x => PAGOS_TOTALES_TIPOS.has(x.tipo)).length
 
     // No shows: call_confirmer distingue por que no hubo show.
@@ -313,10 +298,11 @@ export async function GET(request: Request) {
     const beccpp = r2(p.filter(isBeccpp).reduce((s, x) => s + (x.monto || 0), 0))
     const cc_total = r2(feccu + feccp + beccu + beccpp)
 
-    const fees_arr = p.filter(x => x.tipo === "Fee" || x.tipo === "Refuerzo de Fee")
+    const fees_arr = p.filter(x => FRONT_END_FEE_TIPOS.has(x.tipo))
     const fees_sum = r2(fees_arr.reduce((s, x) => s + (x.monto || 0), 0))
 
-    const aov_d1_arr = p.filter(x => x.tipo === "Venta Nueva (En Call)" || x.tipo === "Venta Nueva" || x.tipo === "Fee")
+    // AOV día 1 = lo que se cobra en la llamada misma: Venta Nueva o Fee.
+    const aov_d1_arr = p.filter(x => CLOSED_IN_CALL_TYPES.has(x.tipo) || x.tipo === "Fee")
     const aov_dia1 = aov_d1_arr.length > 0
       ? r2(aov_d1_arr.reduce((s, x) => s + (x.monto || 0), 0) / aov_d1_arr.length) : null
 
@@ -369,21 +355,14 @@ export async function GET(request: Request) {
       }
     })
 
-    // CASH COLLECTED POR CALIFICACIÓN, DESGLOSADO POR CLOSER. Los dos Tomás
-    // deben conservar identidades distintas; usar solo el primer nombre los
-    // fusionaba y contaminaba tanto métricas como el ramp-up de Tommy.
+    // CASH COLLECTED POR CALIFICACIÓN, DESGLOSADO POR CLOSER. Los apodos
+    // (Nawe → Nahuel, Cris → Cristian, Ken → Kenneth) se unifican con
+    // lib/equipo.ts para que una misma persona no aparezca dos veces.
     function closerKey(s: string | null | undefined): string {
-      const value = (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
-      if (!value) return ""
-      if (value.includes("yafe")) return "yafe"
-      if (value.includes("ardu") || value.includes("tommy")) return "tommy"
-      if (value.includes("marcos")) return "marcos"
-      return firstWord(value)
+      return nombreCanonico(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim()
     }
-    function closerLabel(key: string, raw: string | null | undefined): string {
-      if (key === "yafe") return "Yafé"
-      if (key === "tommy") return "Tommy"
-      return firstWord(raw || "")
+    function closerLabel(_key: string, raw: string | null | undefined): string {
+      return nombreCanonico(raw) || firstWord(raw || "")
     }
     const closerLabels = new Map<string, string>()
     for (const x of a) {

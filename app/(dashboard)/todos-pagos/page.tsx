@@ -23,16 +23,28 @@ import { MultiSelectFilter } from "@/components/ui/multi-select-filter"
 import { CrmPageIntro, CrmStat } from "@/components/crm-ui"
 import { useSession } from "@/components/session-provider"
 import { canExportPayments } from "@/lib/export-access"
+import { CLOSERS_ACTIVOS, SETTERS_ACTIVOS, SETTERS_TODOS, settersPara } from "@/lib/equipo"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 const PESO_MEDIOS = new Set(["Pesos", "Efectivo ARS"])
 
-const CLOSERS   = ["Tony","Yafé","Tommy","Sin closer"]
-const SETTERS_FULL = ["Santi","Manu","Lolo","Sin Setter"]
-const SETTERS   = ["Santi","Manu","Lolo","Sin Setter"]
-// Luis y Demian dejaron de setear desde junio 2026: solo aparecen en registros de mayo o antes
-const settersFor = (d?: string | null) => (d && String(d).slice(0,7) <= "2026-05") ? SETTERS_FULL : SETTERS
-const TIPO_PAGO = ["Fee","Venta Nueva (En Call)","Fee Venta Interna","Venta Nueva Interna","Refuerzo de Fee","Venta Nueva (Post Fee)","Completó PIF (Post Fee)","Completó PIF + Acceso Total Consulting","Venta Nueva Interna (Post Fee)","Completa Total (Post Venta)","Completa Total + Acceso Acción","Completa Total y Finaliza Pago","Venta Nueva","Cuota","Cuota 1","Cuota 2","Cuota 3","Cuota 4","Cuota 5","Cuota 6","Cuota 7","Cuota 8","Cuota 9","Cuota 10","Cuota Venta Interna","Rollover","Upsell","Otro"]
+// Equipo de EXPOSURE (lib/equipo.ts). Los setters históricos solo aparecen en
+// registros con fecha hasta SETTERS_HISTORICOS_HASTA; el filtro los muestra siempre.
+const CLOSERS   = [...CLOSERS_ACTIVOS, "Sin closer"]
+const SETTERS_FULL = [...SETTERS_TODOS, "Sin Setter"]
+const SETTERS   = [...SETTERS_ACTIVOS, "Sin Setter"]
+const settersFor = (d?: string | null) => [...settersPara(d), "Sin Setter"]
+// Vocabulario de EXPOSURE primero; después las etiquetas heredadas de la plantilla
+// original, por si quedara algún registro viejo. "Upsell /Agency)" es un typo del
+// sheet por "Upsell (Agency)" que sigue existiendo en los pagos importados.
+const TIPO_PAGO = [
+  "Fee","Venta Nueva","Adentro en Seguimiento","Adentro en Seguimiento y Post Fee","Completó PIF","Refuerzo de Fee",
+  "Cuota","Cuota 1","Cuota 2","Cuota 3","Cuota 4","Cuota 5","Cuota 6","Cuota 7","Cuota 8","Cuota 9","Cuota 10",
+  "Fee Venta Interna","Venta Nueva Interna","Venta Interna","Cuota Venta Interna","Upsell (Agency)","Upsell /Agency)",
+  "Venta Nueva (En Call)","Venta Nueva (Post Fee)","Completó PIF (Post Fee)","Completó PIF + Acceso Total Consulting",
+  "Venta Nueva Interna (Post Fee)","Completa Total (Post Venta)","Completa Total + Acceso Acción","Completa Total y Finaliza Pago",
+  "Rollover","Upsell","Otro",
+]
 const MEDIO_PAGO = ["Pesos","Stripe","USDT","Efectivo USD","Efectivo ARS","Transferencia Bancaria USD","Western Unión","PayPal"]
 const CALIFICACION = ["LEAD S","LEAD A","LEAD B","LEAD C","LEAD D"]
 // Colores definitivos de lead (mismos que Centro de Agendas)
@@ -450,7 +462,7 @@ export default function TodosPagosPage() {
               <div className="p-4 bg-muted/30 border border-border rounded-lg grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   <MultiSelectFilter label="Concepto" values={colFilters.tipo} options={TIPO_PAGO} onChange={v => setFilt("tipo", v)} />
                   <MultiSelectFilter label="Closer" values={colFilters.closer} options={CLOSERS} onChange={v => setFilt("closer", v)} />
-                  <MultiSelectFilter label="Setter" values={colFilters.setter} options={SETTERS} onChange={v => setFilt("setter", v)} />
+                  <MultiSelectFilter label="Setter" values={colFilters.setter} options={SETTERS_FULL} onChange={v => setFilt("setter", v)} />
                   <MultiSelectFilter label="Calificación" values={colFilters.calificacion} options={CALIFICACION} onChange={v => setFilt("calificacion", v)} />
                   <MultiSelectFilter label="Medio de Pago" values={colFilters.medio_de_pago} options={MEDIO_PAGO} onChange={v => setFilt("medio_de_pago", v)} />
                   <MultiSelectFilter label="Operación" values={colFilters.operacion} options={OPERACION} onChange={v => setFilt("operacion", v)} />

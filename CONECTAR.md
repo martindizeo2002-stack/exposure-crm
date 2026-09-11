@@ -1,76 +1,89 @@
 # Conectar el CRM al negocio real — checklist
 
-Actualizado 11/09/2026 (tarde). Qué está conectado, qué falta y quién hace cada cosa.
-Las claves van en `.env.local` (y en Vercel cuando se despliegue). Nunca al repo.
+Actualizado 11/09/2026 (madrugada). Qué está conectado, qué falta y quién hace cada cosa.
+Las claves van en `.env.local` (y en Vercel). Nunca al repo. Copia de respaldo en `Documents\exposure-crm-secrets\`.
+
+## 0 · Lo que necesito de vos (en este orden)
+
+| # | Qué | Dónde se saca | Qué destraba |
+|---|---|---|---|
+| 1 | **Token de Supabase** (o contraseña nueva de la base) | supabase.com → avatar → Account → **Access Tokens** → "Generate new token". Guardarlo en `exposure-crm-secrets\supabase-token.txt`. Alternativa: Project Settings → Database → "Reset database password" y guardarla en `db-password.txt`. | Aplicar la migración `20260911000001` (sección 5). Sin ella, cargar un **Fee o una Cuota desde la pantalla falla** y el sheet no recibe avisos automáticos. |
+| 2 | **JSON de la cuenta de servicio de Google** + compartir el sheet | console.cloud.google.com → IAM → Service Accounts → crear → Keys → JSON. Guardarlo como `exposure-crm-secrets\google-service-account.json`. Compartir "EXPOSURE \| CRM CENTRAL 2026" con el mail de esa cuenta (`…@…iam.gserviceaccount.com`) como **Editor**. | El espejo CRM → sheet (sección 4). |
+| 3 | **API key de iClosed** | iClosed → Settings → Integrations / API | Que cada agenda entre sola al pipeline (hoy se cargan del sheet o a mano). |
+| 4 | **API key de Anthropic** | console.anthropic.com → API Keys | La sincronización con Fathom (show / no show real, motivo de no cierre) la exige; también el análisis de llamadas y el asistente interno. |
 
 ## 1 · Lo que ya está conectado
 
-- [x] **Supabase** — base de datos, login, esquema completo (`NEXT_PUBLIC_SUPABASE_URL`, `…ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`).
-- [x] **Usuario CEO** — alex.m.carrera02@gmail.com, aprobado.
-- [x] **Secreto de crons** (`CRON_SECRET`) — cargado, todavía sin crons que lo usen.
-- [x] **Panel del negocio** — lee del CRM; hoy muestra la demo porque el CRM está vacío.
-- [x] **ManyChat** — clave cargada y probada (página "Alex Carrera").
-- [x] **Calendly** — token cargado y probado (org EXPOSURE; evento activo "1-1 con Alex (Exposure)"; sin webhooks todavía).
-- [x] **Fathom** — clave cargada y probada (lee las reuniones); secreto de webhook guardado para cuando exista el endpoint.
-- [x] **Stripe** — clave restringida cargada y probada (cuenta live, lee cobros y balance).
-- [x] **Meta Ads** — token del System User y cuenta `act_…` ("Exposure", USD) cargados y probados. Ese token todavía no ve ninguna página ni cuenta de Instagram.
-- [x] **Clave de ingesta** (`CRM_INGEST_KEY`) — generada.
+- [x] **Supabase** — base, login, esquema (`NEXT_PUBLIC_SUPABASE_URL`, `…ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROJECT_REF`).
+- [x] **Vercel** — https://exposure-crm-nu.vercel.app (repo privado tukienzo/exposure-crm). Variables cargadas.
+- [x] **Usuarios** — Alex (CEO), Nahuel (CEO/admin), Cristian y Kenneth (Closer), Maximo (Setter). Mails y contraseñas en `exposure-crm-secrets\usuarios.txt`. Los mails `@exposure-crm.local` son provisorios: se cambian con `node scripts/crear-usuario.mjs` cuando tengas los reales.
+- [x] **Histórico importado del CRM CENTRAL 2026** (11/09): 579 agendas, 196 pagos (cash por mes igual al sheet, con TC 1.540 para los ARS), 236 clientes (181 los derivó el CRM de los pagos + 55 de ACTIVE CLIENTS sin pago en el sheet), seguimientos e iClosed cruzados. Solo cuentan los closers propios (Alex y Nahuel hasta junio; después también Cristian, Tobias y Kenneth). Script: `Central Negocio\scripts\manychat\importar-crm.py`.
+- [x] **ManyChat** — clave probada; 78.204 contactos leídos con sus tags → `crm_integration_assets`, cruce con las agendas por Instagram, conversaciones nuevas por mes y setter en `metricas_manual`.
+- [x] **Panel del negocio** — lee del CRM (agendas, pagos, clientes, métricas).
+- [x] **Calendly** — token probado. Solo tiene activo el evento "1-1 con Alex (Exposure)" (clientes, no ventas); sin webhooks.
+- [x] **Fathom** — clave y secreto de webhook cargados.
+- [x] **Stripe** — clave restringida cargada (solo lectura).
+- [x] **Meta Ads** — token y cuenta `act_…` cargados. El token todavía no ve la página ni el Instagram.
+- [x] **Clave de ingesta** (`CRM_INGEST_KEY`) y **secreto de crons** (`CRON_SECRET`).
+- [x] **Espejo CRM → Google Sheet** — código listo (`lib/sheet-mirror.ts`, `/api/sheet-sync`, cron diario 09:00 UTC). Falta el JSON de la cuenta de servicio.
 
-## 2 · Claves que faltan (las conseguís vos)
+## 2 · Claves
 
-| # | Servicio | Variable | Dónde se saca | Qué destraba |
-|---|---|---|---|---|
-| ~~1~~ ✅ | **ManyChat** | `MANYCHAT_API_KEY` | ManyChat → Settings → API → Generate key (plan Pro) | Leads y conversaciones, atribución por keyword, embudo y fuentes |
-| ~~2~~ ✅ | **Calendly** | `CALENDLY_TOKEN` *(nuevo)* | Calendly → Integrations → API & Webhooks → Personal Access Token | Agendas en el pipeline sin cargar a mano |
-| ~~3~~ ✅ | **Fathom** | `FATHOM_API_KEY` | Fathom → Settings → API (plan Team, la cuenta donde graban los closers) | Show / no show real, motivo de no cierre, análisis de cada llamada |
-| 4 | **Anthropic** | `ANTHROPIC_API_KEY` | console.anthropic.com → API Keys | La IA que lee las llamadas y el asistente interno |
-| ~~5~~ ✅ | **Stripe** | `STRIPE_SECRET_KEY` *(nuevo, restringida solo lectura)* | Stripe → Developers → API keys → Restricted key | Pagos y cash collected automáticos |
-| ~~6~~ ✅ | **Meta Ads** | `META_ADS_ACCESS_TOKEN` + `META_ADS_ACCOUNT_ID` | Business Settings → System users → token con `ads_read`; el ID es `act_…` | Inversión, costo por venta, ROAS |
-| 7 | **Instagram Graph** | `IG_ACCESS_TOKEN` + `IG_BUSINESS_ID` *(nuevos)* | En Business Settings, asignarle al System User la página de Facebook y la cuenta de Instagram, y regenerar el token con `instagram_basic` + `instagram_manage_insights`. Hoy el token no ve ninguna página. La verificación de la app de Meta sigue pendiente. | Página "El contenido": views y leads por reel |
-| 8 | **Vercel** | cuenta + dominio | vercel.com → Import `tukienzo/exposure-crm` | Que los crons corran solos. Sin esto nada se sincroniza |
+| Servicio | Variable | Estado |
+|---|---|---|
+| ManyChat | `MANYCHAT_API_KEY` | ✅ |
+| Calendly | `CALENDLY_TOKEN` | ✅ |
+| Fathom | `FATHOM_API_KEY`, `FATHOM_WEBHOOK_SECRET` | ✅ |
+| Stripe | `STRIPE_SECRET_KEY` | ✅ |
+| Meta Ads | `META_ADS_ACCESS_TOKEN`, `META_ADS_ACCOUNT_ID` | ✅ |
+| Google Sheets | `GOOGLE_SERVICE_ACCOUNT_JSON` (el JSON entero o en base64), `GOOGLE_SHEET_ID` (`1mLpa1gGCgN29LYt8ul7egX-M5Paej9TY6N7NydND-9w`) | ⏳ falta el JSON |
+| iClosed | `ICLOSED_API_KEY` | ⏳ |
+| Anthropic | `ANTHROPIC_API_KEY` | ⏳ la pide Fathom |
+| Instagram Graph | `IG_ACCESS_TOKEN` + `IG_BUSINESS_ID` | ⏳ depende de la verificación de la app de Meta |
 
-Opcionales, solo si los usás:
+## 3 · ManyChat → CRM en tiempo real (lo hacés vos, 5 minutos)
 
-| # | Servicio | Variable | Para qué |
-|---|---|---|---|
-| 9 | Meta CAPI | `META_CAPI_ACCESS_TOKEN` + ID del dataset del píxel | Devolverle a Meta la calidad de cada lead |
-| 10 | Mercury | `MERCURY_API_TOKEN` | Banco y gastos automáticos (Paul lo usa; vos probablemente no) |
-| 11 | iClosed | `ICLOSED_API_KEY` | Solo si migrás de Calendly a iClosed |
+El CRM ya tiene el endpoint. Hay que decirle a ManyChat que le avise cada vez que un contacto nuevo entra por una keyword (o cuando se le pone el tag de agendado).
 
-No hace falta: `OPENAI_API_KEY` (figura en el archivo, el código no la usa).
+1. ManyChat → **Automation** → abrí el flujo de la keyword (por ejemplo "PARTNER") → agregá un paso **Actions → External Request** al final.
+2. Request type: **POST**. URL: `https://exposure-crm-nu.vercel.app/api/manychat-sync`.
+3. **Headers**: `Authorization` = `Bearer <CRON_SECRET>` (el valor está en `exposure-crm-secrets\env.local.backup`, línea `CRON_SECRET=`). `Content-Type` = `application/json`.
+4. **Body** → "Full Contact Data" (el botón de ManyChat que manda todo el contacto con sus tags y campos).
+5. Guardar y publicar. Repetir el paso en los otros flujos de entrada (o hacer una **Rule**: "Tag added → cualquiera" → External Request, y cubre todo).
 
-## 3 · Datos que me tenés que pasar (no son claves)
+El CRM guarda el contacto, lo vincula por Instagram/teléfono a la persona del pipeline y registra cada tag como evento (pieza que lo trajo, mes de conversación nueva).
 
-- [ ] **Equipo**: mail de cada setter y closer, y su nombre escrito exactamente como aparece en las agendas.
-- [ ] **Precio y meta**: precio de lista vigente y meta mensual de cash collected (`PANEL_PRECIO_BASE`, `PANEL_META_MENSUAL`; hoy 1.300 y 50.000).
-- [ ] **Tipos de pago** que usan: fee, cuota 1…n, PIF, etc. El CRM cuenta como cobrado solo lo que esté en esa lista.
-- [ ] **Fuentes** con las que quieren medir (Reel, Historia, DM PARTNER, Ads, YouTube, Referido…).
-- [ ] **Convención de tags de ManyChat**: qué tag pone cada keyword y cómo se marca "agendó".
-- [ ] **Formulario de calificación** de Calendly: las preguntas exactas (ocupación, ingresos, capital, urgencia).
-- [ ] **Desde qué fecha migrar el histórico** del CRM CENTRAL 2026 y del Grupo Estadístico.
-- [ ] **Programas** que venden hoy y sus planes de pago.
+## 4 · Espejo CRM → Google Sheet (cómo funciona)
 
-## 4 · Decisiones tuyas
+- Es de **una sola dirección**: lo que se carga o cambia en el CRM se escribe en el sheet. Lo que escribas a mano en el sheet no vuelve al CRM.
+- Cada pago va a `💰 PAGOS <MES>` (columnas E a W: mes, fechas, cliente, teléfono, concepto, operación, closer, setter, calificación, CC USD, CC ARS, comprobante, PPP, fuente, contenido, medio de pago, tipo de cambio). Cada agenda va a `📆 AGENDAS <MES>` (columnas A a AJ, en el orden de tu cabecera).
+- Las 775 filas importadas ya están mapeadas a su fila original: si un closer marca show o cerró en el CRM, se actualiza **esa misma fila** del sheet.
+- Lo nuevo se agrega en la primera fila libre de la pestaña del mes. La pestaña sin mes (`💰 PAGOS`, `📆 AGENDAS`) es la del mes en curso. Si no existe pestaña para un mes, el CRM duplica la última y la llama `💰 PAGOS OCTUBRE` (avisame si preferís crearlas vos).
+- Cuándo corre: al instante con la migración aplicada (la base avisa al CRM en cada alta o cambio); si no, una vez por día a las 09:00 UTC (06:00 Argentina). También a mano: `curl -X POST https://exposure-crm-nu.vercel.app/api/sheet-sync -H "Authorization: Bearer <CRON_SECRET>"`.
+- Pagos anulados en el CRM quedan en el sheet con concepto `ANULADO · …` y monto 0.
 
-- [ ] **Calendly o iClosed.** El CRM de Paul habla iClosed; vos usás Calendly. Si seguís con Calendly, yo escribo el adaptador (webhook de Calendly → ingesta del CRM).
-- [ ] **Stripe directo o vía Zapier.** Directo es más simple de mantener.
-- [ ] **Wise y transferencias**: carga manual desde "Carga de pagos", o una planilla que el CRM lea.
-- [ ] **Una sola cuenta o dos.** El código de Paul separa "Paul" y "Cris"; EXPOSURE es una. Lo simplifico salvo que quieras separar por closer o por marca.
+## 5 · Migración pendiente (la aplico yo apenas tenga el token)
 
-## 5 · Lo que hago yo cuando tenga lo de arriba
+Archivo: `supabase/migrations/20260911000001_tipos_pendientes.sql`. Comando: `node scripts/aplicar-sql.mjs supabase/migrations/20260911000001_tipos_pendientes.sql` (usa el token de `exposure-crm-secrets\supabase-token.txt`; con contraseña, `npx supabase@2.114.0 db push`).
 
-- [x] Generar `CRM_INGEST_KEY` y cargarla en `.env.local`.
-- [ ] Adaptador **Calendly → agendas** y **Stripe → pagos** (Paul los tiene para iClosed y Zapier).
-- [ ] Reemplazar lo de Paul en el código: cuentas Paul/Cris (44 lugares), setters fijos Santi y Lolo, catálogo de programas y precios, lista de fuentes, dataset de Meta.
-- [ ] Importar el histórico: ya tengo parseados los 225 pagos del año y las 63 agendas de agosto.
-- [ ] Dar de alta al equipo en `team_members` con `scripts/crear-usuario.mjs`.
-- [ ] Desplegar en Vercel, cargar las variables y prender los crons de a uno: ManyChat, Calendly, Fathom, Stripe, Meta.
-- [ ] Sacar el sello "datos de demostración" del panel cuando entren los primeros datos reales.
+Qué arregla:
+1. `plan_pago_items.pago_id` pasa a texto (el esquema reconstruido lo dejó uuid y el código de Paul lo compara como texto). Hoy cargar un pago que no da acceso (Fee, Cuota) desde la pantalla tira "operator does not exist: uuid = text". El histórico se importó con `grants_access=true` para esquivarlo.
+2. `fecha_agenda` / `fecha_closer` con hora.
+3. Conceptos de EXPOSURE que dan acceso: Venta Nueva, Adentro en Seguimiento, Adentro en Seguimiento y Post Fee, Completó PIF, Venta Interna, Venta Nueva Interna, Upsell (Agency).
+4. "Adentro en Seguimiento y Post Fee" deja de contarse como fee al cargar el plan.
+5. Avisos de la base al espejo del sheet (pg_net) en cada alta o cambio de pagos y agendas.
 
-## 6 · Orden recomendado
+## 6 · Pendientes míos
 
-1. Vercel (sin esto nada corre solo)
-2. Equipo + precio + tipos de pago + fuentes (configuración, un rato)
-3. Histórico importado (para no arrancar en cero)
-4. ManyChat → Calendly → Fathom → Stripe (el núcleo comercial)
-5. Meta Ads e Instagram (segunda ola)
+- [ ] Aplicar la migración (necesita el token o la contraseña).
+- [ ] Probar el espejo con el sheet real (necesita el JSON) y sacar la primera corrida.
+- [ ] Adaptador iClosed → agendas (necesita la API key; el código de Paul ya está en `/api/iclosed-sync`).
+- [ ] Stripe → pagos automáticos (decidir: directo o vía Zapier).
+- [ ] Instagram Graph cuando Meta apruebe la app.
+- [ ] Supabase → Authentication → URL Configuration: Site URL `https://exposure-crm-nu.vercel.app` (solo para "Entrar con link al mail").
+
+## 7 · Cosas del sheet que conviene corregir a mano
+
+- `💰 PAGOS JUNIO`, fila del 19/06 (Adentro en Seguimiento y Post Fee, "Cuota 1 (Agency)", USD 500): no tiene nombre de cliente, no se importó. Ponele el nombre y lo cargo.
+- `💰 PAGOS FEB`: 25 filas tienen el nombre en la columna "Fecha Alta" (columnas corridas). Se importaron igual, pero al espejo le conviene que estén en su lugar.
+- Los pagos de Marcos, Tony, Paul y Bener quedaron afuera (no son closers propios), como acordamos.

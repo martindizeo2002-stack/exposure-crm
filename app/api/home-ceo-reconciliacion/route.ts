@@ -71,7 +71,7 @@ export async function GET(request: Request) {
         cash_collected: {
           valor: cashSistema,
           fuente: "pagos.monto de tipos que efectivamente cobran, con pagos.fecha en el mes",
-          formula: "suma de pagos.monto donde tipo ∈ {Fee, Refuerzo de Fee, Venta Nueva*, Completó PIF*, Completa Total, Cuota 1..10, tipos internos}",
+          formula: "suma de pagos.monto donde tipo ∈ {Fee, Refuerzo de Fee, Venta Nueva, Adentro en Seguimiento (y Post Fee), Completó PIF, Cuota / Cuota 1..10, Venta Interna, Venta Nueva Interna, Fee Venta Interna, Cuota Venta Interna, Upsell (Agency)} — ver lib/cash-collected.ts:CC_TIPOS",
           conteo_pagos: p.filter(x => isCashCollectedType(x.tipo)).length,
         },
         revenue_solo_ventas_nuevas: revenueVentasNuevas,

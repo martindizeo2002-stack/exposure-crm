@@ -15,11 +15,12 @@ import { CrmEmpty, CrmPageIntro, CrmStat } from "@/components/crm-ui"
 import { useSession } from "@/components/session-provider"
 import { canExportRole } from "@/lib/export-access"
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter"
+import { CLOSERS_ACTIVOS } from "@/lib/equipo"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 const ESTADO = ["Por Cobrar","Cobrado","No Paga","Pago Dividido","Paga Tarde","Protocolo","Completó PIF"]
 const MEDIO_PAGO = ["Stripe (Tarjeta)","Pesos (SEOS)","USDT (TRC20)","Efectivo USD","Western Union","Efectivo ARS","Pesos (GOAT)","Binance (USD)","USD (CTA PA)","Paypal USD (PA)","Transferencia Bancaria USD","Tranferencia USD(MARCOS)"]
-const CLOSERS = ["Marcos","Tony","Sin Closer"]
+const CLOSERS = [...CLOSERS_ACTIVOS, "Sin Closer"]
 
 function normNombre(s: string): string {
   return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim()

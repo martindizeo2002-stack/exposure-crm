@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { createSupabaseServer } from "@/lib/supabase-server"
 import { paginatedPayload, parsePagination } from "@/lib/pagination"
+import { FEE_TIPOS } from "@/lib/cash-collected"
+import { ALL_SALE_TYPES, CLOSED_IN_FOLLOWUP_TYPES } from "@/lib/revenue"
 
 
 function getSupabase() {
@@ -53,15 +55,11 @@ export async function GET(request: Request) {
 
 // Tipos de pago que tambien deben reflejarse en la agenda del cliente (plan de
 // pago pactado, medio de pago, comprobante y el monto del primer pago).
-const AGENDA_FEE_TIPOS = new Set(["Fee", "Refuerzo de Fee", "Fee Venta Interna"])
-const AGENDA_CIERRE_TIPOS = new Set([
-  "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)",
-  "Completó PIF", "Completó PIF (Post Fee)", "Completa Total (Post Venta)",
-  "Completó PIF + Acceso Total Consulting",
-  "Completa Total + Acceso Acción",
-  "Completa Total y Finaliza Pago",
-  "Venta Nueva Interna", "Venta Nueva Interna (Post Fee)",
-])
+// Fee = seña (empieza con "Fee" o es "Refuerzo de Fee"); cierre = pago que da
+// acceso (Venta Nueva, Adentro en Seguimiento, Completó PIF, ventas internas).
+// Vocabulario compartido en lib/cash-collected.ts y lib/revenue.ts.
+const AGENDA_FEE_TIPOS = FEE_TIPOS
+const AGENDA_CIERRE_TIPOS = ALL_SALE_TYPES
 const AGENDA_SYNC_TIPOS = new Set([...AGENDA_FEE_TIPOS, ...AGENDA_CIERRE_TIPOS])
 
 const ALLOWED_UPDATE = new Set([
@@ -153,7 +151,8 @@ async function syncAgendaFromPayment(sb: ReturnType<typeof getSupabase>, b: any)
     }
 
     const esFee = AGENDA_FEE_TIPOS.has(String(b.tipo))
-    const esSeguimiento = /Post Fee/i.test(String(b.tipo))
+    // Cerró después de la llamada (Adentro en Seguimiento, Completó PIF, Post Fee).
+    const esSeguimiento = CLOSED_IN_FOLLOWUP_TYPES.has(String(b.tipo))
     const estadoAgenda = esFee ? "Fee" : esSeguimiento ? "Adentro en FUP" : "Adentro en Call"
     const updates: Record<string, unknown> = {
       show: true,
@@ -257,9 +256,9 @@ export async function POST(request: Request) {
       planItemSync = itemError ? { linked: false, error: itemError.message } : { linked: true }
     }
 
-    // Best-effort: sincroniza la agenda del cliente cuando el pago es uno de
-    // los 4 tipos que arrancan/destraban un plan (Fee, Venta Nueva En Call,
-    // Fee Venta Interna, Venta Nueva Interna). Si no existe agenda para ese
+    // Best-effort: sincroniza la agenda del cliente cuando el pago es un fee o
+    // un pago que da acceso (Venta Nueva, Adentro en Seguimiento, Completó PIF,
+    // Fee Venta Interna, Venta Nueva Interna, etc.). Si no existe agenda para ese
     // nombre, no hace nada; si algo falla, no debe romper la respuesta del pago.
     // Replica lo que hacia la landing vieja: al cargar el primer pago real, se
     // completa Cerro/Estado/Fecha TC/Fecha Baja/Fathom en la fila que el

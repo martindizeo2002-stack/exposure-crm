@@ -359,7 +359,7 @@ export default function MetricasPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatBox label="FECCU" value={fmt$(c!.feccu)} sub="Upfront" onClick={canDrill ? () => openDetail("feccu", "FECCU — Upfront") : undefined} />
                 <StatBox label="FECCP" value={fmt$(c!.feccp)} sub="Plan de pago" onClick={canDrill ? () => openDetail("feccp", "FECCP — Plan de pago") : undefined} />
-                <StatBox label="AOV Día 1" value={fmt$(c!.aov_dia1)} sub="Venta Nueva + Fee" onClick={canDrill ? () => openDetail("aov_dia1", "AOV Día 1 — Venta Nueva (En Call) + Fee") : undefined} />
+                <StatBox label="AOV Día 1" value={fmt$(c!.aov_dia1)} sub="Venta Nueva + Fee" onClick={canDrill ? () => openDetail("aov_dia1", "AOV Día 1 — Venta Nueva + Fee") : undefined} />
                 <StatBox label="AOV TC" value={fmt$(c!.aov_tc)} sub="Promedio por cierre" onClick={canDrill ? () => openDetail("aov_tc", "AOV TC — Promedio por cierre") : undefined} />
                 <StatBox label="Fees" value={fmt$(c!.fees_sum)} sub={`${c!.fees_count} fee${c!.fees_count !== 1 ? "s" : ""}`} onClick={canDrill ? () => openDetail("fees", "Fees") : undefined} />
               </div>
@@ -374,7 +374,7 @@ export default function MetricasPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatBox label="BECCU" value={fmt$(c!.beccu)} sub="Upfront (ventas internas)" onClick={canDrill ? () => openDetail("beccu", "BECCU — Upfront ventas internas") : undefined} />
                 <StatBox label="BECCPP" value={fmt$(c!.beccpp)} sub="Plan de pago" onClick={canDrill ? () => openDetail("beccpp", "BECCPP — Plan de pago") : undefined} />
-                <StatBox label="Cierres BE" value={String(f!.cierres_be)} sub="Venta Nueva Interna" onClick={canDrill ? () => openDetail("cierres_be", "Cierres BE — Venta Nueva Interna") : undefined} />
+                <StatBox label="Cierres BE" value={String(f!.cierres_be)} sub="Venta Interna / Venta Nueva Interna / Upsell" onClick={canDrill ? () => openDetail("cierres_be", "Cierres BE — Venta Interna / Venta Nueva Interna / Upsell") : undefined} />
               </div>
             </div>
           </section>
@@ -398,12 +398,12 @@ export default function MetricasPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-border">
                 <StatBox label="Cierres totales" value={String(f!.cierres)} sub={`FE: ${f!.cierres_fe} · BE: ${f!.cierres_be}`} onClick={canDrill ? () => openDetail("cierres_totales", "Cierres Totales") : undefined} />
                 <StatBox label="Agendas" value={String(f!.total_agendas)} sub={`${fmtPct(f!.show_total)} show`} onClick={canDrill ? () => openDetail("agendas", "Agendas") : undefined} />
-                <StatBox label="AOV Día 1" value={fmt$(c!.aov_dia1)} sub="Venta Nueva (En Call) + Fee" onClick={canDrill ? () => openDetail("aov_dia1", "AOV Día 1 — Venta Nueva (En Call) + Fee") : undefined} />
+                <StatBox label="AOV Día 1" value={fmt$(c!.aov_dia1)} sub="Venta Nueva + Fee" onClick={canDrill ? () => openDetail("aov_dia1", "AOV Día 1 — Venta Nueva + Fee") : undefined} />
                 <StatBox label="AOV TC" value={fmt$(c!.aov_tc)} sub="Promedio por cierre" onClick={canDrill ? () => openDetail("aov_tc", "AOV TC — Promedio por cierre") : undefined} />
               </div>
               <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-border">
-                <StatBox label="Unidades Cerradas en Llamada" value={String(f!.cierres_llamada)} sub="Venta Nueva (En Call)" onClick={canDrill ? () => openDetail("cierres_llamada", "Unidades Cerradas en Llamada") : undefined} />
-                <StatBox label="Unidades Cerradas en Seguimiento" value={String(f!.cierres_seguimiento)} sub="Post Fee / Completó PIF / Interna" onClick={canDrill ? () => openDetail("cierres_seguimiento", "Unidades Cerradas en Seguimiento") : undefined} />
+                <StatBox label="Unidades Cerradas en Llamada" value={String(f!.cierres_llamada)} sub="Venta Nueva (en la llamada)" onClick={canDrill ? () => openDetail("cierres_llamada", "Unidades Cerradas en Llamada") : undefined} />
+                <StatBox label="Unidades Cerradas en Seguimiento" value={String(f!.cierres_seguimiento)} sub="Adentro en Seguimiento / Completó PIF / Interna" onClick={canDrill ? () => openDetail("cierres_seguimiento", "Unidades Cerradas en Seguimiento") : undefined} />
               </div>
             </div>
           </section>

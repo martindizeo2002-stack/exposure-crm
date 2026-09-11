@@ -3,29 +3,33 @@ export type ConceptoDef = {
   pppTexto: string       // texto fijo que va en el mensaje (mayusculas), o "" si es dinamico (ver Cuota Venta Interna)
   daAcceso: boolean
   requiereNumeroCuota?: boolean   // true para "Cuota Venta Interna" (pide un input extra de numero)
-  actualizaAgendas?: boolean      // true para los 4 conceptos que tambien tocan la tabla agendas
+  actualizaAgendas?: boolean      // true para los conceptos que tambien tocan la tabla agendas
 }
+
+// Vocabulario de EXPOSURE (importado del sheet CRM CENTRAL 2026, 11/09/2026):
+//   Front end (cliente nuevo, dan acceso): Venta Nueva · Adentro en Seguimiento ·
+//   Adentro en Seguimiento y Post Fee · Completó PIF.
+//   Fee = reserva de lugar, sin acceso. Cuota = cuota de un plan front end.
+//   Back end (cliente existente): Venta Interna · Venta Nueva Interna ·
+//   Fee Venta Interna · Cuota Venta Interna · Upsell (Agency).
 
 // Conceptos disponibles SOLO como primer pago del cliente (fila 1 / primera vez).
 export const CONCEPTOS_FILA1: ConceptoDef[] = [
   { label: "Fee", pppTexto: "GUARDAMOS LUGAR", daAcceso: false, actualizaAgendas: true },
-  { label: "Fee + Acceso Acción", pppTexto: "ACCESO A CRM BASE ACCIÓN", daAcceso: true, actualizaAgendas: true },
-  { label: "Venta Nueva (En Call)", pppTexto: "ACCESO DIRECTO", daAcceso: true, actualizaAgendas: true },
+  { label: "Venta Nueva", pppTexto: "ACCESO DIRECTO", daAcceso: true, actualizaAgendas: true },
+  { label: "Adentro en Seguimiento", pppTexto: "ACCESO EN SEGUIMIENTO", daAcceso: true, actualizaAgendas: true },
   { label: "Fee Venta Interna", pppTexto: "GUARDAMOS LUGAR", daAcceso: false, actualizaAgendas: true },
   { label: "Venta Nueva Interna", pppTexto: "ACCESO", daAcceso: true, actualizaAgendas: true },
+  { label: "Venta Interna", pppTexto: "ACCESO", daAcceso: true },
+  { label: "Upsell (Agency)", pppTexto: "UPSELL AGENCY Y ACCESO", daAcceso: true },
 ]
 
 // Conceptos disponibles SOLO desde el segundo pago en adelante (fila 2+).
 // "Cuota 1".."Cuota 10" son entradas individuales (no una sola generica).
 export const CONCEPTOS_FILA2: ConceptoDef[] = [
   { label: "Refuerzo de Fee", pppTexto: "REFUERZA FEE", daAcceso: false },
-  { label: "Venta Nueva (Post Fee)", pppTexto: "ACCESO", daAcceso: true },
-  { label: "Completó PIF (Post Fee)", pppTexto: "COMPLETA PIF Y ACCESO", daAcceso: true },
-  { label: "Completó PIF + Acceso Total Consulting", pppTexto: "COMPLETA PIF Y ACCESO TOTAL A CONSULTING", daAcceso: true },
-  { label: "Completa Total (Post Venta)", pppTexto: "COMPLETA TOTAL Y ACCESO", daAcceso: true },
-  { label: "Completa Total + Acceso Acción", pppTexto: "COMPLETA TOTAL Y ACCESO A CRM BASE ACCIÓN", daAcceso: true },
-  { label: "Completa Total y Finaliza Pago", pppTexto: "COMPLETA TOTAL Y FINALIZA PAGO", daAcceso: false },
-  { label: "Venta Nueva Interna (Post Fee)", pppTexto: "ACCESO", daAcceso: true },
+  { label: "Completó PIF", pppTexto: "COMPLETA PIF Y ACCESO", daAcceso: true },
+  { label: "Adentro en Seguimiento y Post Fee", pppTexto: "ACCESO POST FEE", daAcceso: true },
   { label: "Cuota 1", pppTexto: "CUOTA 1", daAcceso: false },
   { label: "Cuota 2", pppTexto: "CUOTA 2", daAcceso: false },
   { label: "Cuota 3", pppTexto: "CUOTA 3", daAcceso: false },
@@ -70,11 +74,11 @@ export function textoPPPDeFila(
 ): string {
   const c = buscarConcepto(fila.concepto)
   if (!c) return ""
-  if (fila.concepto === "Completó PIF (Post Fee)" && accesoPrograma) {
+  if (fila.concepto === "Completó PIF" && accesoPrograma) {
     return `COMPLETA PIF Y ACCESO A ${accesoPrograma.toUpperCase()}`
   }
-  if (fila.concepto === "Completa Total (Post Venta)" && accesoPrograma) {
-    return `COMPLETA TOTAL Y ACCESO A ${accesoPrograma.toUpperCase()}`
+  if (fila.concepto === "Adentro en Seguimiento y Post Fee" && accesoPrograma) {
+    return `ACCESO A ${accesoPrograma.toUpperCase()} POST FEE`
   }
   if (fila.concepto === "Cuota Venta Interna") {
     const n = fila.numeroCuota != null ? fila.numeroCuota : ""

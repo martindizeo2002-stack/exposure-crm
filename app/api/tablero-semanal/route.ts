@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-import { revenueFromPlans } from "@/lib/revenue"
+import { ALL_SALE_TYPES, revenueFromPlans } from "@/lib/revenue"
 import { isCashCollectedType, sumCashCollected } from "@/lib/cash-collected"
+import { nombreCanonico } from "@/lib/equipo"
 
 export const dynamic = "force-dynamic"
 
@@ -18,10 +19,8 @@ function getSupabase() {
 const META_MENSUAL_USD = 50000
 
 const CALIFS_AB = new Set(["LEAD S", "LEAD A", "LEAD B"])
-const CIERRES_TIPOS = new Set([
-  "Venta Nueva", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)",
-  "Completó PIF (Post Fee)", "Venta Nueva Interna",
-])
+// Ventas = pagos que dan acceso (FE + BE), vocabulario de EXPOSURE en lib/revenue.ts.
+const CIERRES_TIPOS = ALL_SALE_TYPES
 
 function r2(n: number) { return Math.round(n * 100) / 100 }
 function iso(d: Date) { return d.toISOString().slice(0, 10) }
@@ -146,14 +145,15 @@ export async function GET(request: Request) {
     const revenueTotal = r2(revenueFromPlans(plans))
 
     // POR CLOSER: revenue (planes) + cash collected (pagos), unificados por
-    // primer nombre normalizado (mismo criterio que leaderboard/metricas).
-    const closerKey = (s: string | null | undefined) => stripAccents(firstWord(s))
+    // primer nombre normalizado con los apodos de lib/equipo.ts (Nawe → Nahuel),
+    // mismo criterio que leaderboard/metricas.
+    const closerKey = (s: string | null | undefined) => stripAccents(nombreCanonico(s))
     const closerLabel = new Map<string, string>()
     const porCloser = new Map<string, { revenue: number; cash: number; ventas: number; llamadas: number; cerradas: number }>()
     function ensureCloser(raw: string | null | undefined) {
       const key = closerKey(raw)
       if (!key || key === "sin") return null
-      if (!closerLabel.has(key)) closerLabel.set(key, firstWord(raw))
+      if (!closerLabel.has(key)) closerLabel.set(key, nombreCanonico(raw) || firstWord(raw))
       if (!porCloser.has(key)) porCloser.set(key, { revenue: 0, cash: 0, ventas: 0, llamadas: 0, cerradas: 0 })
       return key
     }

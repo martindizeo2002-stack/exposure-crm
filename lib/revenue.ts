@@ -15,17 +15,41 @@ export type ContractPlan = {
   operacion?: string | null
 }
 
-const FRONT_END_SALE_TYPES = new Set([
-  "Venta Nueva",
+// Ventas front end (cliente nuevo que ENTRA al programa). Un Fee no es venta:
+// la venta se cuenta cuando llega el pago que da acceso.
+// Vocabulario de EXPOSURE + etiquetas heredadas de la plantilla original.
+export const FRONT_END_SALE_TYPES = new Set([
+  "Venta Nueva",                        // cerró en la llamada
+  "Adentro en Seguimiento",             // cerró en seguimiento
+  "Adentro en Seguimiento y Post Fee",  // cerró en seguimiento después de un Fee
+  "Completó PIF",                       // pagó el total después de un Fee
+  // Heredados
   "Venta Nueva (En Call)",
   "Venta Nueva (Post Fee)",
   "Completó PIF (Post Fee)",
 ])
 
-const ALL_SALE_TYPES = new Set([
-  ...FRONT_END_SALE_TYPES,
+// Ventas back end (cliente existente). Cobran, pero no son front end.
+// "Upsell /Agency)" es un typo del sheet por "Upsell (Agency)".
+export const BACK_END_SALE_TYPES = new Set([
   "Venta Nueva Interna",
+  "Venta Interna",
+  "Upsell (Agency)", "Upsell /Agency)",
+  // Heredado
   "Venta Nueva Interna (Post Fee)",
+])
+
+export const ALL_SALE_TYPES = new Set([
+  ...FRONT_END_SALE_TYPES,
+  ...BACK_END_SALE_TYPES,
+])
+
+// Cierre que ocurre en la llamada misma vs. cierre posterior (seguimiento).
+export const CLOSED_IN_CALL_TYPES = new Set(["Venta Nueva", "Venta Nueva (En Call)"])
+export const CLOSED_IN_FOLLOWUP_TYPES = new Set([
+  "Adentro en Seguimiento", "Adentro en Seguimiento y Post Fee", "Completó PIF",
+  // Heredados
+  "Venta Nueva (Post Fee)", "Completó PIF (Post Fee)", "Venta Nueva Interna (Post Fee)",
 ])
 
 function normalized(value: string) {
