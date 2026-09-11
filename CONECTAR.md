@@ -17,8 +17,8 @@ Las claves van en `.env.local` (y en Vercel). Nunca al repo. Copia de respaldo e
 ## 1 · Lo que ya está conectado
 
 - [x] **Supabase** — base, login, esquema (`NEXT_PUBLIC_SUPABASE_URL`, `…ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROJECT_REF`).
-- [x] **Vercel** — https://exposure-crm-nu.vercel.app (repo privado tukienzo/exposure-crm). Variables cargadas.
-- [x] **Usuarios** — Alex (CEO), Nahuel (CEO/admin), Cristian y Kenneth (Closer), Maximo (Setter). Mails y contraseñas en `exposure-crm-secrets\usuarios.txt`. Los mails `@exposure-crm.local` son provisorios: se cambian con `node scripts/crear-usuario.mjs` cuando tengas los reales.
+- [x] **Vercel** — https://exposure-crm-nu.vercel.app (repo privado tukienzo/exposure-crm). Variables cargadas. **Plan Pro desde el 11/09 (05:00)**: crons frecuentes (espejo cada 5 min, Fathom cada 30, iClosed cada 10, ManyChat cada 6 h, operaciones cada hora, repaso diario 09:00 UTC) y funciones de hasta 300 s.
+- [x] **Usuarios** — Alex (CEO), Nahuel (CEO/admin), Cristian, Kenneth y Bener (Closer), Maximo (Setter). Mails y contraseñas en `exposure-crm-secrets\usuarios.txt`. Los mails `@exposure-crm.local` son provisorios: se cambian con `node scripts/crear-usuario.mjs` cuando tengas los reales.
 - [x] **Histórico importado del CRM CENTRAL 2026** (11/09): 579 agendas, 196 pagos (cash por mes igual al sheet, con TC 1.540 para los ARS), 236 clientes (181 los derivó el CRM de los pagos + 55 de ACTIVE CLIENTS sin pago en el sheet), seguimientos e iClosed cruzados. Solo cuentan los closers propios (Alex y Nahuel hasta junio; después también Cristian, Tobias y Kenneth). Script: `Central Negocio\scripts\manychat\importar-crm.py`.
 - [x] **ManyChat** — clave probada; 78.204 contactos leídos con sus tags → `crm_integration_assets`, cruce con las agendas por Instagram, conversaciones nuevas por mes y setter en `metricas_manual`.
 - [x] **Panel del negocio** — lee del CRM (agendas, pagos, clientes, métricas).
@@ -45,7 +45,7 @@ Las claves van en `.env.local` (y en Vercel). Nunca al repo. Copia de respaldo e
 
 ## 3 · ManyChat → CRM en tiempo real (5 minutos, en la pantalla de ManyChat)
 
-El CRM ya tiene el endpoint. ManyChat no permite crear automatizaciones por API: el paso "External Request" solo se agrega desde su editor de automatizaciones, por eso queda de tu lado (o lo hacemos juntos en una llamada de 5 minutos).
+El CRM ya tiene el endpoint. ManyChat no permite crear automatizaciones por API: el paso "External Request" solo se agrega desde su editor de automatizaciones. Intenté armarlo desde el navegador la madrugada del 11/09 y el sistema no me dejó operar dentro de tu cuenta de ManyChat, así que queda de tu lado (o lo hacemos juntos en una llamada de 5 minutos).
 
 1. ManyChat → **Automation** → abrí el flujo de la keyword (por ejemplo "PARTNER") → agregá un paso **Actions → External Request** al final.
 2. Request type: **POST**. URL: `https://exposure-crm-nu.vercel.app/api/manychat-sync`.
