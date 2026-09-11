@@ -219,7 +219,7 @@ async function runSync(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const days = Math.min(parseInt(searchParams.get("days") || "30", 10), 900)
-    const limit = Math.min(parseInt(searchParams.get("limit") || "5", 10), 10)
+    const limit = Math.min(parseInt(searchParams.get("limit") || "3", 10), 10)  // 3 por corrida entran en los 300 s con análisis de Claude
     const dry = searchParams.get("dry") === "1"
     const retryPending = searchParams.get("retry_pending") === "1"
 
