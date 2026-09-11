@@ -7,7 +7,7 @@ import { attachEmailToPerson } from "@/lib/crm-email"
 import { updateHammerAudience } from "@/lib/meta-hammer-audience"
 import { canonicalCloserName } from "@/lib/closer-routing"
 
-export const maxDuration = 60
+export const maxDuration = 300
 const API = "https://public.api.iclosed.io/v1/eventCalls"
 
 async function allRows(queryFactory: (from: number, to: number) => PromiseLike<any>) {
