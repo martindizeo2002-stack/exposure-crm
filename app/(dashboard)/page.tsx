@@ -246,7 +246,7 @@ export default function HomePage() {
           ? loadingPlans || loadingExceptions
           : loadingExceptions
   const cash = metrics?.cash
-  const goal = 100000
+  const goal = Number(process.env.NEXT_PUBLIC_META_CASH_MENSUAL || 50000) || 50000  // meta de cash collected mensual de EXPOSURE
   const progress = Math.min(100, ((cash?.cc_total || 0) / goal) * 100)
   const profit = profitInputs?.complete ? (cash?.cc_total || 0) - profitInputs.expenses - profitInputs.commissions : null
   const commercialCommissions = [...(leaderboard?.closers || []), ...(leaderboard?.setters || [])].reduce((sum, row) => sum + Number(row.comisiones || 0), 0)
@@ -331,10 +331,10 @@ export default function HomePage() {
         </div>
         <div className="relative z-10 min-w-0 flex-1">
           <p className="text-[10px] font-black uppercase tracking-[.22em] text-red-300">Avance en tiempo real</p>
-          <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Objetivo Cash Collected · USD 100K</h2>
+          <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">Objetivo Cash Collected · {money(goal)}</h2>
           <p className="mt-2 text-sm text-white/45">FECCU + FECCPP + BECCU + BECCPP</p>
           <div className="command-progress"><div style={{ width: `${progress}%` }} /></div>
-          <div className="mt-3 flex justify-between text-xs text-white/45"><span>USD 0</span><span>Faltan {money(Math.max(0, goal - (cash?.cc_total || 0)))}</span><span>USD 100K</span></div>
+          <div className="mt-3 flex justify-between text-xs text-white/45"><span>USD 0</span><span>Faltan {money(Math.max(0, goal - (cash?.cc_total || 0)))}</span><span>{money(goal)}</span></div>
         </div>
       </section>
       <section><div className="mb-3"><p className="text-xs font-bold uppercase tracking-[.18em] text-red-500">Solo CEO</p><h2 className="text-xl font-bold">Rentabilidad y backend</h2></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

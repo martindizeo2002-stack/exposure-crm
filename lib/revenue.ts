@@ -86,6 +86,22 @@ export function contractValueFromOperation(operation: string | null | undefined,
     if (amount) return amount
   }
 
+  // Formas de EXPOSURE sin "$": "3 Pagos (650 + 650 + 500)", "Agency 2K", "IA PARTNER - 1300 PP",
+  // "Content (700) PP", "Circulo | 1 año | 1800", "Agency 1600 pif".
+  const sumOfParts = value.match(/\d+\s*pagos?\s*\(([\d\s+.,]+)\)/i)
+  if (sumOfParts) {
+    const total = sumOfParts[1].split("+").map(x => moneyNumber(x.trim()) || 0).reduce((a, b) => a + b, 0)
+    if (total) return total
+  }
+  const thousands = value.match(/(\d+(?:[.,]\d+)?)\s*k/i)
+  if (thousands) {
+    const amount = moneyNumber(thousands[1])
+    if (amount) return amount * 1000
+  }
+  const bare = Array.from(value.matchAll(/(?<![\d.,])(\d{3,5})(?![\d.,]*\s*(?:%|meses|mes|cuotas|pagos|x|año))/gi))
+    .map(m => Number(m[1])).filter(n => n >= 300 && n <= 20000)
+  if (bare.length) return Math.max(...bare)
+
   return fallback
 }
 
