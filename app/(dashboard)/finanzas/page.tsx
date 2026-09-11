@@ -157,7 +157,7 @@ export default function FinanzasPage() {
           </div>
           <h1 className="text-3xl font-black tracking-tight">Centro Financiero</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Cierre mensual auditable. Desde agosto: default 50/50, renovación cerrada por Cuenta A 65/35 y venta nueva originada en @cuenta.principal 80/20.
+            Cierre mensual auditable. Desde agosto: default 50/50, renovación cerrada por Alex 65/35 y venta nueva originada en @alexmcarrera 80/20.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -223,7 +223,7 @@ export default function FinanzasPage() {
                   <div className="mt-4 rounded-2xl border bg-muted/30 p-4">
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Utilidad distribuible</p>
                     <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-                      <p className="text-sm text-muted-foreground">Regla general 50/50. Excepciones desde agosto: renovación cerrada personalmente por Cuenta A 65/35; venta nueva originada en @cuenta.principal 80/20. Si coinciden, prevalece renovación Cuenta A. La base especial es cash neto de plataforma y reembolsos.</p>
+                      <p className="text-sm text-muted-foreground">Regla general 50/50. Excepciones desde agosto: renovación cerrada personalmente por Alex 65/35; venta nueva originada en @alexmcarrera 80/20. Si coinciden, prevalece renovación Alex. La base especial es cash neto de plataforma y reembolsos.</p>
                       <p className="text-2xl font-black">{money(selected.distributable_profit, selected.base_currency)}</p>
                     </div>
                   </div>
@@ -234,7 +234,7 @@ export default function FinanzasPage() {
                 <CardContent className="grid gap-3 sm:grid-cols-2">
                   {approvals.length ? approvals.map(approval => (
                     <div key={approval.id} className="flex items-center justify-between rounded-xl border p-3">
-                      <p className="text-sm font-bold">{approval.partner_key === "partner_a" ? "Cuenta B" : "Cuenta A"}</p>
+                      <p className="text-sm font-bold">{approval.partner_key === "partner_a" ? "Nahuel" : "Alex"}</p>
                       {approval.status === "aprobado"
                         ? <Badge className="gap-1 bg-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Aprobado</Badge>
                         : <Badge variant="outline" className="gap-1"><CircleDashed className="h-3.5 w-3.5" /> Falta aprobar</Badge>}

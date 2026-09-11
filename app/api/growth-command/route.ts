@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     methodology: {
       health: "La salud manual no se sobrescribe. La señal automática solo describe actividad verificable a 7/14 días.",
       priority: "Backend y renovación se ordenan únicamente con prioridad, potencial y estado explícitos; sin evidencia quedan como requiere_evidencia.",
-      finance: "Renovación vendida por Cuenta A 65/35 prevalece sobre origen @cuenta.principal 80/20 desde 2026-08-01.",
+      finance: "Renovación vendida por Alex 65/35 prevalece sobre origen @alexmcarrera 80/20 desde 2026-08-01.",
     },
   })
 }

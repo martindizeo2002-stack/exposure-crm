@@ -71,8 +71,12 @@ function statusMeta(status: string) {
 
 const STATUS_OPTIONS = ["idea", "guion_listo", "para_grabar", "grabado", "publicado"]
 const PAUL_REEL_STATUS_OPTIONS = ["idea", "grabado", "edicion", "completo"]
-const RESPONSABLE_OPTIONS = ["SIN ASIGNAR", "CRISTIAN", "PAUL", "JOACO", "VALEN", "JOACO (SUPERVISA VALEN)", "JOACO (OK FINAL PAUL)", "JOACO BUSCA · VALEN ACOMODA · PAUL GRABA", "TOMÁS", "JOEL", "FIDEL"]
-const CRIS_RESPONSABLE_OPTIONS = ["Cuenta B", "Cuenta A", "Joaco", "Valen", "Joaco (supervisa Valen)", "Joaco (OK final Cuenta A)", "Joaco busca · Valen acomoda · Cuenta A graba"]
+const RESPONSABLE_OPTIONS = ["SIN ASIGNAR", "ALEX", "NAHUEL", "EDITOR", "MAXIMO"]
+// EXPOSURE opera una sola cuenta: la lista es la misma para cualquier content_account guardado.
+const CRIS_RESPONSABLE_OPTIONS = RESPONSABLE_OPTIONS
+// Quién graba los reels de "Grabar ya". "PAUL" queda por las filas históricas
+// de la plantilla; las nuevas se asignan a ALEX.
+const RECORDING_ASSIGNEES = ["PAUL", "ALEX"]
 // Catálogo base propio de Preview. No puede depender solo de las piezas que
 // existan hoy: una migración o un archivado nunca debe borrar opciones.
 const OFFICIAL_FORMAT_OPTIONS = [
@@ -93,11 +97,11 @@ function canonicalFormatLabel(value: string) {
 }
 
 function automaticTitle(angle: string, rawTitle: string, plannedAt: string) {
-  const code = (angle.match(/^[A-Z]+\d+/i)?.[0] || "PIEZA").toUpperCase()
+  const code = (angle.match(/^[A-Z]*\d+/i)?.[0] || "PIEZA").toUpperCase()
   const date = plannedAt.slice(0, 10).split("-").reverse().join("-")
-  const generic = /^(VIDEO (DE )?(CRISTIAN|PAUL)|REEL)(\s*[—-]\s*SLOT\s*\d+)?$/i
-  const cleaned = rawTitle.replace(/^([A-Z]+\d+)\s*[-—·]\s*/i, "").replace(/\s*[-—·]\s*\d{2}[-/]\d{2}[-/]\d{2,4}$/i, "").trim()
-  const descriptor = (generic.test(cleaned) || !cleaned ? angle.replace(/^[A-Z]+\d+\s*[·—-]\s*/i, "") : cleaned)
+  const generic = /^(VIDEO (DE )?(CRISTIAN|PAUL|ALEX)|REEL)(\s*[—-]\s*SLOT\s*\d+)?$/i
+  const cleaned = rawTitle.replace(/^([A-Z]*\d+)\s*[-—·]\s*/i, "").replace(/\s*[-—·]\s*\d{2}[-/]\d{2}[-/]\d{2,4}$/i, "").trim()
+  const descriptor = (generic.test(cleaned) || !cleaned ? angle.replace(/^[A-Z]*\d+\s*[·—-]\s*/i, "") : cleaned)
     .split(/\s+/).filter(Boolean).slice(0, 4).join(" ").toUpperCase() || "SIN CONCEPTO"
   return [code, descriptor, date].filter(Boolean).join(" - ")
 }
@@ -195,7 +199,7 @@ export function ContentWorkspace() {
   const canCreateOrDelete = canEdit && session.rol !== "Editor"
   const initialRecordingView = searchParams.get("view") === "grabar"
   const [view, setView] = useState<"semana" | "stories" | "grabar" | "biblioteca">(initialRecordingView ? "grabar" : "semana")
-  const [contentAccount, setContentAccount] = useState<"CRIS" | "PAUL">(initialRecordingView ? "PAUL" : "CRIS")
+  const [contentAccount, setContentAccount] = useState<"CRIS" | "PAUL">("PAUL")
   const [weekOffset, setWeekOffset] = useState(0)
   const [editing, setEditing] = useState<ContentRow | null>(null)
   const [creating, setCreating] = useState(false)
@@ -217,7 +221,7 @@ export function ContentWorkspace() {
     view === "semana" ? weekKey : null, fetcher,
   )
 
-  // Ventana operativa manual: solo cambia cuando Valen confirma que el próximo
+  // Ventana operativa manual: solo cambia cuando edición confirma que el próximo
   // bloque está listo. No depende del calendario ni modifica filas.
   const recordingWindow = PAUL_RECORDING_WINDOW
   const recordingKey = `/api/content-workspace?managed_only=1&content_account=PAUL&content_kind=feed&start=${recordingWindow.start}&end=${recordingWindow.end}&limit=200`
@@ -233,14 +237,13 @@ export function ContentWorkspace() {
   const targetContentAssetId = searchParams.get("content_asset_id")
   useEffect(() => {
     if (isCristianRestricted) {
-      setContentAccount("CRIS")
       if (view === "grabar") setView("semana")
       return
     }
     if (searchParams.get("source") !== "testimonios") return
-    const requestedAccount = searchParams.get("content_account")
+    // EXPOSURE opera una sola cuenta: cualquier content_account pedido cae en la misma vista.
     setView("biblioteca")
-    setContentAccount(requestedAccount === "PAUL" ? "PAUL" : "CRIS")
+    setContentAccount("PAUL")
     setLibQuery(targetContentAssetId ? "" : "TESTIMONIO")
   }, [isCristianRestricted, searchParams, targetContentAssetId, view])
   const libParams = new URLSearchParams({ managed_only: "1", content_account: contentAccount, content_kind: "feed", limit: "300" })
@@ -297,11 +300,11 @@ export function ContentWorkspace() {
   const [markingRecordedId, setMarkingRecordedId] = useState<string | null>(null)
   const recordingRows = useMemo(() => {
     return (recordingData?.rows || []).filter((row) => {
-      return isPaulReel(row) && row.status !== "grabado" && row.assigned_to === "PAUL"
+      return isPaulReel(row) && row.status !== "grabado" && RECORDING_ASSIGNEES.includes(row.assigned_to || "")
     }).sort((a, b) => `${a.planned_at || ""}-${Number(a.metadata?.slot || 0)}`.localeCompare(`${b.planned_at || ""}-${Number(b.metadata?.slot || 0)}`))
   }, [recordingData?.rows])
   const editingRows = useMemo(
-    () => (recordingData?.rows || []).filter((row) => isPaulReel(row) && row.assigned_to === "PAUL" && ["grabado", "edicion"].includes(row.status)),
+    () => (recordingData?.rows || []).filter((row) => isPaulReel(row) && RECORDING_ASSIGNEES.includes(row.assigned_to || "") && ["grabado", "edicion"].includes(row.status)),
     [recordingData?.rows],
   )
   const recordingGroups = useMemo(() => ({
@@ -386,9 +389,8 @@ export function ContentWorkspace() {
 
   return (
     <div className="min-w-0 max-w-full space-y-5 overflow-x-hidden">
-      <div className={cn("grid max-w-lg gap-2 rounded-2xl border border-white/10 bg-white/[.035] p-1.5", isCristianRestricted ? "grid-cols-1" : "grid-cols-2")}>
-        <button onClick={() => setContentAccount("CRIS")} className={cn("rounded-xl px-4 py-2.5 text-xs font-black", contentAccount === "CRIS" ? "bg-white text-zinc-950" : "text-white/55 hover:bg-white/[.06]")}>CONTENIDO CRIS</button>
-        {!isCristianRestricted && <button onClick={() => setContentAccount("PAUL")} className={cn("rounded-xl px-4 py-2.5 text-xs font-black", contentAccount === "PAUL" ? "bg-fuchsia-400 text-zinc-950" : "text-white/55 hover:bg-white/[.06]")}>CONTENIDO PAUL</button>}
+      <div className="inline-flex max-w-lg rounded-2xl border border-white/10 bg-white/[.035] p-1.5">
+        <span className="rounded-xl bg-fuchsia-400 px-4 py-2.5 text-xs font-black text-zinc-950">CONTENIDO EXPOSURE</span>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className={cn("grid w-full max-w-3xl gap-1.5 rounded-2xl border border-white/10 bg-white/[.035] p-1.5 sm:w-auto", isCristianRestricted ? "grid-cols-3" : "grid-cols-4")}>
@@ -509,7 +511,7 @@ export function ContentWorkspace() {
         <div className="space-y-4">
           {grouped.map(([dateKey, items]) => {
             const paulReels = contentAccount === "PAUL" ? items.filter(isPaulReel) : []
-            const valenItems = contentAccount === "PAUL" ? items.filter((row) =>
+            const editingItems = contentAccount === "PAUL" ? items.filter((row) =>
               ["VOLUMEN", "CARRUSEL", "TESTIMONIO"].includes(contentPieceKind(row)),
             ) : []
             return (
@@ -523,14 +525,14 @@ export function ContentWorkspace() {
                 <div className="space-y-3">
                   <section className="rounded-2xl border border-white/10 bg-black/20">
                     <div className="px-4 py-3 text-xs font-black uppercase tracking-wider text-white/60">
-                      VALEN · {valenItems.filter((r) => contentPieceKind(r) === "VOLUMEN").length} Volumen · {valenItems.filter((r) => contentPieceKind(r) === "CARRUSEL").length} Carruseles · {valenItems.filter((r) => contentPieceKind(r) === "TESTIMONIO").length} Testimonio
+                      EDICIÓN · {editingItems.filter((r) => contentPieceKind(r) === "VOLUMEN").length} Volumen · {editingItems.filter((r) => contentPieceKind(r) === "CARRUSEL").length} Carruseles · {editingItems.filter((r) => contentPieceKind(r) === "TESTIMONIO").length} Testimonio
                     </div>
                     <div className="grid gap-2.5 border-t border-white/10 p-3 md:grid-cols-2 xl:grid-cols-3">
-                      {valenItems.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} />)}
+                      {editingItems.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} />)}
                     </div>
                   </section>
                   <div>
-                    <p className="mb-2 px-1 text-xs font-black uppercase tracking-wider text-fuchsia-300">PAUL · {paulReels.length} Reels para grabar</p>
+                    <p className="mb-2 px-1 text-xs font-black uppercase tracking-wider text-fuchsia-300">ALEX · {paulReels.length} reels para grabar</p>
                     <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                       {paulReels.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} detailed />)}
                     </div>
@@ -625,7 +627,7 @@ function RecordingBrief({ row }: { row: ContentRow }) {
       <p className="text-[10px] font-black uppercase tracking-[.18em] text-cyan-300">Cómo grabarlo</p>
       <p className="mt-1 text-lg font-black text-white">{recordingFormat(row)}</p>
       <p className="mt-1 text-sm text-white/60">{reaction ? "Abrí el video, reaccioná y desarrollá tu lectura." : "Una toma simple, directa y sin edición pesada."}</p>
-      {reaction && (link ? <a href={link} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-cyan-200">Abrir video de reacción <ArrowUpRight className="h-4 w-4" /></a> : <p className="mt-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs font-bold text-amber-200">Valen todavía no cargó el video de reacción.</p>)}
+      {reaction && (link ? <a href={link} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-cyan-200">Abrir video de reacción <ArrowUpRight className="h-4 w-4" /></a> : <p className="mt-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs font-bold text-amber-200">Todavía no se cargó el video de reacción.</p>)}
     </div>
     <div className="rounded-2xl border border-orange-400/25 bg-orange-400/[.08] p-4">
       <p className="text-[10px] font-black uppercase tracking-[.18em] text-orange-300">Ángulo</p>
@@ -651,7 +653,7 @@ function RecordingPieceDialog({ row, busy, canEdit, onClose, onRecorded }: { row
 }
 
 function ContentEditDialog({
-  row, formatOptions, onClose, onSave, onDelete, forceReadOnly = false, allowGenerator = true, contentAccount = "CRIS",
+  row, formatOptions, onClose, onSave, onDelete, forceReadOnly = false, allowGenerator = true, contentAccount = "PAUL",
 }: {
   row: ContentRow | null
   formatOptions: string[]
@@ -746,7 +748,7 @@ function ContentEditDialog({
           format: form.format,
           funnel_stage: form.funnel_stage,
           awareness_level: form.awareness_level,
-          assigned_to: form.assigned_to || (isPaul ? "SIN ASIGNAR" : "Cuenta B"),
+          assigned_to: form.assigned_to || (isPaul ? "SIN ASIGNAR" : "ALEX"),
           source_url: form.source_url,
         }),
       })
@@ -756,7 +758,7 @@ function ContentEditDialog({
         ...current,
         title: automaticTitle(current.angle, output.title || current.title, current.planned_at),
         format: current.format || output.format || "Talking Head",
-        assigned_to: current.assigned_to || (isPaul ? "SIN ASIGNAR" : "Cuenta B"),
+        assigned_to: current.assigned_to || (isPaul ? "SIN ASIGNAR" : "ALEX"),
         status: "guion_listo",
         awareness_level: output.awareness_level || current.awareness_level,
         script_text: output.script_text || current.script_text,

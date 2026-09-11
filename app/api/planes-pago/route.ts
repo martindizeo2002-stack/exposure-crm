@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { createSupabaseServer } from "@/lib/supabase-server"
+import { nombreCanonico } from "@/lib/equipo"
 import { paginatedPayload, parsePagination } from "@/lib/pagination"
 
 function getSupabase() {
@@ -14,16 +15,14 @@ const ITEM_UPDATE_FIELDS = new Set(["concepto", "numero_cuota", "monto", "fecha_
 const PLAN_UPDATE_FIELDS = new Set(["cliente", "telefono", "operacion", "closer", "categoria_venta", "setter", "calificacion", "fuente", "contenido_contestado", "fecha_alta", "fecha_baja"])
 const CATEGORIAS_VENTA = new Set(["Front End", "Back End"])
 
+// Clave de dueño de la cartera: primer nombre pasado por los alias del equipo
+// (lib/equipo → alex, nahuel, cristian, tobias, bener). Un nombre desconocido
+// vuelve tal cual: primera palabra, sin tildes, en minúsculas.
 function ownerKey(value: unknown) {
-  const key = String(value || "")
-    .trim()
-    .split(/\s+/)[0]
+  return nombreCanonico(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-  if (["tomas", "yafe"].includes(key)) return "yafe"
-  if (["tomi", "tommy", "ardu", "arduino"].includes(key)) return "tommy"
-  return key
 }
 
 // GET: devuelve todos los planes con sus items (join). Sin filtro de fecha

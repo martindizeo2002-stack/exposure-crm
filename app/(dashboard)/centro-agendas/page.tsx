@@ -97,7 +97,7 @@ const settersFor = (d?: string | null) => [...settersPara(d), "Sin Setter"]
 const CUENTA = ["@cristiansocial","@cuenta.principal"]
 const CALIFICACION = ["LEAD S","LEAD A","LEAD B","LEAD C","LEAD D"]
 const OCUPACION = ["Negocio","Empleado","Estudiante","No se le envió"]
-const MANYCHAT_OPTS = ["AUDIO 1","AUDIO 2","AUDIO PAUL","OPCIÓN 1","OPCIÓN 2","OPCIONES","FOLLOW MANY FILTRADO","RECURSO FOLLOWER",'FOLLOWERS DM "QUÉ HAGO?"','🐍 | NEW FOLLOWER',"No Respondió","No se le envió"]
+const MANYCHAT_OPTS = ["AUDIO 1","AUDIO 2","OPCIÓN 1","OPCIÓN 2","OPCIONES","FOLLOW MANY FILTRADO","RECURSO FOLLOWER",'FOLLOWERS DM "QUÉ HAGO?"','🐍 | NEW FOLLOWER',"No Respondió","No se le envió"]
 const CALL_CONFIRMER = ["Confirmada","Cancelada por Triage","No Respondió","Pendiente"]
 const NO_PRECALLER_FROM = "2026-08-01"
 function isNoPrecallerAgenda(a: Partial<Agenda> | null | undefined) {
@@ -1299,7 +1299,7 @@ export default function CentroAgendasPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Volver a contactar</Label><Input type="date" className="h-9" value={form.seguimiento_fecha?.split("T")[0] || ""} onChange={e => { setF("seguimiento_fecha", e.target.value || null); if (e.target.value) { setF("seguimiento_estado", "Pendiente"); if (!form.seguimiento_responsable) setF("seguimiento_responsable", form.closer || "") } }} /></div>
                   <div className="sm:col-span-2"><TxtArea label="Nota de seguimiento" value={form.seguimiento_nota} onChange={v => setF("seguimiento_nota", v)} /></div>
-                  <div className="sm:col-span-2"><Label className="text-xs text-muted-foreground">Responsable</Label><Input className="mt-1.5 h-9" value={form.seguimiento_responsable || ""} onChange={e => setF("seguimiento_responsable", e.target.value)} placeholder="Ej. Cuenta A, Marcos, closer asignado" /></div>
+                  <div className="sm:col-span-2"><Label className="text-xs text-muted-foreground">Responsable</Label><Input className="mt-1.5 h-9" value={form.seguimiento_responsable || ""} onChange={e => setF("seguimiento_responsable", e.target.value)} placeholder="Ej. Nahuel, Cristian, closer asignado" /></div>
                 </div>
               </div>}
               {form.show && form.cerro && <>

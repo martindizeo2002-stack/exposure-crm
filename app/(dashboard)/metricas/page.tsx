@@ -591,7 +591,7 @@ export default function MetricasPage() {
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <VolumenBlock title="Agendas por cuenta" subtitle="Cuenta B vs Cuenta A" items={data.volumen.por_cuenta} total={data.volumen.total}
+                <VolumenBlock title="Agendas por cuenta" subtitle="EXPOSURE" items={data.volumen.por_cuenta} total={data.volumen.total}
                   onItemClick={canDrill ? (v) => openVolumenDetail("cuenta", v, "Agendas por cuenta") : undefined} />
                 <VolumenBlock title="Agendas por ocupación" subtitle="Negocio / Empleado / Estudiante" items={data.volumen.por_ocupacion} total={data.volumen.total}
                   onItemClick={canDrill ? (v) => openVolumenDetail("ocupacion", v, "Agendas por ocupación") : undefined} />

@@ -61,10 +61,7 @@ const pitchColors: Record<string, string> = {
 
 const DURACION_OPTS = ["1 Mes", "2 Meses", "4 Meses", "6 Meses", "8 Meses", "12 Meses"]
 
-const MEDIO_PAGO_OPTS = [
-  "Stripe (Tarjeta)", "Pesos (RECA)", "USDT (TRC20)", "Efectivo USD",
-  "Western Union", "USD (CTA PA)", "Binance", "Pesos (CTA PA)", "PayPal (CTA PA)",
-]
+const MEDIO_PAGO_OPTS = ["Transferencia USD", "Transferencia ARS", "Stripe", "PayPal", "Wise", "Mercado Pago", "Efectivo", "Otro"]
 
 const PITCH_OPTS = ["No ofrecido", "Ofrecido y Pagó", "Ofrecido y Rechazado", "No cualifica", "Pitcheado"]
 

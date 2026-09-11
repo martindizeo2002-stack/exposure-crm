@@ -20,12 +20,12 @@ const steps = [
 ] as const
 
 const roles = [
-  ["CEO / Cuenta A", "Revisa Revenue, Cash, ROAS, períodos, matches en revisión, excepciones, exportaciones y cambios estructurales."],
+  ["CEO (Alex)", "Revisa Revenue, Cash, ROAS, períodos, matches en revisión, excepciones, exportaciones y cambios estructurales."],
   ["Closer", "Completa la llamada y seguimiento el mismo día. La IA y Fathom aportan evidencia, no reemplazan su carga."],
   ["Setter", "Completa fuente/UTM/ManyChat, asignación y scoring. S/A/B es calificada; nunca pisa manual con shadow."],
   ["Precaller (pausado)", "Desde agosto de 2026 el paso está oculto por el experimento sin precaller. El histórico se conserva para reactivarlo sin perder datos."],
   ["CSM", "Completa formulario, contrato, accesos, onboarding, objetivos/dolores, T1–T4, accionables y upsell."],
-  ["Contenido · Cuenta B / Valen", "Pestaña Semanal: cargan/editan fecha, responsable, guion, formato y ángulo (reemplaza Notion). Pestaña Métricas: leen tasas con N y cobertura explícita."],
+  ["Contenido · Alex / Editor", "Pestaña Semanal: cargan/editan fecha, responsable, guion, formato y ángulo (reemplaza Notion). Pestaña Métricas: leen tasas con N y cobertura explícita."],
 ]
 
 const fields = [
@@ -89,7 +89,7 @@ export default function SopCrmPage() {
       <section>
         <div className="mb-4 flex items-center gap-2"><Bot className="h-5 w-5 text-primary" /><h2 className="text-xl font-black">Funciones del sistema</h2></div>
         <div className="grid gap-3 md:grid-cols-2">
-          <Rule title="Reconciliación CEO (Inicio)" text="Compara Revenue y Cash Collected del sistema contra el corte declarado por Cuenta A. Muestra fórmula, fuente y diferencia exacta; nunca oculta un conflicto ni inventa un número. Solo CEO/Contaduría." />
+          <Rule title="Reconciliación CEO (Inicio)" text="Compara Revenue y Cash Collected del sistema contra el corte declarado por Alex. Muestra fórmula, fuente y diferencia exacta; nunca oculta un conflicto ni inventa un número. Solo CEO/Contaduría." />
           <Rule title="Tablero semanal" text="Agendas por origen, scoring S/A/B/C/D, presentadas, ventas, Revenue y Cash Collected por closer en la semana en curso, con avance vs objetivo semanal prorrateado de la meta mensual (USD 50k) y ritmo necesario para las semanas restantes. Todo desde agendas/pagos/planes_pago, con numerador y denominador explícitos." />
           <Rule title="Conflictos de identidad" text="Cola de revisión de colisiones teléfono/Instagram/email (tabla crm_identity_conflicts, solo lectura). Nunca se fusiona automáticamente por nombre; la resolución final la hace una persona con evidencia." />
           <Rule title="Asistente interno" text="Responde 5 consultas deterministas sin IA generativa ni web: teléfono de una persona, ángulos con más leads S, brecha vs meta mensual, mejor mes histórico de Cash Collected, y métricas propias por rol. Cada respuesta trae su fuente/fórmula o dice explícitamente que no hay evidencia suficiente. Consultas globales solo CEO/Contaduría; closers/setters solo ven sus propias métricas. Nunca escribe datos." />

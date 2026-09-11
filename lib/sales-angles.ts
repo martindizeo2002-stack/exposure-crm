@@ -1,62 +1,75 @@
-export const SALES_ANGLES = [
-  "P1 · Dependencia del azar/entorno",
-  "P2 · Parálisis con la mujer que le gusta",
-  "P3 · Conversación sin emoción",
-  "P4 · Genera interés pero no escala",
-  "P5 · Contactos que no se convierten en citas",
-  "P6 · Tiene citas pero no con las que quiere",
-  "P7 · Pierde el marco cuando ella importa",
-  "P8 · Post-separación",
-  "S1 · Sistema predecible de oportunidades",
-  "S2 · Exposición progresiva",
-  "S3 · Comunicación emocional e intención",
-  "S4 · Ruta de interacción a cita",
-  "S5 · Marco y autoliderazgo",
-  "M1 · Actuar antes de sentir confianza",
-  "M2 · Información sin feedback no alcanza",
-  "M3 · Depender del entorno no es tener opciones",
-  "M4 · El costo de seguir conformándose",
-  "M5 · Es una habilidad entrenable",
-  "PR1 · Diagnóstico individual",
-  "PR2 · Feedback sobre situaciones reales",
-  "PR3 · Reconstrucción post-separación",
-  "PR4 · De contactos a citas consistentes",
-  "PR5 · De conformarse a poder elegir",
-  "PR6 · Un día entrenando clientes",
-] as const
+import { ANGULOS_EXPOSURE } from "@/lib/angulos-exposure"
 
-const aliases: Array<[RegExp, string]> = [
-  [/^P1\b|depend(e|é)s? del azar|entorno impredecible|apps? de citas/i, SALES_ANGLES[0]],
-  [/^P2\b|no te anim(a|á)s|par(a|á)lisis|miedo al rechazo/i, SALES_ANGLES[1]],
-  [/^P3\b|conversaci(o|ó)n sin emoci(o|ó)n|modo entrevista/i, SALES_ANGLES[2]],
-  [/^P4\b|^game$|game\s*\/\s*escalada|no escala|gener(a|á)s inter(e|é)s/i, SALES_ANGLES[3]],
-  [/^P5\b|contacto sin cita|el visto|ghosting/i, SALES_ANGLES[4]],
-  [/^P6\b|falta de elecci(o|ó)n|no con las que quer(e|é)s|hombre bueno/i, SALES_ANGLES[5]],
-  [/^P7\b|escasez|needy|pierde el marco/i, SALES_ANGLES[6]],
-  [/^P8\b|post.?separaci(o|ó)n/i, SALES_ANGLES[7]],
-  [/^S1\b|sistema predecible/i, SALES_ANGLES[8]],
-  [/^S2\b|exposici(o|ó)n progresiva/i, SALES_ANGLES[9]],
-  [/^S3\b|comunicaci(o|ó)n emocional/i, SALES_ANGLES[10]],
-  [/^S4\b|ruta (concreta )?de interacci(o|ó)n/i, SALES_ANGLES[11]],
-  [/^S5\b|marco y autoliderazgo/i, SALES_ANGLES[12]],
-  [/^M1\b|esperar confianza/i, SALES_ANGLES[13]],
-  [/^M2\b|informaci(o|ó)n sin feedback|^feedback$/i, SALES_ANGLES[14]],
-  [/^M3\b|^opciones$/i, SALES_ANGLES[15]],
-  [/^M4\b|costo de conformarse/i, SALES_ANGLES[16]],
-  [/^M5\b|habilidad entrenable|looks?/i, SALES_ANGLES[17]],
-  [/^broad$/i, SALES_ANGLES[17]],
-  [/shit.?test/i, SALES_ANGLES[6]],
-  [/^PR1\b|diagn(o|ó)stico individual/i, SALES_ANGLES[18]],
-  [/^PR2\b|feedback sobre situaciones/i, SALES_ANGLES[19]],
-  [/^PR3\b|caso post.?separaci(o|ó)n/i, SALES_ANGLES[20]],
-  [/^PR4\b|caso game|de contactos a citas/i, SALES_ANGLES[21]],
-  [/^PR5\b|caso falta de elecci(o|ó)n|de conformarse a poder elegir/i, SALES_ANGLES[22]],
-  [/^PR6\b|acompa(ñ|n)ame un d(i|í)a|entrenando clientes/i, SALES_ANGLES[23]],
+// Etiquetas canónicas de ángulo que se guardan en `crm_content_assets.angle` y
+// en los eventos de trazabilidad: "N · <título>" sobre el banco fijo de 25
+// ángulos de EXPOSURE (lib/angulos-exposure). Regla de la casa: no se inventan
+// ángulos; si un texto no mapea, vuelve tal cual y el consumidor decide
+// (ver knownSalesAngle en lib/trace-intelligence).
+export const SALES_ANGLES: readonly string[] = ANGULOS_EXPOSURE.map((a) => `${a.id} · ${a.titulo}`)
+
+export function salesAngleLabel(id: number): string | null {
+  return SALES_ANGLES[id - 1] ?? null
+}
+
+// Número de ángulo (1-25) cuando el texto arranca con él: "12", "12 ·", "#12",
+// "12 - ...". Exige separador o fin de texto para no confundir "20 caminos"
+// ni "10K" con un número de ángulo.
+const NUMBER_PREFIX = /^#?\s*(\d{1,2})\s*(?:[·—\-:)]|$)/
+export function salesAngleId(value: unknown): number | null {
+  const match = String(value ?? "").trim().match(NUMBER_PREFIX)
+  if (!match) return null
+  const id = Number(match[1])
+  return id >= 1 && id <= ANGULOS_EXPOSURE.length ? id : null
+}
+
+function normalize(value: string) {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+}
+
+// Palabras clave por ángulo, evaluadas sobre texto normalizado (sin tildes,
+// minúsculas) y en este orden: los patrones más específicos van antes que las
+// palabras compartidas ("negocio de otro" antes que "techo", "dropshipping"
+// antes que "vehiculo").
+const KEYWORDS: Array<[RegExp, number]> = [
+  [/mejor empleado|peor jefe/, 2],
+  [/negocio de otro|lo que el decide/, 10],
+  [/techo|1\.?500|mejor editando|editando, cerrando/, 1],
+  [/dos anos metido|metido en lo digital/, 3],
+  [/dropshipping|afiliados|trading/, 11],
+  [/no vas a ejercer|estudias algo/, 21],
+  [/vehiculo|ganas, el tiempo/, 4],
+  [/informacion/, 5],
+  [/consumo no es accion|consumiste|seguis en cero/, 6],
+  [/piensa el negocio|el que arranca/, 20],
+  [/costo de oportunidad|ultimos 5 meses/, 22],
+  [/pico sin sistema|tocaste un pico|sin sistema/, 7],
+  [/habilidad barata|300 a 3\.?000/, 8],
+  [/regatea/, 9],
+  [/regalando|servicio barato/, 23],
+  [/prospeccion|cinco "?no"?/, 12],
+  [/impostor|high ticket/, 13],
+  [/10k|nadie de tu entorno/, 14],
+  [/pueblo|bullying|no te mostras/, 15],
+  [/disfrutar la vida|comerme el mundo|subibaja/, 16],
+  [/demostrarte que podes/, 17],
+  [/lambo|celu robado|verdadero lujo/, 18],
+  [/20 caminos|exceso de opciones|cual tomar/, 19],
+  [/referentes|espejo/, 24],
+  [/estafa|no confias/, 25],
 ]
 
+// Devuelve la etiqueta canónica si el valor es una etiqueta, un número de
+// ángulo, el título exacto o contiene una palabra clave. Vacío → "Sin ángulo".
+// Texto desconocido → vuelve tal cual (mismo contrato que siempre).
 export function canonicalSalesAngle(value: unknown) {
   const raw = String(value ?? "").trim()
   if (!raw) return "Sin ángulo"
-  if ((SALES_ANGLES as readonly string[]).includes(raw)) return raw
-  return aliases.find(([pattern]) => pattern.test(raw))?.[1] || raw
+  if (SALES_ANGLES.includes(raw)) return raw
+  const byId = salesAngleId(raw)
+  if (byId) return salesAngleLabel(byId) || raw
+  const text = normalize(raw)
+  const exact = ANGULOS_EXPOSURE.find((a) => normalize(a.titulo) === text)
+  if (exact) return salesAngleLabel(exact.id) || raw
+  const hit = KEYWORDS.find(([pattern]) => pattern.test(text))
+  return hit ? salesAngleLabel(hit[1]) || raw : raw
 }

@@ -289,7 +289,7 @@ export async function GET(request: Request) {
 
     // CASH
     const feccu = r2(p.filter(x => !isBackendContext(x) && FECCU_TIPOS.has(x.tipo)).reduce((s, x) => s + (x.monto || 0), 0))
-    // Definición vigente confirmada por Cuenta A (08/08/2026): ROAS usa solo
+    // Definición vigente confirmada por Alex (08/08/2026): ROAS usa solo
     // FECCU efectivamente cobrado en el período. No entran cuotas/FECCP,
     // ventas internas/backend ni revenue contractual pendiente.
     const roas = metaSpend.available && metaSpend.spend > 0 ? r2(feccu / metaSpend.spend) : null
@@ -478,8 +478,8 @@ export async function GET(request: Request) {
 
     const cuentaNorm = (v: string) => {
       const low = v.toLowerCase()
-      if (low.includes("cristian") || low.includes("cris")) return "Cuenta B (@cristiansocial)"
-      if (low.includes("paul")) return "Cuenta A (@cuenta.principal)"
+      if (low.includes("cristian") || low.includes("cris")) return "EXPOSURE (@alexmcarrera)"
+      if (low.includes("paul")) return "EXPOSURE (@alexmcarrera)"
       return v
     }
 

@@ -18,7 +18,7 @@ export default function OperacionesTecnicasPage() {
     await mutate()
   }
   return <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
-    <div className="flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-violet-500">Solo Cuenta A / Cuenta B</p><h1 className="mt-1 text-3xl font-bold">Operación técnica</h1><p className="mt-2 text-sm text-muted-foreground">Colas, errores, latencia, caché y avisos de las últimas 24 horas.</p></div><Button onClick={refresh} variant="outline"><RefreshCw className="mr-2 h-4 w-4" />Refrescar señales</Button></div>
+    <div className="flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-violet-500">Solo dirección</p><h1 className="mt-1 text-3xl font-bold">Operación técnica</h1><p className="mt-2 text-sm text-muted-foreground">Colas, errores, latencia, caché y avisos de las últimas 24 horas.</p></div><Button onClick={refresh} variant="outline"><RefreshCw className="mr-2 h-4 w-4" />Refrescar señales</Button></div>
     {isLoading ? <div className="grid min-h-64 place-items-center"><Loader2 className="h-7 w-7 animate-spin" /></div> : error ? <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 text-red-600">No se pudo leer observabilidad.</div> : <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={Workflow} label="Jobs 24h" value={data.jobs.total24h} />

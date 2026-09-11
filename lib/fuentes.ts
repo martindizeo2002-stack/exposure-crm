@@ -1,9 +1,7 @@
-// Lista unica de Fuente, agrupada por canal, compartida por Centro de
-// Agendas, Carga de Pagos y Todos los Pagos. Antes cada pantalla tenia su
-// propia lista plana (30+ opciones sin orden) — ahora esta agrupada para que
-// el selector no sea un quilombo visual, pero el VALOR guardado en la base
-// sigue siendo un string completo y sin ambiguedad (el "label" de cada
-// opcion es solo lo que se muestra adentro del grupo, mas corto).
+// Lista única de Fuente de EXPOSURE, agrupada por canal, compartida por Centro
+// de Agendas, Carga de Pagos y Todos los Pagos. Los VALORES son exactamente los
+// que se guardan en agendas.fuente (no tocarlos: rompe el histórico); el
+// "label" es solo lo que se muestra adentro del grupo, más corto.
 
 export type FuenteItem = { value: string; label: string }
 export type FuenteGroup = { label: string; items: FuenteItem[] }
@@ -12,63 +10,33 @@ export const FUENTE_GROUPS: FuenteGroup[] = [
   {
     label: "Instagram",
     items: [
-      { value: "Instagram Link in Bio", label: "Link in Bio" },
       { value: "Instagram Reel", label: "Reel" },
-      { value: "Instagram Reel Cuenta B", label: "Reel Cuenta B" },
-      { value: "Instagram Reel Cuenta A", label: "Reel Cuenta A" },
-      { value: "Instagram Story", label: "Story" },
-      { value: "Instagram Story Cuenta B", label: "Story Cuenta B" },
-      { value: "Instagram Story Cuenta A", label: "Story Cuenta A" },
       { value: "Instagram Carrusel", label: "Carrusel" },
-      { value: 'Instagram DM "INFO"', label: 'DM "INFO"' },
-      { value: 'Instagram DM "INFO" Cuenta B', label: 'DM "INFO" Cuenta B' },
-      { value: 'Instagram DM "INFO" Cuenta A', label: 'DM "INFO" Cuenta A' },
-      { value: "Instagram Cris", label: "Cris (general)" },
-      { value: "IG @cuenta.principal", label: "IG @cuenta.principal" },
+      { value: "Instagram Story", label: "Historia" },
+      { value: "Instagram", label: "Instagram (general)" },
     ],
   },
   {
-    label: "Outbound",
+    label: "Outbound / Manychat",
     items: [
-      { value: "Outbound Likes", label: "Likes" },
-      { value: "Outbound Story", label: "Story" },
-      { value: "Outbound Story Cuenta B", label: "Story Cuenta B" },
-      { value: "Outbound Seguidor", label: "Seguidor" },
+      { value: "Outbound Seguidor", label: "Outbound a seguidor nuevo" },
+      { value: "Outbound Story", label: "Outbound por historia" },
       { value: "Bienvenida Manychat", label: "Bienvenida Manychat" },
-      { value: "Bienvenida Manychat Cuenta B", label: "Bienvenida Manychat Cuenta B" },
     ],
   },
   {
     label: "Anuncios",
     items: [
       { value: "DM-ADS", label: "DM-ADS" },
-      { value: "ADS RMKT", label: "ADS RMKT" },
-      { value: "ADS FRIO", label: "ADS FRIO" },
-    ],
-  },
-  {
-    label: "YouTube",
-    items: [
-      { value: "YouTube Cris", label: "Cris" },
-      { value: "YouTube Cuenta A", label: "Cuenta A" },
-      { value: "YouTube General", label: "General" },
-    ],
-  },
-  {
-    label: "TikTok",
-    items: [
-      { value: "TikTok Cris", label: "Cris" },
-      { value: "TikTok Cuenta A", label: "Cuenta A" },
-      { value: "TikTok General", label: "General" },
     ],
   },
 ]
 
-export const FUENTE_STANDALONE = ["Enrutamientos", "Landing", "Biblioteca Recursos", "Webinar", "Base de Datos"]
+export const FUENTE_STANDALONE = ["Webinar", "Referido", "YouTube", "WhatsApp", "Producto"]
 
-// Muestra el label corto si la fuente esta en la lista vigente; si es un
-// valor historico ya sacado de las opciones (ej "WhatsApp"), muestra el
-// valor tal cual — nunca lo deja en blanco.
+// Muestra el label corto si la fuente está en la lista vigente; si es un
+// valor histórico ya sacado de las opciones (ej. "Instagram Link in Bio"),
+// muestra el valor tal cual — nunca lo deja en blanco.
 export function fuenteLabel(value: string | null | undefined): string {
   if (!value) return ""
   for (const g of FUENTE_GROUPS) {

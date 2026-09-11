@@ -20,8 +20,8 @@ import {
   Wallet, Target, Kanban, CalendarRange, Compass, Coins, Mic, Layers,
 } from "lucide-react"
 
-export type GroupName = "General" | "Panel del negocio" | "Ventas" | "Producto" | "Marketing" | "Operaciones" | "Sistema IA"
-export const GROUP_ORDER: GroupName[] = ["General", "Panel del negocio", "Ventas", "Producto", "Marketing", "Operaciones", "Sistema IA"]
+export type GroupName = "General" | "Panel del negocio" | "Ventas" | "Producto" | "Marketing" | "Operaciones" | "Sistema IA · maqueta"
+export const GROUP_ORDER: GroupName[] = ["General", "Panel del negocio", "Ventas", "Producto", "Marketing", "Operaciones", "Sistema IA · maqueta"]
 export type NavItem = {
   label: string
   href: string
@@ -85,19 +85,19 @@ export const modules: NavItem[] = [
   { label: "Finanzas", href: "/finanzas", icon: WalletCards, match: ["/finanzas"], ramp: ramps.finanzas, group: "Operaciones", roles: ["CEO", "Contaduria"] },
   { label: "Sistema", href: "/operaciones-tecnicas", icon: Monitor, match: ["/operaciones-tecnicas"], ramp: ramps.ajustes, group: "Operaciones", roles: ["CEO"] },
   // Capa de agentes de Exposure OS (datos ficticios hasta conectarla)
-  { label: "Centro de Mando", href: "/sistema/centro-de-mando", icon: LayoutGrid, match: ["/sistema/centro-de-mando"], ramp: ramps.sistema, group: "Sistema IA" },
-  { label: "Agentes", href: "/sistema/agentes", icon: Users, match: ["/sistema/agentes"], ramp: ramps.sistema, group: "Sistema IA" },
-  { label: "Tareas", href: "/sistema/tareas", icon: ListChecks, match: ["/sistema/tareas"], ramp: ramps.sistema, group: "Sistema IA" },
-  { label: "Agenda", href: "/sistema/agenda", icon: Calendar, match: ["/sistema/agenda"], ramp: ramps.sistema, group: "Sistema IA" },
-  { label: "Herramientas", href: "/sistema/herramientas", icon: Wrench, match: ["/sistema/herramientas"], ramp: ramps.sistema, group: "Sistema IA" },
-  { label: "Analítica de contenido", href: "/sistema/analitica", icon: ChartSpline, match: ["/sistema/analitica"], ramp: ramps.sistema, group: "Sistema IA" },
-  { label: "Contenido IA", href: "/sistema/contenido", icon: FileText, match: ["/sistema/contenido"], ramp: ramps.sistema, group: "Sistema IA" },
-  { label: "Memoria compartida", href: "/sistema/memoria", icon: Network, match: ["/sistema/memoria"], ramp: ramps.sistema, group: "Sistema IA" },
+  { label: "Centro de Mando", href: "/sistema/centro-de-mando", icon: LayoutGrid, match: ["/sistema/centro-de-mando"], ramp: ramps.sistema, group: "Sistema IA · maqueta" },
+  { label: "Agentes", href: "/sistema/agentes", icon: Users, match: ["/sistema/agentes"], ramp: ramps.sistema, group: "Sistema IA · maqueta" },
+  { label: "Tareas", href: "/sistema/tareas", icon: ListChecks, match: ["/sistema/tareas"], ramp: ramps.sistema, group: "Sistema IA · maqueta" },
+  { label: "Agenda", href: "/sistema/agenda", icon: Calendar, match: ["/sistema/agenda"], ramp: ramps.sistema, group: "Sistema IA · maqueta" },
+  { label: "Herramientas", href: "/sistema/herramientas", icon: Wrench, match: ["/sistema/herramientas"], ramp: ramps.sistema, group: "Sistema IA · maqueta" },
+  { label: "Analítica de contenido", href: "/sistema/analitica", icon: ChartSpline, match: ["/sistema/analitica"], ramp: ramps.sistema, group: "Sistema IA · maqueta" },
+  { label: "Contenido IA", href: "/sistema/contenido", icon: FileText, match: ["/sistema/contenido"], ramp: ramps.sistema, group: "Sistema IA · maqueta" },
+  { label: "Memoria compartida", href: "/sistema/memoria", icon: Network, match: ["/sistema/memoria"], ramp: ramps.sistema, group: "Sistema IA · maqueta" },
 ]
 
 export const groupColors: Record<GroupName | "Ayuda", string> = {
   General: "#8a857e", "Panel del negocio": "#8f8cff", Ventas: "#8fd96f", Producto: "#e0b45c",
-  Marketing: "#6ba6e8", Operaciones: "#9b8fe0", "Sistema IA": "#c8a95d", Ayuda: "#7c7c86",
+  Marketing: "#6ba6e8", Operaciones: "#9b8fe0", "Sistema IA · maqueta": "#c8a95d", Ayuda: "#7c7c86",
 }
 
 export function CRMNavigation({ rol = "", nombre = "", email = "" }: { rol?: string; nombre?: string; email?: string }) {

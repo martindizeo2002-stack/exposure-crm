@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { SALES_ANGLES } from "@/lib/sales-angles"
 
 type Account = "CRIS" | "PAUL"
 type StoryRow = {
@@ -29,19 +30,25 @@ const STORY_STATUSES = [
 ]
 const statusLabel = (value: string) => STORY_STATUSES.find(option => option.value === value)?.label || "Idea"
 const AVATARS = [
-  "1 · EL QUE ESTÁ EN CERO Y NO SE ANIMA",
-  "2 · EL QUE GENERA INTERÉS PERO NO CONVIERTE",
-  "3 · EL QUE TIENE ALGÚN RESULTADO PERO NO CON LAS QUE QUIERE",
-  "4 · EL PROFESIONAL AISLADO QUE DEPENDE DEL AZAR",
-  "5 · EL POST-SEPARACIÓN QUE NECESITA RECONSTRUIR",
+  "1 · Universitario inquieto",
+  "2 · Laburante digital explotado",
+  "3 · Agencia chica perdida",
+  "4 · Ya metido en make money online",
+  "5 · 9-5 que quiere ingreso extra",
 ]
-const ANGLES: Record<string, string[]> = {
-  [AVATARS[0]]: ["P2 — Parálisis con la mujer que le gusta"],
-  [AVATARS[1]]: ["P3 — Conversación sin emoción", "P4 — Genera interés pero no escala", "P5 — Contactos que no se convierten en citas"],
-  [AVATARS[2]]: ["P6 — Tiene citas pero no con las que quiere"],
-  [AVATARS[3]]: ["P1 — Dependencia del azar y del entorno"],
-  [AVATARS[4]]: ["P8 — Post-separación"],
+// Ángulos sugeridos por sub-perfil (primero los que más le pegan) y después el
+// resto del banco de 25, así ningún ángulo queda fuera del selector.
+const PRIORITY_ANGLES: Record<string, number[]> = {
+  [AVATARS[0]]: [21, 4, 3, 5, 19, 20, 6],
+  [AVATARS[1]]: [1, 2, 10, 8, 23, 13],
+  [AVATARS[2]]: [9, 12, 7, 23, 8],
+  [AVATARS[3]]: [11, 25, 19, 24, 6],
+  [AVATARS[4]]: [4, 22, 14, 16, 17, 18, 15],
 }
+const ANGLES: Record<string, string[]> = Object.fromEntries(AVATARS.map((avatar) => {
+  const priority = PRIORITY_ANGLES[avatar].map((id) => SALES_ANGLES[id - 1])
+  return [avatar, [...priority, ...SALES_ANGLES.filter((angle) => !priority.includes(angle))]]
+}))
 
 function week(base: Date) {
   const d = new Date(base); const offset = (d.getDay() + 6) % 7
@@ -124,7 +131,7 @@ function StoryDialog({ row, account, onClose, onSave }: { row: StoryRow | null; 
   })
   const hook = blocks[0]?.trim() || ""
   return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent className="max-w-xl">
-    <DialogHeader><DialogTitle><Pencil className="mr-2 inline h-4 w-4" />{row ? "Editar secuencia" : `Nueva secuencia · ${account === "PAUL" ? "Cuenta A" : "Cuenta B"}`}</DialogTitle></DialogHeader>
+    <DialogHeader><DialogTitle><Pencil className="mr-2 inline h-4 w-4" />{row ? "Editar secuencia" : "Nueva secuencia · EXPOSURE"}</DialogTitle></DialogHeader>
     <div className="grid gap-4">
       <div><Label>Formato</Label><Select value={format} onValueChange={(v) => { setFormat(v); if (!["Hand Raiser", "Caso de éxito"].includes(v)) { setAvatar(""); setAngle("") } }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FORMATS.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
       {needsAvatar && <><div><Label>Avatar *</Label><Select value={avatar} onValueChange={changeAvatar}><SelectTrigger><SelectValue placeholder="Elegí avatar" /></SelectTrigger><SelectContent>{AVATARS.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>

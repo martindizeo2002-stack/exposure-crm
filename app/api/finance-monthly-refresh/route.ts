@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     unexplained_difference: 0, explained_differences: [
       { kind: "missing_month_end", note: "Preview: faltan payroll, fees, otros canales y el cierre definitivo del período" },
       ...withdrawals.map((row) => ({ kind: "partner_distribution_withdrawal", destination: row.counterpartyName || "Financiera", amount: Math.abs(Number(row.amount || 0)) })),
-      ...personal.map((row) => ({ kind: "partner_personal_expense", partner: /cristian/i.test(cardOwners.get(row.cardId || "") || "") ? "Cuenta B" : "Cuenta A", cardholder: cardOwners.get(row.cardId || "") || "Sin titular", merchant: row.counterpartyName || row.merchant?.name || "Sin dato", amount: Math.abs(Number(row.amount || 0)) })),
+      ...personal.map((row) => ({ kind: "partner_personal_expense", partner: /cristian/i.test(cardOwners.get(row.cardId || "") || "") ? "Nahuel" : "Alex", cardholder: cardOwners.get(row.cardId || "") || "Sin titular", merchant: row.counterpartyName || row.merchant?.name || "Sin dato", amount: Math.abs(Number(row.amount || 0)) })),
     ],
     payroll_reconciled: false, bonuses_reconciled: false, distribution_reproducible: false,
     evidence_level: "parcial", evidence_source: "estimado", evidence_summary: `Preview automático CRM + Mercury al ${end}`,

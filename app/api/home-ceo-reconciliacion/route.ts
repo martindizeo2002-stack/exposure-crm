@@ -12,9 +12,9 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-// Cortes declarados por Cuenta A explícitamente para reconciliar contra el
+// Cortes declarados por Alex explícitamente para reconciliar contra el
 // sistema. Nunca se usan para reemplazar el cálculo del sistema: solo para
-// mostrar la diferencia auditable. Si Cuenta A declara un corte nuevo para otro
+// mostrar la diferencia auditable. Si Alex declara un corte nuevo para otro
 // mes, agregar la entrada acá con su fecha de corte; nunca inferir.
 const CORTES_DECLARADOS: Record<string, { revenue: number; cash_collected: number; fecha_corte: string }> = {
   "2026-07": { revenue: 50167, cash_collected: 24574, fecha_corte: "2026-07-23" },
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
       diferencias,
       nota: declarado
         ? "La diferencia refleja ventas/pagos que aún no tienen fuente identificada en el sistema (ver docs/CRM_HISTORICAL_INVENTORY.md). No se oculta ni se ajusta el número del sistema para igualar el corte declarado."
-        : `No hay corte declarado por Cuenta A registrado para ${mes}. Se muestra solo el cálculo del sistema.`,
+        : `No hay corte declarado por Alex registrado para ${mes}. Se muestra solo el cálculo del sistema.`,
     })
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error de servidor" }, { status: 500 })

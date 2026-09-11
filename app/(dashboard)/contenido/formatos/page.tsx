@@ -1,47 +1,66 @@
 "use client"
 
+import { useState } from "react"
+import useSWR from "swr"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 
-type Tag = "Mejorando" | "Estable" | "Cayendo" | "Poca data"
-type Fila = { formato: string; noTeAnimas: Tag; game: Tag; hombreBueno: Tag; elVisto: Tag; escasezNeedy: Tag; queHacer: string }
+type Fila = { nombre: string; formato?: string; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number; ultima?: string | null }
+type Datos = { desde: string; dias: number; total: number; formatos: Fila[]; piezas: Fila[]; canales: Fila[] }
 
-// Matriz de Preview restaurada. No pertenece a Producción y no debe tocarse
-// durante una sincronización de los datos operativos Producción → Preview.
-const FILAS: Fila[] = [
-  { formato: "Reacción", noTeAnimas: "Poca data", game: "Estable", hombreBueno: "Estable", elVisto: "Mejorando", escasezNeedy: "Poca data", queHacer: "Seguir, especialmente con El Visto" },
-  { formato: "Talking Head", noTeAnimas: "Poca data", game: "Estable", hombreBueno: "Poca data", elVisto: "Cayendo", escasezNeedy: "Poca data", queHacer: "Pausar con El Visto — viene cayendo" },
-  { formato: "Voz en Off", noTeAnimas: "Poca data", game: "Poca data", hombreBueno: "Cayendo", elVisto: "Cayendo", escasezNeedy: "Poca data", queHacer: "Bajarle prioridad en Hombre Bueno y El Visto" },
-  { formato: "Análisis", noTeAnimas: "Poca data", game: "Estable", hombreBueno: "Poca data", elVisto: "Poca data", escasezNeedy: "Poca data", queHacer: "Mantener con Game" },
-  { formato: "Volumen", noTeAnimas: "Estable", game: "Cayendo", hombreBueno: "Estable", elVisto: "Estable", escasezNeedy: "Mejorando", queHacer: "Caballo de batalla — no tocar" },
-  { formato: "Cámara + PC", noTeAnimas: "Poca data", game: "Poca data", hombreBueno: "Poca data", elVisto: "Cayendo", escasezNeedy: "Poca data", queHacer: "Pausar con El Visto" },
-  { formato: "Carrusel", noTeAnimas: "Poca data", game: "Mejorando", hombreBueno: "Poca data", elVisto: "Poca data", escasezNeedy: "Poca data", queHacer: "Escalar con Game — viene subiendo" },
-]
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const pct = (n: number, d: number) => (d ? `${Math.round((n / d) * 1000) / 10}%`.replace(".", ",") : "—")
+const money = (n: number) => `USD ${Math.round(n).toLocaleString("es-AR")}`
 
-const COLORS: Record<Tag, string> = {
-  Mejorando: "bg-emerald-500/15 text-emerald-300",
-  Estable: "bg-white/[.07] text-white/70",
-  Cayendo: "bg-red-500/15 text-red-300",
-  "Poca data": "bg-white/[.04] text-white/40 italic",
+function Veredicto({ f }: { f: Fila }) {
+  if (f.agendas < 5) return <span className="inline-block rounded-md bg-white/[.04] px-3 py-1 text-xs italic text-white/40">Poca data</span>
+  const cierre = f.presentadas ? f.cierres / f.presentadas : 0
+  const show = f.agendas ? f.presentadas / f.agendas : 0
+  if (cierre >= 0.3) return <span className="inline-block rounded-md bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">Escalar · cierra {pct(f.cierres, f.presentadas)}</span>
+  if (show < 0.25) return <span className="inline-block rounded-md bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-300">Revisar · show {pct(f.presentadas, f.agendas)}</span>
+  return <span className="inline-block rounded-md bg-white/[.07] px-3 py-1 text-xs font-semibold text-white/70">Mantener</span>
 }
 
-function Pill({ tag }: { tag: Tag }) {
-  return <span className={cn("inline-block rounded-md px-3 py-1 text-xs font-semibold", COLORS[tag])}>{tag}</span>
+function Tabla({ filas, titulo, sub, conFormato }: { filas: Fila[]; titulo: string; sub: string; conFormato?: boolean }) {
+  return <Card className="border-white/10 bg-white/[.035]">
+    <CardHeader className="pb-2"><CardTitle className="text-base">{titulo}</CardTitle><p className="text-xs text-muted-foreground">{sub}</p></CardHeader>
+    <CardContent className="pt-2">
+      <div className="overflow-x-auto"><Table>
+        <TableHeader><TableRow className="hover:bg-transparent">
+          <TableHead>{conFormato ? "Pieza (tag de ManyChat)" : "Formato"}</TableHead>{conFormato && <TableHead>Formato</TableHead>}
+          <TableHead className="text-right">Agendas</TableHead><TableHead className="text-right">Presentadas</TableHead><TableHead className="text-right">Show</TableHead>
+          <TableHead className="text-right">Calificadas</TableHead><TableHead className="text-right">Cierres</TableHead><TableHead className="text-right">Cierre</TableHead>
+          <TableHead className="text-right">Cash día 1</TableHead><TableHead>Última agenda</TableHead><TableHead>Qué hacer</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>{filas.map((f) => <TableRow key={f.nombre + (f.formato || "")}>
+          <TableCell className={cn("font-bold", conFormato && "max-w-[420px] whitespace-normal")}>{f.nombre}</TableCell>
+          {conFormato && <TableCell className="text-muted-foreground">{f.formato}</TableCell>}
+          <TableCell className="text-right">{f.agendas}</TableCell><TableCell className="text-right">{f.presentadas}</TableCell><TableCell className="text-right">{pct(f.presentadas, f.agendas)}</TableCell>
+          <TableCell className="text-right">{f.calificadas}</TableCell><TableCell className="text-right font-semibold">{f.cierres}</TableCell><TableCell className="text-right">{pct(f.cierres, f.presentadas)}</TableCell>
+          <TableCell className="text-right">{f.cash ? money(f.cash) : "—"}</TableCell><TableCell className="text-muted-foreground">{f.ultima ? f.ultima.split("-").reverse().join("/") : "—"}</TableCell>
+          <TableCell><Veredicto f={f} /></TableCell>
+        </TableRow>)}</TableBody>
+      </Table></div>
+    </CardContent>
+  </Card>
 }
 
 export default function FormatosPage() {
+  const [dias, setDias] = useState(90)
+  const { data, error, isLoading } = useSWR<Datos>(`/api/formatos?dias=${dias}`, fetcher)
   return <div className="mx-auto w-full max-w-[1800px] space-y-6 px-4 py-5 sm:px-6 lg:px-[1.5cm]">
-    <div><h1 className="text-2xl font-black">Formatos</h1><p className="text-sm text-muted-foreground">Qué formato usar según el ángulo que vayas a grabar.</p></div>
-    <Card className="border-white/10 bg-white/[.035]">
-      <CardHeader className="pb-2"><CardTitle className="text-base">¿Cómo viene funcionando cada combinación?</CardTitle><p className="text-xs text-muted-foreground">Comparado contra los meses anteriores</p></CardHeader>
-      <CardContent className="pt-2">
-        <div className="overflow-x-auto"><Table>
-          <TableHeader><TableRow className="hover:bg-transparent"><TableHead>Formato</TableHead><TableHead>No Te Animás</TableHead><TableHead>Game</TableHead><TableHead>Hombre Bueno</TableHead><TableHead>El Visto</TableHead><TableHead>Escasez/Needy</TableHead><TableHead>Qué hacer</TableHead></TableRow></TableHeader>
-          <TableBody>{FILAS.map((f) => <TableRow key={f.formato}><TableCell className="font-bold">{f.formato}</TableCell><TableCell><Pill tag={f.noTeAnimas} /></TableCell><TableCell><Pill tag={f.game} /></TableCell><TableCell><Pill tag={f.hombreBueno} /></TableCell><TableCell><Pill tag={f.elVisto} /></TableCell><TableCell><Pill tag={f.escasezNeedy} /></TableCell><TableCell className="min-w-64 text-sm">{f.queHacer}</TableCell></TableRow>)}</TableBody>
-        </Table></div>
-        <p className="mt-4 text-sm italic text-muted-foreground">“Poca data” = todavía no se filmó suficiente en esa combinación.</p>
-      </CardContent>
-    </Card>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div><h1 className="text-2xl font-black">Formatos</h1><p className="text-sm text-muted-foreground">Qué tipo de pieza y qué pieza concreta traen agendas, llamadas presentadas y ventas. Sale del cruce de cada agenda con su contacto de ManyChat (el tag de la pieza que la trajo).</p></div>
+      <div className="flex gap-2">{[30, 90, 180, 365].map((d) => <button key={d} type="button" onClick={() => setDias(d)} className={cn("rounded-full border px-3 py-1.5 text-xs font-bold uppercase tracking-wide", dias === d ? "border-white bg-white text-black" : "border-white/15 text-white/60 hover:bg-white/5")}>{d} días</button>)}</div>
+    </div>
+    {error && <p className="text-sm text-red-300">No se pudo cargar: {String(error)}</p>}
+    {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+    {data && <>
+      <p className="text-xs text-muted-foreground">{data.total} agendas desde el {data.desde.split("-").reverse().join("/")}. "Poca data" = menos de 5 agendas en esa fila.</p>
+      <Tabla filas={data.formatos} titulo="Por tipo de pieza" sub="Reel, carrusel, historia, webinar, ads, nuevo seguidor. Las agendas sin pieza identificada no tienen contacto de ManyChat cruzado." />
+      <Tabla filas={data.piezas} titulo="Las piezas concretas que más cierran" sub="Cada fila es un contenido real (el tag que ManyChat le puso al lead). Ordenado por cierres y agendas." conFormato />
+      <Tabla filas={data.canales} titulo="Por canal de origen" sub="Agrupa la fuente de la agenda: Instagram orgánico, ads, webinar, outbound, referidos." />
+    </>}
   </div>
 }

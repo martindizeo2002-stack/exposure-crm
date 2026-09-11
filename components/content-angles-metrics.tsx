@@ -51,7 +51,7 @@ const money = (value: number | null | undefined) => new Intl.NumberFormat("es-AR
 }).format(Number(value || 0))
 const pct = (value: number | null | undefined) => value == null ? "—" : `${value}%`
 
-const TABS = ["Ángulos", "Arquetipos", "Motivos", "Viajes", "Contenido", "Revisión Valen"] as const
+const TABS = ["Ángulos", "Arquetipos", "Motivos", "Viajes", "Contenido", "Revisión de edición"] as const
 type Tab = (typeof TABS)[number]
 
 export function ContentAnglesMetrics() {
@@ -60,7 +60,7 @@ export function ContentAnglesMetrics() {
     revalidateOnFocus: false,
   })
   const [tab, setTab] = useState<Tab>("Ángulos")
-  const visibleTabs = rol === "Editor" ? TABS.filter((item) => item !== "Revisión Valen") : TABS
+  const visibleTabs = rol === "Editor" ? TABS.filter((item) => item !== "Revisión de edición") : TABS
 
   return <main className="space-y-6">
     <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(217,70,239,.18),transparent_35%),linear-gradient(135deg,rgba(24,24,27,.96),rgba(9,9,11,.98))] p-5 shadow-2xl shadow-black/30 sm:p-8">
@@ -87,12 +87,12 @@ export function ContentAnglesMetrics() {
       <Metric label="Compradores ≥500" value={(data?.totals.buyers500 || 0).toLocaleString("es-AR")} icon={CheckCircle2} tone="emerald" />
       <Metric label="Agendas únicas" value={(data?.totals.agendas || 0).toLocaleString("es-AR")} icon={CalendarCheck2} />
       <Metric label="Piezas Notion/CRM" value={(data?.totals.assets || 0).toLocaleString("es-AR")} icon={Layers3} />
-      <Metric label="Pendientes Valen" value={(data?.totals.reviewPending || 0).toLocaleString("es-AR")} icon={CircleAlert} tone="amber" />
+      <Metric label="Pendientes de edición" value={(data?.totals.reviewPending || 0).toLocaleString("es-AR")} icon={CircleAlert} tone="amber" />
     </section>
 
     <section className="rounded-[26px] border border-white/10 bg-white/[.03] p-2">
       <div className="flex gap-2 overflow-x-auto">
-        {visibleTabs.map((item) => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap rounded-2xl px-4 py-3 text-sm font-bold transition ${tab === item ? "bg-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/20" : "text-white/45 hover:bg-white/[.06] hover:text-white"}`}>{item}{item === "Revisión Valen" && data?.totals.reviewPending ? ` · ${data.totals.reviewPending}` : ""}</button>)}
+        {visibleTabs.map((item) => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap rounded-2xl px-4 py-3 text-sm font-bold transition ${tab === item ? "bg-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/20" : "text-white/45 hover:bg-white/[.06] hover:text-white"}`}>{item}{item === "Revisión de edición" && data?.totals.reviewPending ? ` · ${data.totals.reviewPending}` : ""}</button>)}
       </div>
     </section>
 
@@ -101,7 +101,7 @@ export function ContentAnglesMetrics() {
     {data && tab === "Motivos" && <Motives rows={data.motives} />}
     {data && tab === "Viajes" && <Journeys journeys={data.journeys} sources={data.sources} />}
     {data && tab === "Contenido" && <Pieces rows={data.pieces} />}
-    {data && tab === "Revisión Valen" && <ReviewQueue rows={data.reviewQueue} onSaved={() => mutate()} />}
+    {data && tab === "Revisión de edición" && <ReviewQueue rows={data.reviewQueue} onSaved={() => mutate()} />}
 
     {data && <section className="rounded-[24px] border border-white/10 bg-black/25 p-5">
       <h2 className="text-sm font-black uppercase tracking-[.18em] text-white/55">Método de atribución</h2>

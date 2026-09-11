@@ -68,6 +68,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
 
 const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/panel", [...OPERATIONS, "Contaduria"]],  // datos del Panel del negocio
+  ["/api/formatos", [...OPERATIONS, "Editor"]],   // rendimiento por pieza de contenido
   ["/api/security/activity", CRM_ROLES as unknown as CRMRole[]],
   ["/api/operations-health", ["CEO"]],
   ["/api/growth-command", OPERATIONS],

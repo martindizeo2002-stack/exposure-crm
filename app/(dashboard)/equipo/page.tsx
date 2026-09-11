@@ -188,9 +188,7 @@ function CloserGameCard({ closer, index, businessGoal }: { closer: CloserData; i
         </div>
         <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 text-right"><p className="text-[10px] font-black uppercase text-emerald-200/60">Comisión</p><p className="text-lg font-black text-emerald-300">{fUSD(closer.comisiones)}</p><p className="text-[9px] font-bold text-emerald-100/45">Base neta {fUSD(closer.commissionable_cc)}</p></div>
       </div>
-      <div className="relative mt-5 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-2xl border border-violet-300/15 bg-violet-400/[.07] p-3"><p className="text-[10px] font-black uppercase text-white/35">CC Cuenta A</p><p className="text-lg font-black text-violet-200">{fUSD(closer.cc_paul)}</p></div>
-        <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/[.07] p-3"><p className="text-[10px] font-black uppercase text-white/35">CC Cuenta B</p><p className="text-lg font-black text-cyan-200">{fUSD(closer.cc_cristian)}</p></div>
+      <div className="relative mt-5 grid grid-cols-1 gap-2 text-center">
         <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/[.07] p-3"><p className="text-[10px] font-black uppercase text-white/35">CC Total</p><p className="text-lg font-black text-emerald-300">{fUSD(closer.cc_total)}</p></div>
       </div>
       <div className="relative mt-6"><CommissionTrack rate={closer.rate ?? (closer.nivel === 3 ? 10 : closer.nivel === 2 ? 9 : 8)} /></div>
@@ -232,9 +230,7 @@ function SetterGameCard({ setter, index, businessGoal }: { setter: SetterData; i
           </div>
         </div>
       </div>
-      <div className="relative mt-5 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-2xl border border-violet-300/15 bg-violet-400/[.07] p-3"><p className="text-[10px] font-black uppercase text-white/35">CC Cuenta A</p><p className="text-lg font-black text-violet-200">{fUSD(setter.cc_paul)}</p></div>
-        <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/[.07] p-3"><p className="text-[10px] font-black uppercase text-white/35">CC Cuenta B</p><p className="text-lg font-black text-cyan-200">{fUSD(setter.cc_cristian)}</p></div>
+      <div className="relative mt-5 grid grid-cols-1 gap-2 text-center">
         <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/[.07] p-3"><p className="text-[10px] font-black uppercase text-white/35">CC Total</p><p className="text-lg font-black text-emerald-300">{fUSD(setter.cc_total)}</p></div>
       </div>
       <div className="relative mt-6"><SetterCommissionTrack rate={rate} /></div>
@@ -294,7 +290,7 @@ export default function EquipoPage() {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   })
-  // El toggle de sonido se saco de la UI a pedido de Cuenta A (no lo quiere ver
+  // El toggle de sonido se saco de la UI a pedido de Alex (no lo quiere ver
   // en Equipo); el sonido de logro queda activo siempre, sin control visible.
   const soundEnabled = true
   const [unlock, setUnlock] = useState<{ nombre: string; rate: number } | null>(null)
@@ -305,7 +301,7 @@ export default function EquipoPage() {
   const { data: raw, isLoading: lbLoading } = useSWR<LeaderboardData>(
     `/api/leaderboard?month=${selectedMonth}`, fetcher, { revalidateOnFocus: false }
   )
-  // Strikes son informacion de auditoria interna para Cuenta A/CEO; el equipo
+  // Strikes son informacion de auditoria interna para Alex/CEO; el equipo
   // (closers/setters) nunca debe verlas, ni el conteo ni el endpoint.
   const { data: strikes, isLoading: strikesLoading } = useSWR<Strike[]>(isManager ? "/api/strikes" : null, fetcher)
 

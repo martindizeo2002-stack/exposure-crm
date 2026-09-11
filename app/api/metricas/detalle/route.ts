@@ -92,8 +92,8 @@ function normalizeVolumenVal(field: string, raw: unknown): string {
   if (field === "cuenta") {
     if (!v || v === "-" || v === "No se le envió") return SIN
     const low = v.toLowerCase()
-    if (low.includes("cristian") || low.includes("cris")) return "Cuenta B (@cristiansocial)"
-    if (low.includes("paul")) return "Cuenta A (@cuenta.principal)"
+    if (low.includes("cristian") || low.includes("cris")) return "EXPOSURE (@alexmcarrera)"
+    if (low.includes("paul")) return "EXPOSURE (@alexmcarrera)"
     return v
   }
   if (field === "ocupacion" || field === "manychat") {
