@@ -209,6 +209,7 @@ function callType(m: any) {
   if (title.includes("daily") || title.includes("reunion de equipo") || title.includes("reporte semanal")) return "other"
   if (
     haystack.includes("venta") || haystack.includes("closer") || haystack.includes("auditoria")
+    || /x exposure|exposure x/.test(title)  // las llamadas de venta se agendan como "Lead x Exposure"
     || CLOSERS_NOMBRE_COMPLETO.some((closer) => haystack.includes(closer))
   ) return "sales"
   return "other"
