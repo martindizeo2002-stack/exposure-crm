@@ -17,7 +17,7 @@ import {
   BarChart3, Bell, BellRing, Calendar, ChartSpline, ChevronDown, CircleDollarSign, Clapperboard, FileText, Gauge, GraduationCap, LayoutGrid, ListChecks, Network, PhoneCall, Users, Wrench,
   Eye, LogOut, Menu, Monitor, Moon, Palette, Radar, RotateCcw, Search, Settings2, Sparkles, Sun, Trophy, Type, UserRound,
   UsersRound, Volume2, WalletCards, ShieldCheck, MessageSquareQuote,
-  Wallet, Target, Kanban, CalendarRange, Compass, Coins, Mic, Layers,
+  Wallet, Target, Kanban, CalendarRange, Compass, Coins, Mic, Layers, NotebookPen, MessageCircle,
 } from "lucide-react"
 
 export type GroupName = "General" | "Panel del negocio" | "Ventas" | "Producto" | "Marketing" | "Operaciones" | "Sistema IA · maqueta"
@@ -72,12 +72,15 @@ export const modules: NavItem[] = [
   { label: "Generador de carruseles", href: "/panel/carrusel", icon: Layers, match: ["/panel/carrusel"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
   { label: "Agendas", href: "/ventas", icon: UsersRound, match: ["/ventas", "/pipeline", "/centro-agendas"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria"] },
   { label: "Seguimientos", href: "/seguimientos", icon: BellRing, match: ["/seguimientos"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer"] },
+  { label: "Resumen de setting", href: "/setting-resumen", icon: NotebookPen, match: ["/setting-resumen"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter"] },
+  { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle, match: ["/whatsapp"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager"] },
   { label: "Pagos", href: "/pagos", icon: CircleDollarSign, match: ["/pagos", "/carga-pagos", "/todos-pagos"], ramp: ramps.pagos, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria", "CSM"] },
   { label: "Cobros y cuotas", href: "/recordatorios", icon: BellRing, match: ["/cobros", "/recordatorios", "/cuotas", "/planes-pago"], ramp: ramps.cuotas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Cobranzas", "Contaduria"] },
   { label: "Leaderboard", href: "/equipo", icon: Trophy, match: ["/equipo", "/esquema-comisiones"], ramp: ramps.leaderboard, group: "Producto", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria"] },
   { label: "Clientes", href: "/clientes-hub", icon: UserRound, match: ["/clientes-hub", "/clientes", "/historia-leads"], ramp: ramps.clientes, group: "Producto", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria", "CSM"] },
   { label: "Contenido", href: "/contenido-angulos", icon: Radar, match: ["/contenido-angulos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Formatos", href: "/contenido/formatos", icon: Clapperboard, match: ["/contenido/formatos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT"] },
+  { label: "Ángulos", href: "/contenido/angulos", icon: Radar, match: ["/contenido/angulos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT"] },
   { label: "Testimonios", href: "/testimonios", icon: MessageSquareQuote, match: ["/testimonios"], ramp: ramps.testimonios, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "CSM", "Editor"] },
   { label: "Métricas", href: "/rendimiento", icon: BarChart3, match: ["/rendimiento", "/metricas", "/evolucion-diaria"], ramp: ramps.metricas, group: "Operaciones", roles: ["CEO", "Sales Manager", "Manager MKT", "Contaduria"] },
   { label: "Calidad", href: "/calidad-datos", icon: ShieldCheck, match: ["/calidad-datos"], ramp: ramps.metricas, group: "Operaciones", roles: ["CEO", "Sales Manager", "Manager MKT", "CSM"] },

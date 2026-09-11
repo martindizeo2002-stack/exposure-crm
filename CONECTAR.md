@@ -144,3 +144,34 @@ Qué hace (idempotente: se puede repetir sin duplicar):
   con otro nombre, o la agenda nunca se creó en iClosed.
 
 Ojo con "calificado" en estos reportes: significa negocio + dolor identificados, no capacidad de pago.
+
+## 11 · Ángulos, resumen de setting y WhatsApp (11/09, noche)
+
+**Marketing → Ángulos** (`/contenido/angulos`). Lee las etiquetas de ManyChat de los 78.000 contactos y las
+cruza con las agendas y los pagos de cada persona: tipo de ángulo (🟢 Solución · 🟣 Volumen/TOFU · 🔵 Producto ·
+🔴 Problema), sub-ángulo, pieza (formato + ángulo + fecha), historia, formato y categoría (reel, carrusel,
+historia, ads, nuevo seguidor). Para cada uno: leads, nuevos en el período, agendas, presentadas, calificadas,
+cierres y cash collected. La función `crm_angulos_manychat(fecha)` vive en la base (migración 20260911000003).
+Cobertura: solo las agendas cuya persona tiene identidad de ManyChat entran en las filas; el pie de la página
+dice cuántas son.
+
+**Ventas → Resumen de setting** (`/setting-resumen`). El setter pega las notas crudas del día, Claude arma el
+reporte (números + lead por lead + síntesis para el closer) y el mensaje para WhatsApp (botón "Abrir WhatsApp").
+"Guardar en el CRM" hace lo mismo que `scripts/setting/actualizar.py`: cruza cada lead con su agenda, completa
+dolor/objetivo/gatillo/fuente/setter si estaban vacíos, deja el evento en la ficha, y actualiza el Panel
+(Setting diario) y Métricas (calendarios enviados). Usa `ANTHROPIC_API_KEY` (la misma del asistente).
+
+**Ventas → WhatsApp** (`/whatsapp`). Los grupos donde esté el número del bot, con lectura por rango y
+"Resumir con IA". El bot corre en tu PC:
+
+```
+cd "C:\Users\Alex\Documents\EXPOSURE\Central Negocio"
+node scripts/whatsapp/bot.mjs
+```
+
+La primera vez muestra un QR: se escanea desde WhatsApp → Dispositivos vinculados, con el **número del bot**
+(usá un chip del equipo, no tu número personal: WhatsApp puede cerrar sesiones automatizadas). Después, ese
+número se agrega a los grupos que quieras leer y cada mensaje llega al CRM (`/api/whatsapp-ingest`, con el
+CRON_SECRET). Opcional: `datos/whatsapp/grupos.txt` con un nombre de grupo por línea para limitar cuáles.
+La sesión queda en `datos/whatsapp/.auth` (no se sube a ningún lado). Mientras la PC esté apagada no entra
+nada; cuando vuelve, WhatsApp le manda lo pendiente.

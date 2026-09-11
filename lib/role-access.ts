@@ -38,6 +38,9 @@ const pageRules: Array<[string, CRMRole[]]> = [
   ["/payroll", ["CEO", "Contaduria"]],
   ["/reglas", ["CEO"]],
   ["/contenido/formatos", OPERATIONS],
+  ["/contenido/angulos", OPERATIONS],      // medidor de ángulos de comunicación (etiquetas de ManyChat)
+  ["/setting-resumen", SALES_OPERATIONS],  // generador de resúmenes del setter
+  ["/whatsapp", OPERATIONS],               // grupos de WhatsApp del equipo
   ["/testimonios", [...OPERATIONS, "CSM", "Editor"]],
   ["/contenido", [...OPERATIONS, "Editor"]],
   ["/contenido-angulos", [...OPERATIONS, "Editor"]],
@@ -69,6 +72,9 @@ const pageRules: Array<[string, CRMRole[]]> = [
 const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/panel", [...OPERATIONS, "Contaduria"]],  // datos del Panel del negocio
   ["/api/formatos", [...OPERATIONS, "Editor"]],   // rendimiento por pieza de contenido
+  ["/api/angulos-manychat", OPERATIONS],
+  ["/api/setting-resumen", SALES_OPERATIONS],
+  ["/api/whatsapp", OPERATIONS],
   ["/api/security/activity", CRM_ROLES as unknown as CRMRole[]],
   ["/api/operations-health", ["CEO"]],
   ["/api/growth-command", OPERATIONS],

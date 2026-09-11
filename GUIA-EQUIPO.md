@@ -32,6 +32,10 @@ Lo que no le corresponde a un rol rebota con "Tu cuenta no tiene acceso a este m
 
 - **Reportes del setter**: cada dashboard diario de Máximo se archiva en `Central Negocio/datos/setting-reports` y se carga con `python scripts/setting/actualizar.py`. Aparece en Panel del negocio → El equipo → Setting diario, en Métricas (calendarios enviados) y en la ficha de cada lead.
 
+- **Resumen de setting** (Ventas → Resumen de setting): el setter pega sus notas del día, sale el reporte y el mensaje para WhatsApp, y con "Guardar" queda en el CRM sin pasar por archivos.
+- **Ángulos** (Marketing → Ángulos): qué ángulo de comunicación trae leads, agendas, cierres y cash, según las etiquetas de ManyChat.
+- **WhatsApp** (Ventas → WhatsApp): los grupos donde está el número del bot, con resumen por IA.
+
 ## Reglas para que los números cierren
 
 - El **concepto** del pago es lo que decide todo: cash collected, FECCU/FECCPP, comisiones y si el cliente tiene acceso. Usá siempre el de la lista.
