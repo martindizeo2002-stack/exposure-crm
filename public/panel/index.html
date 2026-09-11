@@ -1427,6 +1427,7 @@ function largoPath(d){
 }
 function sparkline(serie, color, w, h, area){
   if (!serie || serie.length < 2) return "";
+  serie = serie.map(v => Number.isFinite(+v) ? +v : 0);  // un hueco en la serie no puede volcar NaN al SVG
   const mx = Math.max.apply(null, serie), mn = Math.min.apply(null, serie), r = (mx - mn) || 1;
   /* margen lateral: sin esto el último punto queda pegado al borde y el círculo
      se corta por la mitad justo donde el ojo va a buscar el valor de hoy. */
