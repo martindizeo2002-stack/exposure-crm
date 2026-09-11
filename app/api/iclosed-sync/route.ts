@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     const pageCount = Math.min(5, Math.max(1, Number(searchParams.get("pages") || "5") || 5))
     const dryRun = searchParams.get("dry_run") === "1"
     const key = process.env.ICLOSED_API_KEY
-    if (!key) return NextResponse.json({ error: "Falta ICLOSED_API_KEY en preview" }, { status: 500 })
+    if (!key) return NextResponse.json({ ok: true, skipped: true, motivo: "Falta ICLOSED_API_KEY: el cron se saltea hasta que se cargue la clave de iClosed" })
     // iClosed no devuelve un orden estable: el subconjunto cambia según
     // `limit`, por lo que consultar solo limit=100 omite reservas recientes.
     // Cruzar varias ventanas y deduplicar por call ID evita perder agendas.
