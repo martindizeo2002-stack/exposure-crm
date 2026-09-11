@@ -1695,14 +1695,15 @@ function pintarEmbudo(c){
   const pasos = [
     {l:"Leads",              v:a.leads},
     {l:"Agendas",            v:a.agendas,     nota:"tasa de agenda",  art:"la", vara:12},
-    {l:"Se presentaron",     v:a.presentadas, nota:"show rate",       art:"el", vara:68},
+    {l:"Se presentaron",     v:a.presentadas, nota:"show rate",       art:"el", vara:68, base:(a.vencidas != null ? a.vencidas : a.agendas)},  // sobre llamadas ya realizadas
     {l:"Calificadas",        v:a.calificadas, nota:"calificación",    art:"la", vara:75},
     {l:"Ventas",             v:a.cierres,     nota:"tasa de cierre",  art:"la", vara:30},
   ];
   const max = pasos[0].v || 1;
   let peor = -1, peorBrecha = 0;
   pasos.forEach((p,i) => { if (!i) return;
-    const r = pasos[i-1].v ? p.v / pasos[i-1].v * 100 : 0;
+    const den = p.base != null ? p.base : pasos[i-1].v;
+    const r = den ? p.v / den * 100 : 0;
     const brecha = p.vara - r;
     if (brecha > peorBrecha) { peorBrecha = brecha; peor = i; }
   });
@@ -1766,7 +1767,7 @@ function pintarEmbudo(c){
       + "</div></div>"
     + '<div class="ec-foot">'
       + pasos.slice(1).map((p,i) => {
-          const conv = p.v / pasos[i].v * 100, mala = (i+1) === peor;
+          const conv = p.v / ((p.base != null ? p.base : pasos[i].v) || 1) * 100, mala = (i+1) === peor;
           return '<span class="ec-paso'+(mala?" mal":"")+'"><b>'+pct(conv)+"</b> "+p.nota
                + " <i>vara "+p.vara+"%</i></span>";
         }).join("")
@@ -1778,7 +1779,7 @@ function pintarEmbudo(c){
   if (peor < 0) {
     document.getElementById("tEmbudo").innerHTML = "Todos los pasos están en su vara o por arriba.";
   } else {
-    const faltan = Math.round(pasos[peor-1].v * enc.vara/100 - enc.v);
+    const faltan = Math.round((enc.base != null ? enc.base : pasos[peor-1].v) * enc.vara/100 - enc.v);
     const plata  = enc.l === "Ventas" ? faltan * a.aov
                  : Math.round(faltan * (a.cierres / pasos[peor].v) * a.aov);
     document.getElementById("tEmbudo").innerHTML =
