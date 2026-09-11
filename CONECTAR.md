@@ -57,6 +57,13 @@ Automatización **"CRM EXPOSURE · sincronizar contactos"** publicada en ManyCha
 
 El CRM guarda el contacto, lo vincula por Instagram/teléfono a la persona del pipeline y registra cada tag como evento (pieza que lo trajo, mes de conversación nueva).
 
+**Ajuste del 11/09 a la noche.** El disparador *Nuevo contacto creado* solo corre para contactos que llegan a "Suscrito" (mandaron un DM);
+la mayoría de los contactos nuevos entran como "Visitante" (siguieron o comentaron, sin DM) y ahí ManyChat no ejecuta la automatización.
+Por eso la automatización tiene además 7 disparadores *Se aplica la etiqueta a un contacto*: `Nuevo Seguidor | Septiembre 2026`,
+`Leads | Septiembre 2026`, `ASIGNADO`, `🟢Ángulo Solución`, `🟣Ángulo Volumen/TOFU`, `🔵Ángulo PRODUCTO`, `🔴Ángulo Problema`.
+Probado por API (sacar y volver a poner ASIGNADO a un contacto → llegó al CRM en segundos). **Cada mes** hay que agregar las dos
+etiquetas nuevas del mes (`Nuevo Seguidor | <Mes>` y `Leads | <Mes>`) como disparadores; pedímelo y lo hago.
+
 ## 4 · Espejo CRM → Google Sheet (cómo funciona)
 
 - Va en las dos direcciones: lo que se carga o cambia en el CRM se escribe en el sheet al instante, y **los pagos que se escriben a mano en la pestaña del mes entran al CRM cada 10 minutos** (`/api/sheet-pull`; necesitan concepto, nombre y monto). Las agendas siguen entrando por iClosed.
