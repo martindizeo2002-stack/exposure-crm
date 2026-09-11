@@ -132,17 +132,27 @@ function hashDe(bloques: Array<{ desde: number; valores: unknown[] }>): string {
 
 type Cursor = { desde: string | null; ultimo: string | null; lock?: string | null }
 
+const CURSOR = { source: "gsheet", asset_type: "config", source_id: "cursor" }
+
+// Candado atómico: el lock solo se toma si nadie lo cambió entre la lectura y la escritura
+// (compare-and-swap sobre metadata->>lock). Dos avisos simultáneos de la base ya no corren juntos.
 async function tomarCursor(admin: ReturnType<typeof createSupabaseAdmin>): Promise<{ cursor: Cursor; existe: boolean } | null> {
-  const { data } = await admin.from("crm_integration_assets").select("metadata").eq("source", "gsheet").eq("asset_type", "config").eq("source_id", "cursor").maybeSingle()
+  const { data } = await admin.from("crm_integration_assets").select("metadata").match(CURSOR).maybeSingle()
+  if (!data) {
+    await admin.from("crm_integration_assets").upsert(
+      { ...CURSOR, name: "Espejo Google Sheet", metadata: { desde: null, ultimo: null, lock: null } },
+      { onConflict: "source,asset_type,source_id", ignoreDuplicates: true },
+    )
+  }
   const cursor = ((data?.metadata as Cursor) || { desde: null, ultimo: null })
   const ahora = Date.now()
   if (cursor.lock && ahora - Date.parse(cursor.lock) < 90_000) return null
   const conLock = { ...cursor, lock: new Date(ahora).toISOString() }
-  const { error } = await admin.from("crm_integration_assets").upsert(
-    { source: "gsheet", asset_type: "config", source_id: "cursor", name: "Espejo Google Sheet", metadata: conLock, last_seen_at: conLock.lock },
-    { onConflict: "source,asset_type,source_id" },
-  )
+  let consulta = admin.from("crm_integration_assets").update({ metadata: conLock, last_seen_at: conLock.lock }).match(CURSOR)
+  consulta = cursor.lock ? consulta.eq("metadata->>lock", cursor.lock) : consulta.is("metadata->>lock", null)
+  const { data: tomadas, error } = await consulta.select("source_id")
   if (error) throw error
+  if (!tomadas || tomadas.length === 0) return null  // otro proceso lo tomó primero
   return { cursor: conLock, existe: Boolean(data) }
 }
 
