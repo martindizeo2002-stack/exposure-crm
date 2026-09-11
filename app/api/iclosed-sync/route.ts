@@ -78,9 +78,14 @@ function callWallTime(call: any): string | null {
 }
 
 function hostName(call: any): string | null {
-  const full = [call.user?.firstName, call.user?.lastName].filter(Boolean).join(" ")
-  return full ? canonicalCloserName(full) : null
+  const full = [call.user?.firstName, call.user?.lastName].filter(Boolean).join(" ").trim()
+  // la cuenta "exposure Consulting" es la empresa (superadmin de iClosed), no un closer: queda sin asignar
+  if (!full || /^exposure/i.test(full)) return null
+  return canonicalCloserName(full)
 }
+
+// Calendarios de venta a importar. Vacío = todos los del workspace (EXPOSURE tiene uno solo).
+const EVENT_IDS = (process.env.ICLOSED_EVENT_IDS || "").split(",").map((x) => Number(x.trim())).filter((n) => Number.isFinite(n) && n > 0)
 
 export async function POST(request: Request) {
   const auth = authorizePreviewSync(request)
@@ -136,9 +141,12 @@ export async function POST(request: Request) {
       // reservas recientes directamente desde iClosed. Se limita a los dos
       // calendarios comerciales y a 72 h desde la reserva para no importar
       // histórico ni tocar otras cuentas.
-      if ([17239, 17252].includes(Number(call.eventId))) {
+      if (!EVENT_IDS.length || EVENT_IDS.includes(Number(call.eventId))) {
         const bookedAt = new Date(call.createdAt || "")
-        const recent = Number.isFinite(bookedAt.getTime()) && Date.now() - bookedAt.getTime() <= 72 * 60 * 60 * 1000
+        const callAt = new Date(call.dateTimeUTC || call.dateTime || "")
+        // reservas de las últimas 72 h, o llamadas todavía por venir aunque se hayan reservado antes
+        const recent = (Number.isFinite(bookedAt.getTime()) && Date.now() - bookedAt.getTime() <= 72 * 60 * 60 * 1000)
+          || (Number.isFinite(callAt.getTime()) && callAt.getTime() >= Date.now() - 60 * 60 * 1000)
         const closer = hostName(call)
         const fechaCloser = callWallTime(call)
         const duplicate = (agendas || []).find((row: any) => {
