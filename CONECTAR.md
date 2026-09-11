@@ -7,8 +7,8 @@ Las claves van en `.env.local` (y en Vercel). Nunca al repo. Copia de respaldo e
 
 | # | Qué | Dónde se saca | Qué destraba |
 |---|---|---|---|
-| 1 | **Token de Supabase** (o contraseña nueva de la base) | supabase.com → avatar → Account → **Access Tokens** → "Generate new token". Guardarlo en `exposure-crm-secrets\supabase-token.txt`. Alternativa: Project Settings → Database → "Reset database password" y guardarla en `db-password.txt`. | Aplicar la migración `20260911000001` (sección 5). Sin ella, cargar un **Fee o una Cuota desde la pantalla falla** y el sheet no recibe avisos automáticos. |
-| 2 | **JSON de la cuenta de servicio de Google** + compartir el sheet | console.cloud.google.com → IAM → Service Accounts → crear → Keys → JSON. Guardarlo como `exposure-crm-secrets\google-service-account.json`. Compartir "EXPOSURE \| CRM CENTRAL 2026" con el mail de esa cuenta (`…@…iam.gserviceaccount.com`) como **Editor**. | El espejo CRM → sheet (sección 4). |
+| ~~1~~ ✅ | Contraseña de la base de Supabase | Alex la pasó el 11/09 (04:20). Está en `exposure-crm-secrets\db-password.txt`. La migración `20260911000001` ya se aplicó (sección 5). | Fees y cuotas desde la pantalla, avisos al sheet. |
+| ~~2~~ ✅ | JSON de la cuenta de servicio de Google | `crm-exposure@original-nation-395419.iam.gserviceaccount.com`, guardado en `exposure-crm-secrets\google-service-account.json` y cargado en Vercel. El sheet ya está compartido con esa cuenta. | Espejo CRM → sheet (sección 4). |
 | 3 | **API key de iClosed** | iClosed → Settings → Integrations / API | Que cada agenda entre sola al pipeline (hoy se cargan del sheet o a mano). |
 | 4 | **API key de Anthropic** | console.anthropic.com → API Keys | La sincronización con Fathom (show / no show real, motivo de no cierre) la exige; también el análisis de llamadas y el asistente interno. |
 
@@ -25,7 +25,7 @@ Las claves van en `.env.local` (y en Vercel). Nunca al repo. Copia de respaldo e
 - [x] **Stripe** — clave restringida cargada (solo lectura).
 - [x] **Meta Ads** — token y cuenta `act_…` cargados. El token todavía no ve la página ni el Instagram.
 - [x] **Clave de ingesta** (`CRM_INGEST_KEY`) y **secreto de crons** (`CRON_SECRET`).
-- [x] **Espejo CRM → Google Sheet** — código listo (`lib/sheet-mirror.ts`, `/api/sheet-sync`, cron diario 09:00 UTC). Falta el JSON de la cuenta de servicio.
+- [x] **Espejo CRM → Google Sheet** — conectado (`lib/sheet-mirror.ts`, `/api/sheet-sync`); la base avisa por pg_net en cada alta o cambio y el cron diario (`/api/cron-diario`, 09:00 UTC) repasa todo.
 
 ## 2 · Claves
 
@@ -36,7 +36,7 @@ Las claves van en `.env.local` (y en Vercel). Nunca al repo. Copia de respaldo e
 | Fathom | `FATHOM_API_KEY`, `FATHOM_WEBHOOK_SECRET` | ✅ |
 | Stripe | `STRIPE_SECRET_KEY` | ✅ |
 | Meta Ads | `META_ADS_ACCESS_TOKEN`, `META_ADS_ACCOUNT_ID` | ✅ |
-| Google Sheets | `GOOGLE_SERVICE_ACCOUNT_JSON` (el JSON entero o en base64), `GOOGLE_SHEET_ID` (`1mLpa1gGCgN29LYt8ul7egX-M5Paej9TY6N7NydND-9w`) | ⏳ falta el JSON |
+| Google Sheets | `GOOGLE_SERVICE_ACCOUNT_JSON` (base64 del JSON), `GOOGLE_SHEET_ID` (`1mLpa1gGCgN29LYt8ul7egX-M5Paej9TY6N7NydND-9w`) | ✅ |
 | iClosed | `ICLOSED_API_KEY` | ⏳ |
 | Anthropic | `ANTHROPIC_API_KEY` | ⏳ la pide Fathom |
 | Instagram Graph | `IG_ACCESS_TOKEN` + `IG_BUSINESS_ID` | ⏳ depende de la verificación de la app de Meta |
@@ -62,21 +62,22 @@ El CRM guarda el contacto, lo vincula por Instagram/teléfono a la persona del p
 - Cuándo corre: al instante con la migración aplicada (la base avisa al CRM en cada alta o cambio); si no, una vez por día a las 09:00 UTC (06:00 Argentina). También a mano: `curl -X POST https://exposure-crm-nu.vercel.app/api/sheet-sync -H "Authorization: Bearer <CRON_SECRET>"`.
 - Pagos anulados en el CRM quedan en el sheet con concepto `ANULADO · …` y monto 0.
 
-## 5 · Migración pendiente (la aplico yo apenas tenga el token)
+## 5 · Migración 20260911000001 (aplicada el 11/09 a las 04:26)
 
-Archivo: `supabase/migrations/20260911000001_tipos_pendientes.sql`. Comando: `node scripts/aplicar-sql.mjs supabase/migrations/20260911000001_tipos_pendientes.sql` (usa el token de `exposure-crm-secrets\supabase-token.txt`; con contraseña, `npx supabase@2.114.0 db push`).
+Archivo: `supabase/migrations/20260911000001_tipos_pendientes.sql`. Se aplicó con `python scripts/aplicar-sql.py <archivo>` (host directo de la base con la contraseña de `exposure-crm-secrets\db-password.txt`; el pooler tarda unos minutos en aceptar una contraseña nueva). Para SQL suelto: `python scripts/sql.py "select …"`.
 
-Qué arregla:
-1. `plan_pago_items.pago_id` pasa a texto (el esquema reconstruido lo dejó uuid y el código de Paul lo compara como texto). Hoy cargar un pago que no da acceso (Fee, Cuota) desde la pantalla tira "operator does not exist: uuid = text". El histórico se importó con `grants_access=true` para esquivarlo.
+Qué arregló:
+1. `plan_pago_items.pago_id` pasa a texto (el esquema reconstruido lo dejó uuid y el código de Paul lo compara como texto). Antes, cargar un pago que no da acceso (Fee, Cuota) desde la pantalla tiraba "operator does not exist: uuid = text". Después de aplicarla se corrigió el histórico: el acceso lo decide el concepto y se borraron 34 "clientes" que solo habían pagado un Fee.
 2. `fecha_agenda` / `fecha_closer` con hora.
 3. Conceptos de EXPOSURE que dan acceso: Venta Nueva, Adentro en Seguimiento, Adentro en Seguimiento y Post Fee, Completó PIF, Venta Interna, Venta Nueva Interna, Upsell (Agency).
 4. "Adentro en Seguimiento y Post Fee" deja de contarse como fee al cargar el plan.
-5. Avisos de la base al espejo del sheet (pg_net) en cada alta o cambio de pagos y agendas.
+5. Avisos de la base al espejo del sheet (pg_net) en cada alta o cambio de pagos y agendas. La URL y el secreto están en la tabla `crm_config` (sin acceso para anon/authenticated).
+6. Columnas de la bandeja de avisos (`crm_notification_outbox`) que faltaban para `operations-refresh`.
 
 ## 6 · Pendientes míos
 
-- [ ] Aplicar la migración (necesita el token o la contraseña).
-- [ ] Probar el espejo con el sheet real (necesita el JSON) y sacar la primera corrida.
+- [x] Aplicar la migración.
+- [ ] Probar el espejo con el sheet real y sacar la primera corrida.
 - [ ] Adaptador iClosed → agendas (necesita la API key; el código de Paul ya está en `/api/iclosed-sync`).
 - [ ] Stripe → pagos automáticos (decidir: directo o vía Zapier).
 - [ ] Instagram Graph cuando Meta apruebe la app.

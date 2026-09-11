@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic"
 async function correr(request: Request) {
   const auth = authorizePreviewSync(request)
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
-  const resultado = await sincronizarSheet()
+  const body = request.method === "POST" ? await request.json().catch(() => null) : null
+  const registro = body && typeof body.table === "string" && typeof body.id === "string" ? { table: body.table, id: body.id } : null
+  const resultado = await sincronizarSheet({ registro })
   return NextResponse.json(resultado, { status: resultado.ok ? 200 : 202 })
 }
 

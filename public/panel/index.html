@@ -1839,7 +1839,8 @@ function fila(i, nombre, valor, sub, prop, color){
    tarjeta se ordena por lo COBRADO y no por views a propósito: ese orden es
    todo el argumento de la sección. */
 (function reels(){
-  if (!D.reels || !D.reels.length) { document.getElementById("reels").closest("section").hidden = true; return; }
+  const cajaReels = document.getElementById("reels");
+  if (!D.reels || !D.reels.length || !cajaReels) { const sec = cajaReels && cajaReels.closest("section"); if (sec) sec.hidden = true; return; }
   const R = D.reels.slice().sort((a,b) => b.cobrado - a.cobrado || b.leads - a.leads);
   const maxPlata = R[0].cobrado || 1;
   const ojo = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';

@@ -153,7 +153,7 @@ async function guardarCursor(admin: ReturnType<typeof createSupabaseAdmin>, curs
   )
 }
 
-export async function sincronizarSheet(opts: { limite?: number } = {}): Promise<ResultadoEspejo> {
+export async function sincronizarSheet(opts: { limite?: number; registro?: { table: string; id: string } | null } = {}): Promise<ResultadoEspejo> {
   const vacio: ResultadoEspejo = { ok: true, agregados: 0, actualizados: 0, sinCambios: 0, historicosSinMapa: 0, pestanasCreadas: [], errores: [] }
   if (!sheetsConfigured()) return { ...vacio, ok: false, motivo: "Faltan GOOGLE_SERVICE_ACCOUNT_JSON / GOOGLE_SHEET_ID" }
   const admin = createSupabaseAdmin()
@@ -168,7 +168,8 @@ export async function sincronizarSheet(opts: { limite?: number } = {}): Promise<
   const resultado = { ...vacio }
   try {
     const tabs = await listTabs()
-    const desdeConsulta = cursor.ultimo ? new Date(Date.parse(cursor.ultimo) - 120_000).toISOString() : cursor.desde
+    // cursor estricto: el webhook de la base manda tabla + id, y ese registro se incluye siempre
+    const desdeConsulta = cursor.ultimo || cursor.desde
     const escrituras: Array<{ range: string; values: unknown[][] }> = []
     const mapasNuevos: Array<Record<string, unknown>> = []
     const siguienteFila = new Map<string, number>()
@@ -178,6 +179,10 @@ export async function sincronizarSheet(opts: { limite?: number } = {}): Promise<
       const { data: filas, error } = await admin.from(kind).select("*").gt("updated_at", desdeConsulta).order("updated_at", { ascending: true }).limit(limite)
       if (error) throw error
       const registros = (filas || []) as Registro[]
+      if (opts.registro && opts.registro.table === kind && opts.registro.id && !registros.some(r => r.id === opts.registro!.id)) {
+        const { data: uno } = await admin.from(kind).select("*").eq("id", opts.registro.id).maybeSingle()
+        if (uno) registros.push(uno as Registro)
+      }
       if (!registros.length) continue
       const { data: mapas } = await admin.from("crm_integration_assets").select("source_id,metadata")
         .eq("source", "gsheet").eq("asset_type", ASSET[kind]).in("source_id", registros.map(r => r.id))
