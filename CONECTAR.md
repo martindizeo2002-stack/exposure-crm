@@ -41,7 +41,7 @@ Las claves van en `.env.local` (y en Vercel). Nunca al repo. Copia de respaldo e
 | Google Sheets | `GOOGLE_SERVICE_ACCOUNT_JSON` (base64 del JSON), `GOOGLE_SHEET_ID` (`1mLpa1gGCgN29LYt8ul7egX-M5Paej9TY6N7NydND-9w`) | ✅ |
 | iClosed | `ICLOSED_API_KEY` | ✅ (11/09 13:00; calendarios 37886 y 48656; cron cada 10 min; API con límite de tasa → pedidos en serie) |
 | Anthropic | `ANTHROPIC_API_KEY` | ✅ |
-| Instagram Graph | `IG_ACCESS_TOKEN` + `IG_BUSINESS_ID` | ⏳ depende de la verificación de la app de Meta |
+| Instagram Graph | `IG_ACCESS_TOKEN` + `IG_BUSINESS_ID` | ⏳ el token del System User (app "EXPOSURE Ads") solo tiene permisos de anuncios y no ve ninguna página. Pasos exactos abajo (sección 8). |
 
 ## 3 · ManyChat → CRM en tiempo real (HECHO el 11/09 a las 13:30)
 
@@ -92,3 +92,17 @@ Qué arregló:
 - `💰 PAGOS JUNIO`, fila del 19/06 (Adentro en Seguimiento y Post Fee, "Cuota 1 (Agency)", USD 500): no tiene nombre de cliente, no se importó. Ponele el nombre y lo cargo.
 - `💰 PAGOS FEB`: 25 filas tienen el nombre en la columna "Fecha Alta" (columnas corridas). Se importaron igual, pero al espejo le conviene que estén en su lugar.
 - Los pagos de Marcos, Tony, Paul y Bener quedaron afuera (no son closers propios), como acordamos.
+
+## 8 · Conectar tu Instagram al CRM (5 minutos, en Meta Business)
+
+El CRM ya sabe leer views, alcance y comentarios por reel, pero el token que tengo (System User de la app "EXPOSURE Ads")
+solo tiene `ads_read` y no ve tu página. Hace falta un token que vea la página de Facebook conectada a @alexmcarrera:
+
+1. business.facebook.com → **Configuración del negocio** → *Usuarios → Usuarios del sistema* → el System User de "EXPOSURE Ads".
+2. **Asignar activos**: agregá la **página de Facebook** (control total) y la **cuenta de Instagram** @alexmcarrera (control total).
+3. **Generar nuevo token** para la app "EXPOSURE Ads" con estos permisos: `pages_show_list`, `pages_read_engagement`,
+   `instagram_basic`, `instagram_manage_insights` (dejá también `ads_read`). Sin vencimiento.
+4. Pegame el token acá. Yo lo cargo como `IG_ACCESS_TOKEN`, obtengo el `IG_BUSINESS_ID` y prendo la página "El contenido".
+
+Mientras la app siga "en desarrollo", esto funciona igual para tu propia cuenta (sos administrador de la app); la verificación de
+Meta solo hace falta para cuentas de terceros.
