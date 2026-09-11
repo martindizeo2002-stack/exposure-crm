@@ -6,11 +6,26 @@
 --    compara y lo asigna como text (`pago_id = payment.id::text`, `payment_id::text`). Sin esto, cargar
 --    un pago que no otorgue acceso (Fee, Cuota) desde la pantalla falla con "operator does not exist: uuid = text".
 alter table public.plan_pago_items drop constraint if exists plan_pago_items_pago_id_fkey;
+drop trigger if exists crm_plan_item_access_after on public.plan_pago_items;  -- depende de la columna; se vuelve a crear abajo
 alter table public.plan_pago_items alter column pago_id type text using pago_id::text;
+create trigger crm_plan_item_access_after
+after insert or update of pago_id,da_acceso,estado on public.plan_pago_items
+for each row execute function public.crm_plan_item_access_after();
 
 -- 2) fecha_agenda / fecha_closer llevan hora en el CRM original (timestamp sin zona).
-alter table public.agendas alter column fecha_agenda type timestamp using fecha_agenda::timestamp;
-alter table public.agendas alter column fecha_closer type timestamp using fecha_closer::timestamp;
+--    Las vistas crm_data_quality_queue / crm_exception_queue dependen de la columna: se guardan, se tiran y se recrean.
+do $$
+declare v_calidad text; v_excepciones text;
+begin
+  if to_regclass('public.crm_data_quality_queue') is not null then v_calidad := pg_get_viewdef('public.crm_data_quality_queue'::regclass, true); end if;
+  if to_regclass('public.crm_exception_queue') is not null then v_excepciones := pg_get_viewdef('public.crm_exception_queue'::regclass, true); end if;
+  drop view if exists public.crm_exception_queue;
+  drop view if exists public.crm_data_quality_queue;
+  alter table public.agendas alter column fecha_agenda type timestamp using fecha_agenda::timestamp;
+  alter table public.agendas alter column fecha_closer type timestamp using fecha_closer::timestamp;
+  if v_calidad is not null then execute 'create view public.crm_data_quality_queue as ' || v_calidad; end if;
+  if v_excepciones is not null then execute 'create view public.crm_exception_queue as ' || v_excepciones; end if;
+end $$;
 
 -- 3) Conceptos de pago de EXPOSURE que otorgan acceso al programa.
 create or replace function public.crm_payment_type_grants_access(p_type text)
@@ -164,14 +179,24 @@ grant execute on function public.crm_create_payment_plan_atomic(text,jsonb,jsonb
 -- 5) Espejo CRM → Google Sheet: cada alta o cambio en pagos/agendas avisa al CRM (pg_net) y el CRM
 --    escribe la fila en el sheet. Si pg_net no está disponible, el cron diario de Vercel hace lo mismo.
 create extension if not exists pg_net with schema extensions;
-alter database postgres set app.sheet_sync_url = '{{APP_URL}}/api/sheet-sync';
-alter database postgres set app.cron_secret = '{{CRON_SECRET}}';
+-- La URL y el secreto viven en crm_config (sin acceso para anon/authenticated); el rol postgres no puede ALTER DATABASE SET.
+create table if not exists public.crm_config (
+  clave text primary key,
+  valor text not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.crm_config enable row level security;
+revoke all on public.crm_config from anon, authenticated;
+insert into public.crm_config (clave, valor) values ('sheet_sync_url', '{{APP_URL}}/api/sheet-sync'), ('cron_secret', '{{CRON_SECRET}}')
+on conflict (clave) do update set valor = excluded.valor, updated_at = now();
 create or replace function public.crm_sheet_webhook() returns trigger
 language plpgsql security definer set search_path = public, extensions as $$
 declare
-  url text := current_setting('app.sheet_sync_url', true);
-  secreto text := current_setting('app.cron_secret', true);
+  url text;
+  secreto text;
 begin
+  select valor into url from public.crm_config where clave = 'sheet_sync_url';
+  select valor into secreto from public.crm_config where clave = 'cron_secret';
   if url is null or url = '' or secreto is null or secreto = '' then return new; end if;
   perform net.http_post(
     url := url,
