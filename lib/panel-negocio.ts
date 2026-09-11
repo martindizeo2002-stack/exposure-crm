@@ -137,7 +137,8 @@ const diasEntre = (a: Date, b: Date) => Math.max(0, Math.round((b.getTime() - a.
 // ── normalización de textos ────────────────────────────────────────────────
 const limpio = (s: string | null | undefined) => String(s || "").trim()
 const minus = (s: string | null | undefined) => limpio(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
-const CALIF_AB = new Set(["lead a", "lead b", "a", "b"])
+// Calificada = LEAD A, B o C (D no). En EXPOSURE la mayoría de los cierres son LEAD C (29 de 44 desde junio 2026).
+const CALIF_AB = new Set(["lead a", "lead b", "lead c", "a", "b", "c", "s"])
 const esCalificada = (a: AgendaPanel) => {
   const real = minus(a.calificaba_realmente)
   if (real) return real.startsWith("s") || real === "true"

@@ -327,7 +327,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const CALIFS_AB = new Set(["LEAD S", "LEAD A", "LEAD B"])
+    const CALIFS_AB = new Set(["S", "A", "B", "C", "LEAD A", "LEAD B", "LEAD C"])  // EXPOSURE: A, B y C califican; D no
 
     for (const ag of agendas || []) {
       const closerNorm = canonical(ag.closer || "")
@@ -353,7 +353,7 @@ export async function GET(request: Request) {
         s.agendas++
         if (ag.show) {
           s.shows++
-          // Only count A/B on actual shows (calificadas = showed up AND qualified)
+          // Solo cuenta calificadas (A/B/C) sobre llamadas que se presentaron
           if (CALIFS_AB.has(ag.calificacion || "")) s.agendas_ab++
         }
       }

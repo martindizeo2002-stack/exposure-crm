@@ -2477,7 +2477,7 @@ const A3 = derivar(agregar(u3)), A3ant = derivar(agregar(u3ant));
   const leadsMeta = valorLead ? meta / valorLead : 0;
   const leadsHoy  = A3.leads / 3;
   secc("proyeccion", "Qué hace falta para llegar a la meta",
-    "El camino inverso: se parte del objetivo de <b>"+money(meta)+"</b> y se calcula hacia atrás, "
+    "El camino inverso: se parte de la meta mensual de <b>"+money(meta)+"</b> (la que fijaste vos, no una proyección) y se calcula hacia atrás "
     + "con las tasas reales de los últimos 90 días.",
     "Por mes",
     '<div class="g3">'
@@ -2501,10 +2501,10 @@ const A3 = derivar(agregar(u3)), A3ant = derivar(agregar(u3ant));
     {n:"Al ritmo de hoy", d:"sigue el "+pct(g*100)+" mensual de los últimos 3 meses", g:g, c:"var(--c1)"},
     {n:"Si el cierre llega a la vara", d:"mismo volumen, tasa de cierre al 30%", g:g + (30-A3.tasaCierre)/100/6, c:"var(--ok)"},
   ];
-  secc("proyeccion", "Tres escenarios, mismo motor",
-    "Los tres parten del cierre proyectado de este mes (<b>"+money(proy)+"</b>) y solo cambia el ritmo.",
-    "Próximos 3 meses",
-    tabla([{t:"Escenario"},{t:"Mes +1",num:1},{t:"Mes +2",num:1},{t:"Mes +3",num:1},{t:"Los 3 juntos",num:1},{t:"vs meta",num:1}],
+  secc("proyeccion", "Tres escenarios hipotéticos (no son proyecciones)",
+    "Son simulaciones para comparar ritmos: los tres parten del cierre proyectado de este mes (<b>"+money(proy)+"</b>) y solo cambia el crecimiento supuesto. La meta mensual (<b>"+money(meta)+"</b>) la fijaste vos; la única proyección real es la del ritmo actual.",
+    "Simulación · próximos 3 meses",
+    tabla([{t:"Escenario"},{t:"Mes +1",num:1},{t:"Mes +2",num:1},{t:"Mes +3",num:1},{t:"Suma de los 3 meses",num:1},{t:"Mes +3 vs meta",num:1}],
       ESC.map(e => {
         const v = [], acum = [];
         let x = proy;

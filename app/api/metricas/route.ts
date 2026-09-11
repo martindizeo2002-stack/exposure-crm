@@ -47,8 +47,8 @@ const SETTERS_NO_ACTIVOS = new Set<string>()
 // Claves en minúsculas y sin tildes (ver closerKey). El CEO de EXPOSURE cierra.
 const CLOSERS_EXCLUIDOS = new Set<string>()
 
-// Definición operativa confirmada: una agenda calificada es S, A o B.
-const CALIFS_AB = new Set(["LEAD S", "LEAD A", "LEAD B"])
+// Definición operativa (Alex, 11/09/2026): una agenda calificada es LEAD A, B o C; LEAD D no.
+const CALIFS_AB = new Set(["S", "A", "B", "C", "LEAD A", "LEAD B", "LEAD C"])  // EXPOSURE: A, B y C califican; D no
 
 // Conjuntos compartidos (lib/commission-scheme.ts, lib/revenue.ts,
 // lib/cash-collected.ts) con el vocabulario de EXPOSURE.
