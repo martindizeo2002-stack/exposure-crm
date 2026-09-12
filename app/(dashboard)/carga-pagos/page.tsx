@@ -382,6 +382,10 @@ function NuevoPlanTab() {
   // real en /api/pagos). -1 = ninguna: todo el plan es histórico/ya cobrado, y en
   // ese caso corresponde usar "Guardar plan" en vez de "Guardar y Cargar en CRM".
   const [filaHoyIdx, setFilaHoyIdx] = useState(0)
+  // Fecha de alta del cliente: la carga el closer; si la deja vacía se toma la fecha
+  // del primer pago que da acceso. Antes no existía la casilla y "Guardar plan"
+  // dejaba el plan sin alta (el cliente no aparecía en Clientes ni se podía dar de alta).
+  const [fechaAlta, setFechaAlta] = useState("")
   const [guardandoSolo, setGuardandoSolo] = useState(false)
   const [guardandoCRM, setGuardandoCRM] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -426,6 +430,9 @@ function NuevoPlanTab() {
   const operacionCatalogo = programaDef?.operaciones.find((o) => o.label === operacionFinal)
   const totalPrograma = operacionCatalogo?.total ?? 0
   const duracionLabel = programaDef?.duracionMeses != null ? `${programaDef.duracionMeses} Meses` : null
+  const fechaAltaSugerida = filas.find((f) => daAccesoDeFila({ concepto: f.concepto, masAcceso: f.masAcceso }) && f.fechaPlaneada)?.fechaPlaneada || ""
+  const fechaAltaFinal: string | null = fechaAlta || fechaAltaSugerida || null
+  const fechaBajaFinal = calcularFechaBajaPrograma(fechaAltaFinal, programaDef?.duracionMeses ?? null)
 
   function handleProgramaChange(id: string) {
     setLastSavedMessage(null)
@@ -487,6 +494,7 @@ function NuevoPlanTab() {
     setShared({ ...EMPTY_SHARED })
     setFilas([{ ...EMPTY_FILA }])
     setFilaHoyIdx(0)
+    setFechaAlta("")
   }
 
   function validarComun(): string[] {
@@ -548,8 +556,8 @@ function NuevoPlanTab() {
             calificacion: shared.calificacion || null,
             fuente: fuenteFinal,
             contenido_contestado: contenidoFinal,
-            fecha_alta: null,
-            fecha_baja: null,
+            fecha_alta: fechaAltaFinal,
+            fecha_baja: fechaBajaFinal,
           },
           items: filas.map((f, idx) => ({
             orden: idx,
@@ -596,8 +604,9 @@ function NuevoPlanTab() {
     try {
       const filaHoy = filas[filaHoyIdx]
       const fila0DaAcceso = daAccesoDeFila({ concepto: filaHoy.concepto, masAcceso: filaHoy.masAcceso })
-      const fechaAlta = fila0DaAcceso ? filaHoy.fechaPlaneada : null
-      const fechaBaja = fila0DaAcceso ? calcularFechaBajaPrograma(fechaAlta, programaDef?.duracionMeses ?? null) : null
+      // El pago lleva la alta solo si ES el pago que da acceso; el plan la lleva siempre que se conozca.
+      const fechaAltaPago = fila0DaAcceso ? (fechaAltaFinal || filaHoy.fechaPlaneada) : null
+      const fechaBajaPago = fila0DaAcceso ? calcularFechaBajaPrograma(fechaAltaPago, programaDef?.duracionMeses ?? null) : null
       const fuenteFinal = shared.fuente && shared.fuente !== NONE ? shared.fuente : null
       const medioFinal = shared.medio_de_pago && shared.medio_de_pago !== NONE ? shared.medio_de_pago : null
       const ccArsFinal = shared.ccArsModo === "en_pesos" && shared.cc_ars ? parseFloat(shared.cc_ars) : null
@@ -609,8 +618,8 @@ function NuevoPlanTab() {
         body: JSON.stringify({
           request_id: crypto.randomUUID(),
           fecha: filaHoy.fechaPlaneada || null,
-          fecha_alta: fechaAlta,
-          fecha_baja: fechaBaja,
+          fecha_alta: fechaAltaPago,
+          fecha_baja: fechaBajaPago,
           cliente: shared.cliente || null,
           telefono: shared.telefono || null,
           tipo: filaHoy.concepto || null,
@@ -639,8 +648,8 @@ function NuevoPlanTab() {
             calificacion: shared.calificacion || null,
             fuente: fuenteFinal,
             contenido_contestado: contenidoFinal,
-            fecha_alta: fechaAlta,
-            fecha_baja: fechaBaja,
+            fecha_alta: fechaAltaFinal,
+            fecha_baja: fechaBajaFinal,
           },
           items: filas.map((f, idx) => ({
             orden: idx,
@@ -909,6 +918,27 @@ function NuevoPlanTab() {
 
       <hr className="my-6 border-border" />
 
+      {/* ALTA DEL CLIENTE */}
+      <Sec title="Alta del cliente" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <F label="Fecha de alta">
+          <Input type="date" value={fechaAlta} onChange={(e) => { setLastSavedMessage(null); setFechaAlta(e.target.value) }} />
+        </F>
+        <F label="Fecha de baja (calculada)">
+          <Input type="date" value={fechaBajaFinal || ""} readOnly className="bg-muted/40" />
+        </F>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {fechaAlta
+          ? `Se guarda ${fechaAlta} como fecha de alta del programa.`
+          : fechaAltaSugerida
+            ? `Si la dejás vacía se toma la fecha del primer pago que da acceso: ${fechaAltaSugerida}.`
+            : "Ningún pago del plan da acceso todavía: si no cargás una fecha acá, el cliente queda sin alta y no aparece en Clientes hasta que se confirme un pago con acceso."}
+        {programaDef?.duracionMeses != null && fechaAltaFinal ? ` La baja se calcula a ${programaDef.duracionMeses} meses.` : ""}
+      </p>
+
+      <hr className="my-6 border-border" />
+
       {/* DATOS DEL LEAD */}
       <Sec title="Datos del Lead" />
       <div className="space-y-4">
@@ -1035,6 +1065,59 @@ function NuevoPlanTab() {
 /* ============================================================================================= */
 /* PESTAÑA 2: PLANES EXISTENTES                                                                   */
 /* ============================================================================================= */
+
+// Fecha de alta / baja de un plan ya guardado. Sirve para dar de alta un plan que se
+// guardó sin fecha (antes no había forma de cargarla) o para corregirla.
+function AltaPlanEditor({ plan, onSaved }: { plan: PlanPago; onSaved: () => void }) {
+  const [fechaAlta, setFechaAlta] = useState(plan.fecha_alta ? String(plan.fecha_alta).slice(0, 10) : "")
+  const [guardando, setGuardando] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const meses = buscarProgramaPorOperacion(plan.operacion)?.programa.duracionMeses ?? null
+  const fechaBaja = calcularFechaBajaPrograma(fechaAlta || null, meses)
+  const sinCambios = (fechaAlta || "") === (plan.fecha_alta ? String(plan.fecha_alta).slice(0, 10) : "")
+
+  async function guardar() {
+    setGuardando(true); setMsg(null)
+    try {
+      const res = await fetch("/api/planes-pago", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: plan.id, fecha_alta: fechaAlta || null, fecha_baja: fechaBaja }),
+      })
+      if (!res.ok) {
+        const r = await res.json().catch(() => ({}))
+        setMsg(r.error || "No se pudo guardar la fecha de alta.")
+        return
+      }
+      setMsg("Fecha de alta guardada.")
+      onSaved()
+    } catch {
+      setMsg("Error de conexión.")
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Fecha de alta</Label>
+          <Input type="date" className="h-8 w-44 text-sm" value={fechaAlta} onChange={(e) => { setFechaAlta(e.target.value); setMsg(null) }} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Baja{meses != null ? ` (${meses} meses)` : ""}</Label>
+          <Input type="date" className="h-8 w-44 text-sm bg-muted/40" value={fechaBaja || ""} readOnly />
+        </div>
+        <Button type="button" size="sm" variant="outline" disabled={guardando || sinCambios} onClick={guardar}>
+          {guardando ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Guardando...</> : "Guardar alta"}
+        </Button>
+        {!plan.fecha_alta && !fechaAlta && <span className="text-xs text-amber-600">Este plan no tiene fecha de alta: el cliente no aparece en Clientes.</span>}
+        {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
+      </div>
+    </div>
+  )
+}
 
 function PlanesExistentesTab() {
   const { data: planes, isLoading, error, mutate: mutatePlanes } = useSWR<PlanPago[]>("/api/planes-pago", fetcher)
@@ -1341,8 +1424,9 @@ function PlanesExistentesTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fecha: dialogForm.fecha_planeada,
-          fecha_alta: null,
-          fecha_baja: null,
+          // Si esta cuota da acceso, el pago lleva la alta (la del plan o la fecha de cobro).
+          fecha_alta: item.da_acceso ? (plan.fecha_alta || dialogForm.fecha_planeada) : null,
+          fecha_baja: item.da_acceso ? (plan.fecha_baja || calcularFechaBajaPrograma(plan.fecha_alta || dialogForm.fecha_planeada, buscarProgramaPorOperacion(plan.operacion)?.programa.duracionMeses ?? null)) : null,
           cliente: plan.cliente || null,
           telefono: plan.telefono || null,
           tipo: item.concepto || null,
@@ -1520,6 +1604,7 @@ function PlanesExistentesTab() {
                         Eliminar plan duplicado
                       </Button>
                     </div>
+                    <AltaPlanEditor plan={plan} onSaved={() => mutatePlanes()} />
                     <div className="space-y-2">
                       {items.map((item) => (
                         <div key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
