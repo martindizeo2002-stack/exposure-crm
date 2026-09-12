@@ -2,6 +2,8 @@
 // la duración para calcular fecha_baja y el total del contrato. Las etiquetas históricas
 // (tal como están escritas en el sheet CRM CENTRAL 2026) se reconocen en OPERACIONES_HISTORICAS.
 // Todos los programas duran 4 meses (Alex, 11/09/2026); Círculo Privado es anual y las variantes "8 meses" llevan su override.
+// Precio IA Partner vigente desde septiembre 2026 (Alex, 12/09/2026): $1500 PIF · 2 x $750 si se completa
+// antes de los 21 días · si no, 2 x $1000 ($2000). Las etiquetas de $1300 pasaron a históricas.
 export type ProgramaId = "ia_partner" | "agency" | "agency_pro" | "content" | "circulo"
 
 export type OperacionCatalogo = { label: string; total: number; meses?: number }
@@ -21,9 +23,9 @@ export const PROGRAMAS: ProgramaDef[] = [
     nombreCorto: "IA Partner",
     duracionMeses: 4,
     operaciones: [
-      { label: "IA PARTNER | $1300 PIF", total: 1300 },
-      { label: "IA PARTNER | $1300 PP", total: 1300 },
-      { label: "IA PARTNER | $2000 PP", total: 2000 },
+      { label: "IA PARTNER | $1500 PIF", total: 1500 },
+      { label: "IA PARTNER | 2 x $750 (antes de 21 días)", total: 1500 },
+      { label: "IA PARTNER | 2 x $1000", total: 2000 },
     ],
   },
   {
@@ -80,6 +82,10 @@ export const PROGRAMAS: ProgramaDef[] = [
 
 // Etiquetas tal cual aparecen en los pagos importados del sheet (no se ofrecen en el selector).
 const OPERACIONES_HISTORICAS: Array<{ programaId: ProgramaId; operacion: OperacionCatalogo }> = [
+  // Precio hasta agosto 2026 (selector del 11/09): se reconocen pero ya no se ofrecen.
+  { programaId: "ia_partner", operacion: { label: "IA PARTNER | $1300 PIF", total: 1300 } },
+  { programaId: "ia_partner", operacion: { label: "IA PARTNER | $1300 PP", total: 1300 } },
+  { programaId: "ia_partner", operacion: { label: "IA PARTNER | $2000 PP", total: 2000 } },
   { programaId: "ia_partner", operacion: { label: "IA PARTNER - PIF", total: 1300 } },
   { programaId: "ia_partner", operacion: { label: "IA PARTNER - 1300 PP", total: 1300 } },
   { programaId: "ia_partner", operacion: { label: "IA PARTNER  - 1300 PP", total: 1300 } },

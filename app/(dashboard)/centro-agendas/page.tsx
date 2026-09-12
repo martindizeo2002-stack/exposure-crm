@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Pencil, Filter, BarChart2, X, Search, FileText, Check, ChevronDown, Plus, ExternalLink, Download, UserRound, CalendarClock, Waypoints, ArrowLeft, ArrowRight, Sparkles, Phone, Instagram, UserCheck, MessageSquareText, BriefcaseBusiness, Archive } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { OPERACION_LABELS as OPERACION } from "@/lib/operaciones"
 import { useSession } from "@/components/session-provider"
 import { canExportAgendas } from "@/lib/export-access"
 import type { Agenda } from "@/lib/supabase"
@@ -107,7 +108,7 @@ function isNoPrecallerAgenda(a: Partial<Agenda> | null | undefined) {
 const CALIFICABA = ["Si","No"]
 const ESTADO_AG = ["Adentro en Call","Adentro en FUP","Fee"]
 const MOTIVO = ["Le parecia caro","No llego al PIF","No llegaba a la Cuota 1","Lo tenia que pensar","Desconfianza","Miedo","Metodo de pago","No Califica","Era desempleado"]
-const OPERACION = ["Consulting | $1,800 PIF","Consulting | $1,800 PP","Consulting | $2,300 PP","Consulting | $2,450 PP","Consulting | $1,600 PP","Consulting | 1x$850 (2 meses)","Consulting | $850 PP (2 meses)","Consulting | 2 Meses Extra","Mastermind | $3,500 PIF","Acción | $530 PIF","Especial","Rollover - 8 meses (Consulting)"]
+// Operaciones: catálogo único de lib/programas.ts (antes había una lista de Consulting heredada de la plantilla).
 const MEDIO_PAGO = ["Pesos","Stripe","USDT","Efectivo USD","Efectivo ARS","Transferencia Bancaria USD","Western Unión","PayPal"]
 const PROBLEMA = [
   "Tengo opciones pero no salgo con mujeres",

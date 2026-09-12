@@ -204,7 +204,7 @@ function mesMetrica(m: MetricaPanel): string | null {
 // ── el armado ───────────────────────────────────────────────────────────────
 export function armarDatosPanel(e: EntradaPanel): DatosPanel {
   const hoy = e.hoy ?? new Date()
-  const precioBase = e.precioBase ?? 1300
+  const precioBase = e.precioBase ?? 1500 // IA Partner PIF desde septiembre 2026
   const agendas = e.agendas.filter((a) => !archivada(a))
 
   // 12 meses terminando en el mes en curso

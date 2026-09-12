@@ -95,7 +95,7 @@ deltas y la proyección las calcula él. `lib/panel-negocio.ts` arma cada bloque
 Lo que el CRM no mide no se inventa: "El contenido" y los reels quedan vacíos y el panel
 esconde esas páginas; los setters sin conversaciones cargadas muestran "—" en vez de una tasa.
 La meta mensual y el precio base salen de `PANEL_META_MENSUAL` y `PANEL_PRECIO_BASE` en
-`.env.local` (por defecto 50.000 y 1.300).
+`.env.local` (por defecto 50.000 y 1.500 — el PIF de IA Partner desde septiembre 2026).
 
 Para actualizar el panel a una versión nueva del repo de Agustín: copiar `index.html`, `datos.js`,
 `miniaturas/` y `estilos/` a `public/panel/` y volver a aplicar los cuatro retoques de la copia

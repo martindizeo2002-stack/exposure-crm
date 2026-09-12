@@ -29,7 +29,7 @@ const categories: Category[] = [
       },
       {
         name: "Completar PIF",
-        detail: "El pago PIF debe completarse dentro de los 14 días corridos desde el primer pago del programa. Pasado ese plazo se cobra precio actualizado SIN EXCEPCIÓN, salvo autorización escrita previa al día 15.",
+        detail: "El pago PIF ($1.500) o las 2 cuotas de $750 deben completarse dentro de los 21 días corridos desde el primer pago del programa. Pasado ese plazo se cobra el precio actualizado (2 cuotas de $1.000 = $2.000) SIN EXCEPCIÓN, salvo autorización escrita previa al día 22.",
         sanction: "No cobrar la comisión del monto retrasado",
       },
       {

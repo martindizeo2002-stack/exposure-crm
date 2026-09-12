@@ -87,7 +87,7 @@ export async function GET() {
       clientes: clientes as never, metricas: metricas as never, hoy,
       setting: settingDias.map((r) => r.metadata as never),
       metaMensual: Number(process.env.PANEL_META_MENSUAL || 50000) || 50000,
-      precioBase: Number(process.env.PANEL_PRECIO_BASE || 1300) || 1300,
+      precioBase: Number(process.env.PANEL_PRECIO_BASE || 1500) || 1500, // IA Partner PIF desde sept. 2026
     })
     const cuerpo = `/* Generado por el CRM el ${hoy.toISOString()} — solo números crudos; las tasas las calcula el panel. */\n`
       + `const DATOS = ${JSON.stringify(datos, null, 1)};\nconst MODO_DEMO = false;\n`
