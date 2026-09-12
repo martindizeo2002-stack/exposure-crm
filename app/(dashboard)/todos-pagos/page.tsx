@@ -24,6 +24,7 @@ import { CrmPageIntro, CrmStat } from "@/components/crm-ui"
 import { useSession } from "@/components/session-provider"
 import { canExportPayments } from "@/lib/export-access"
 import { CLOSERS_ACTIVOS, SETTERS_ACTIVOS, SETTERS_TODOS, settersPara } from "@/lib/equipo"
+import { PagoVinculo } from "@/components/pago-vinculo"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 const PESO_MEDIOS = new Set(["Pesos", "Efectivo ARS"])
@@ -593,6 +594,9 @@ export default function TodosPagosPage() {
               <FTxt label="Fecha Carga" value={form.fecha?.split("T")[0]} type="date" onChange={v => setF("fecha", v || null)} />
               <FSel label="Concepto (Tipo)" value={form.tipo} options={TIPO_PAGO} onChange={v => setF("tipo", v)} />
             </div>
+
+            <Sec title="ManyChat y planes de pago" />
+            {editing?.id && <PagoVinculo pagoId={String(editing.id)} defaults={{ tipo: form.tipo, monto: form.monto, fecha: form.fecha, fecha_alta: form.fecha_alta, operacion: form.operacion, closer: form.closer, setter: form.setter, calificacion: form.calificacion, fuente: form.fuente }} />}
 
             <Sec title="Operación" />
             <FSel label="Operación / Programa" value={form.operacion} options={OPERACION} onChange={v => setF("operacion", v)} />

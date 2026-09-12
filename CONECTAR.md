@@ -202,3 +202,18 @@ ingresos no pasa de C. Si el formulario no trae capital ni ingresos ni etapa, qu
 - Se ve en Panel del negocio → El embudo (cards por tipo, filtro y columna en "Las agendas del mes") y en Últimas
   llamadas; en el CRM, en la columna Calificación de agendas y en las tarjetas del pipeline.
 - Para recalibrar: `scripts/simular-scoring.ts` (ver cabecera) y ajustar `CORTES`/pesos en `lib/lead-scoring.ts`.
+
+## 13 · Pagos ↔ ManyChat ↔ planes de pago (12/09)
+
+En **Pagos → Todos los pagos → Editar pago** hay un bloque "ManyChat y planes de pago":
+
+- **ManyChat ID del lead**: pegás el ID del contacto (Contactos → el contacto → ID) y "Vincular". El pago queda
+  atado a la persona de ese contacto (se crea si no existe, o se usa la que ya tiene ese ID o el mismo teléfono),
+  se trae el nombre y el Instagram desde ManyChat, y los planes y agendas de ese cliente que estaban sueltos
+  pasan a la misma persona.
+- **Planes de pago del cliente**: se listan los planes de esa persona (por persona, nombre o teléfono). En cada
+  cuota podés marcar "Este pago es esta cuota" (queda pagada y vinculada) o soltarla.
+- **Nuevo plan**: arma un plan para ese cliente desde el mismo pago; la fila marcada "este pago" queda pagada y
+  vinculada, el resto queda pendiente en Cobros y cuotas.
+
+API: `GET/POST /api/pagos/vinculo`.

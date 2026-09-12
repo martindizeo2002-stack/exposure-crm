@@ -133,7 +133,7 @@ export function canAccessApi(pathname: string, role: string | null | undefined, 
     const verb = method.toUpperCase()
     if (pathname === "/api/security/activity") return verb === "POST"
     if (pathname === "/api/planes-pago") return verb === "GET"
-    if (pathname === "/api/pagos") return ["GET", "POST"].includes(verb)
+    if (pathname === "/api/pagos" || pathname === "/api/pagos/vinculo") return ["GET", "POST"].includes(verb)
     if (pathname === "/api/upload-comprobante") return ["GET", "POST"].includes(verb)
     if (pathname === "/api/cobranza" || pathname === "/api/cobranza/resolver") return verb === "POST"
     return false
