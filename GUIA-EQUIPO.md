@@ -36,6 +36,8 @@ Lo que no le corresponde a un rol rebota con "Tu cuenta no tiene acceso a este m
 - **Ángulos** (Marketing → Ángulos): qué ángulo de comunicación trae leads, agendas, cierres y cash, según las etiquetas de ManyChat.
 - **WhatsApp** (Ventas → WhatsApp): los grupos donde está el número del bot, con resumen por IA.
 
+- **Tipo de lead (S/A/B/C/D)**: lo calcula solo el CRM con el formulario de agenda de iClosed (capital, ingresos, etapa, objetivo, situación). Se ve en cada agenda, en el pipeline y en el Panel del negocio. Si el closer carga otra calificación a mano, esa manda.
+
 ## Reglas para que los números cierren
 
 - El **concepto** del pago es lo que decide todo: cash collected, FECCU/FECCPP, comisiones y si el cliente tiene acceso. Usá siempre el de la lista.

@@ -2,11 +2,15 @@
 // Fuente exclusiva: las respuestas del formulario de agenda de iClosed que quedan en `agendas`:
 //   inversion        → capital disponible para invertir ("-$500 USD", "$500 a $1.300", "Más de $3.000 USD"…)
 //   ingresos         → ingresos actuales por mes ("Menos de $1000 USD/mes", "Entre $2000 - $4000/mes"…)
-//   intentos_previos → etapa del negocio ("No, sería mi primera vez", "Sí, ya tengo un negocio andando con clientes"…)
+//   intentos_previos → etapa del negocio ("No, sería mi primera vez", "Sí, facturo pero no paso de $1.000/mes"…)
 //   motivo_urgencia  → objetivo de ingresos ("Entre $3000 a $5000 USD al mes", "+$20.000 USD al mes"…)
 //   ocupacion        → situación ("No estoy cobrando lo que quiero", "Estoy dependiendo 100% de referidos", "Estudiante"…)
 //   edad             → solo bloquea menores de 18
 // Puntaje 0–100. Nada se inventa: si no hay capital y tampoco ingresos ni etapa, no hay scoring (null).
+// Pesos y cortes calibrados el 12/09/2026 con los cierres reales de julio a septiembre (403 agendas):
+// el público es joven y con poco capital, así que los umbrales son más bajos que en un scoring genérico.
+// Lo que más cierra: capital "$500 a $1.300" (1 de 2), etapa "facturo pero no paso de $1.000" (2 de 5),
+// ingresos "$500 a $1.000" (1 de 3) y objetivos realistas (1k a 10k). "+$20.000 al mes" no cerró ninguna.
 
 export type ScoreInput = {
   edad?: unknown
@@ -28,6 +32,7 @@ export type ScoreResult = {
 } | null
 
 export const PESOS = { capital: 35, ingresos: 20, etapa: 20, objetivo: 15, situacion: 10 } as const
+export const CORTES = { S: 66, A: 54, B: 42, C: 30 } as const
 
 const norm = (value: unknown) => String(value ?? "").trim().toLowerCase()
   .normalize("NFD").replace(/[̀-ͯ]/g, "")
@@ -48,18 +53,18 @@ export function capitalPoints(value: unknown): number | null {
   if (!v) return null
   if (has(v, ["no tengo", "sin capital", "no puedo"])) return 2
   if (has(v, ["mas de $3.000", "mas de 3.000", "+$3.000", "+3.000", "mas de $3000"])) return 35
-  if (has(v, ["$1.300 a $3.000", "1.300 a 3.000", "1300 a 3000"])) return 30
-  if (has(v, ["$800 a $1.500", "800 a 1.500", "800 a 1500"])) return 26
-  if (has(v, ["$500 a $1.300", "500 a 1.300", "500 a 1300"])) return 24
-  if (has(v, ["+500", "+$500", "mas de $500", "mas de 500"])) return 22
-  if (has(v, ["menos de $800", "menos de 800", "-$800", "-800"])) return 12
-  if (has(v, ["menos de $500", "menos de 500", "-$500", "-500"])) return 4
+  if (has(v, ["$1.300 a $3.000", "1.300 a 3.000", "1300 a 3000"])) return 32
+  if (has(v, ["$800 a $1.500", "800 a 1.500", "800 a 1500"])) return 30
+  if (has(v, ["$500 a $1.300", "500 a 1.300", "500 a 1300"])) return 30
+  if (has(v, ["+500", "+$500", "mas de $500", "mas de 500"])) return 24
+  if (has(v, ["menos de $800", "menos de 800", "-$800", "-800"])) return 14
+  if (has(v, ["menos de $500", "menos de 500", "-$500", "-500"])) return 6
   const n = monto(v)
   if (n === null) return null
-  return n >= 3000 ? 35 : n >= 1300 ? 30 : n >= 800 ? 26 : n >= 500 ? 22 : 8
+  return n >= 3000 ? 35 : n >= 1300 ? 32 : n >= 500 ? 30 : n >= 300 ? 14 : 6
 }
 
-// ingresos actuales por mes (0–20)
+// ingresos actuales por mes (0–20): capacidad de pago
 export function incomePoints(value: unknown): number | null {
   const v = norm(value)
   if (!v) return null
@@ -67,38 +72,38 @@ export function incomePoints(value: unknown): number | null {
   if (has(v, ["mas de $3000", "mas de 3000", "+3000", "mas de $3.000"])) return 18
   if (has(v, ["$2000 - $4000", "2000 - 4000", "2000 a 4000", "$2.000 a $4.000"])) return 16
   if (has(v, ["$1.000 a $3.000", "1.000 a 3.000", "1000 a 3000"])) return 14
-  if (has(v, ["$1000 - $2000", "1000 - 2000", "1000 a 2000", "$1.000 a $2.000"])) return 12
-  if (has(v, ["$500 a $1.000", "500 a 1.000", "500 a 1000"])) return 8
-  if (has(v, ["menos de $1000", "menos de 1000", "-$1000", "menos de $1.000"])) return 6
-  if (has(v, ["menos de $500", "menos de 500", "-$500", "-500", "sin ingresos", "no tengo ingresos"])) return 3
+  if (has(v, ["$1000 - $2000", "1000 - 2000", "1000 a 2000", "$1.000 a $2.000"])) return 14
+  if (has(v, ["$500 a $1.000", "500 a 1.000", "500 a 1000"])) return 14
+  if (has(v, ["menos de $1000", "menos de 1000", "-$1000", "menos de $1.000"])) return 10
+  if (has(v, ["menos de $500", "menos de 500", "-$500", "-500", "sin ingresos", "no tengo ingresos"])) return 6
   const n = monto(v)
   if (n === null) return null
-  return n >= 4000 ? 20 : n >= 3000 ? 18 : n >= 2000 ? 16 : n >= 1000 ? 12 : n >= 500 ? 8 : 3
+  return n >= 4000 ? 20 : n >= 3000 ? 18 : n >= 2000 ? 16 : n >= 500 ? 14 : 6
 }
 
 // etapa del negocio (0–20)
 export function stagePoints(value: unknown): number | null {
   const v = norm(value)
   if (!v) return null
-  if (has(v, ["negocio andando", "tengo clientes", "con clientes", "ya facturo mas"])) return 20
-  if (has(v, ["no paso de $1.000", "no paso de 1.000", "no paso de 1000", "facturo pero"])) return 16
-  if (has(v, ["probe algo", "no llegue a facturar", "intente"])) return 10
-  if (has(v, ["primera vez", "nunca", "no, seria", "no probe"])) return 6
+  if (has(v, ["no paso de $1.000", "no paso de 1.000", "no paso de 1000", "facturo pero"])) return 20
+  if (has(v, ["negocio andando", "tengo clientes", "con clientes", "ya facturo mas"])) return 18
+  if (has(v, ["probe algo", "no llegue a facturar", "intente"])) return 12
+  if (has(v, ["primera vez", "nunca", "no, seria", "no probe"])) return 8
   return null
 }
 
-// objetivo de ingresos por mes (0–15): ambición declarada
+// objetivo de ingresos por mes (0–15): la ambición realista es la que compra
 export function goalPoints(value: unknown): number | null {
   const v = norm(value)
   if (!v) return null
-  if (has(v, ["+$20.000", "+20.000", "mas de $20.000", "mas de 20.000", "+$20000"])) return 15
-  if (has(v, ["$10.000 usd - $20.000", "10.000 usd - 20.000", "10.000 - 20.000", "10.000 a 20.000", "10k a 20k", "10k-20k"])) return 14
-  if (has(v, ["$5000 - 10.000", "5000 - 10.000", "5000 a 10.000", "5.000 a 10.000", "5k a 10k", "5k-10k", "5k–10k"])) return 13
-  if (has(v, ["$3000 a $5000", "3000 a 5000", "3.000 a 5.000", "3k a 5k", "3k-5k", "3k–5k"])) return 11
-  if (has(v, ["$1000 a $3000", "1000 a 3000", "1.000 a 3.000", "1k a 3k", "1k-3k"])) return 8
+  if (has(v, ["+$20.000", "+20.000", "mas de $20.000", "mas de 20.000", "+$20000"])) return 8
+  if (has(v, ["$10.000 usd - $20.000", "10.000 usd - 20.000", "10.000 - 20.000", "10.000 a 20.000", "10k a 20k", "10k-20k"])) return 10
+  if (has(v, ["$5000 - 10.000", "5000 - 10.000", "5000 a 10.000", "5.000 a 10.000", "5k a 10k", "5k-10k", "5k–10k"])) return 15
+  if (has(v, ["$3000 a $5000", "3000 a 5000", "3.000 a 5.000", "3k a 5k", "3k-5k", "3k–5k"])) return 12
+  if (has(v, ["$1000 a $3000", "1000 a 3000", "1.000 a 3.000", "1k a 3k", "1k-3k"])) return 14
   const n = monto(v)
-  if (n !== null) return n >= 20000 ? 15 : n >= 10000 ? 14 : n >= 5000 ? 13 : n >= 3000 ? 11 : n >= 1000 ? 8 : 5
-  return 6  // objetivo escrito en palabras ("libertad financiera", "escalar la agencia"): hay ambición, sin cifra
+  if (n !== null) return n >= 20000 ? 8 : n >= 10000 ? 10 : n >= 5000 ? 15 : n >= 3000 ? 12 : n >= 1000 ? 14 : 8
+  return 8  // objetivo escrito en palabras ("libertad financiera", "escalar la agencia"): hay ambición, sin cifra
 }
 
 // situación laboral / del negocio (0–10)
@@ -140,13 +145,11 @@ export function autoScoreLead(row: ScoreInput): ScoreResult {
   if (capital === null && ingresos === null && etapa === null) return null
   if (capital === null && reconocidos < 2) return null
   const puntos = (capital ?? 0) + (ingresos ?? 0) + (etapa ?? 0) + (objetivo ?? 0) + (situacion ?? 0)
-  let grade: LeadGrade = puntos >= 80 ? "LEAD S" : puntos >= 65 ? "LEAD A" : puntos >= 50 ? "LEAD B" : puntos >= 35 ? "LEAD C" : "LEAD D"
-  // Techos por capital: S exige capital para el programa completo; sin capital declarado (-$500) no pasa de B,
-  // y si además gana menos de USD 1.000 por mes, no pasa de C.
+  let grade: LeadGrade = puntos >= CORTES.S ? "LEAD S" : puntos >= CORTES.A ? "LEAD A" : puntos >= CORTES.B ? "LEAD B" : puntos >= CORTES.C ? "LEAD C" : "LEAD D"
   const ORDEN: LeadGrade[] = ["LEAD S", "LEAD A", "LEAD B", "LEAD C", "LEAD D"]
   const tope = (g: LeadGrade, max: LeadGrade) => (ORDEN.indexOf(g) < ORDEN.indexOf(max) ? max : g)
-  if (grade === "LEAD S" && (capital ?? 0) < 30) grade = "LEAD A"
-  if ((capital ?? 0) <= 4) grade = tope(grade, (ingresos ?? 0) >= 12 ? "LEAD B" : "LEAD C")
+  if (grade === "LEAD S" && (capital ?? 0) < 30) grade = "LEAD A"  // S exige capital para el programa completo
+  if ((capital ?? 0) <= 6 && (ingresos ?? 0) <= 6) grade = tope(grade, "LEAD C")  // sin capital y ganando menos de USD 500: no pasa de C
   const faltan = Object.entries(desglose).filter(([, v]) => v === null).map(([k]) => k)
   return { calificacion: grade, motivo: `${puntos}/100 · capital ${capital ?? "?"} · ingresos ${ingresos ?? "?"} · etapa ${etapa ?? "?"} · objetivo ${objetivo ?? "?"} · situación ${situacion ?? "?"}${faltan.length ? ` · sin dato: ${faltan.join(", ")}` : ""}`, puntos, desglose }
 }

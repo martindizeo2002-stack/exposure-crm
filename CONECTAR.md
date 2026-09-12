@@ -187,3 +187,18 @@ nada; cuando vuelve, WhatsApp le manda lo pendiente.
 `scripts/whatsapp/Dockerfile`, `fly.toml` y `README.md` tienen los pasos. El QR ya no se lee en la terminal:
 el bot lo manda al CRM y aparece en Ventas → WhatsApp, junto con el estado (conectado / desconectado / último aviso).
 Hace falta una cuenta en el servicio (unos USD 2 a 5 por mes) y cargarle `CRON_SECRET` y `CRM_URL`.
+
+## 12 · Lead scoring automático (12/09)
+
+Cada agenda recibe un **tipo de lead** (S / A / B / C / D) calculado con las respuestas del formulario de iClosed:
+capital para invertir (35 pts), ingresos actuales (20), etapa del negocio (20), objetivo de ingresos (15) y
+situación (10). Los pesos y cortes están calibrados con los cierres reales de julio a septiembre: de 66 puntos para
+arriba es S (cierra 1 de 2), 54 es A, 42 es B, 30 es C, y menos de 30 es D. Sin capital y con menos de USD 500 de
+ingresos no pasa de C. Si el formulario no trae capital ni ingresos ni etapa, queda "Sin scoring" (no se inventa).
+
+- Se guarda en `agendas.lead_score`, `lead_score_grade` y `lead_score_detalle`; la calificación del closer
+  (`calificacion`) se completa solo si estaba vacía y nunca se pisa a mano.
+- Corre solo cada 15 minutos (`/api/lead-scoring-sync`); `?todo=1` recalcula todas (usarlo si cambian los pesos).
+- Se ve en Panel del negocio → El embudo (cards por tipo, filtro y columna en "Las agendas del mes") y en Últimas
+  llamadas; en el CRM, en la columna Calificación de agendas y en las tarjetas del pipeline.
+- Para recalibrar: `scripts/simular-scoring.ts` (ver cabecera) y ajustar `CORTES`/pesos en `lib/lead-scoring.ts`.
