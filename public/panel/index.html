@@ -1010,6 +1010,8 @@ html.embed .top{padding-top:22px}
     </div>
     <div class="card"><div class="card-b">
       <div class="seg-grid" id="segmentosMes"></div>
+      <p class="card-s" style="margin:16px 0 8px">Por tipo de lead · scoring automático con el formulario de iClosed (capital, ingresos, etapa, objetivo y situación). "Sin scoring" = formulario incompleto.</p>
+      <div class="seg-grid" id="tiposMes"></div>
       <div class="tog" id="togAgendas">
         <button type="button" class="act" data-v="todas">Todas hasta hoy</button>
         <button type="button" data-v="pendientes">Pendientes</button>
@@ -1020,6 +1022,14 @@ html.embed .top{padding-top:22px}
         <button type="button" data-s="Webinar">Webinar</button>
         <button type="button" data-s="Orgánico">Orgánico</button>
         <button type="button" data-s="Ads">Ads</button>
+        <span class="tog-sep"></span>
+        <button type="button" class="act" data-t="">Todos los tipos</button>
+        <button type="button" data-t="LEAD S">S</button>
+        <button type="button" data-t="LEAD A">A</button>
+        <button type="button" data-t="LEAD B">B</button>
+        <button type="button" data-t="LEAD C">C</button>
+        <button type="button" data-t="LEAD D">D</button>
+        <button type="button" data-t="sin">Sin scoring</button>
       </div>
       <p class="kpi-pie" id="pieAgendasMes"></p>
       <div class="tabla-wrap"><table id="tablaAgendasMes"></table></div>
@@ -1296,6 +1306,9 @@ const D = DATOS, M = D.meses, MON = D.marca.moneda || "$";
 /* ══ formato ══════════════════════════════════════════════════════════════ */
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const miles = n => Math.round(n).toLocaleString("es-AR");
+/* tipo de lead (scoring automático S/A/B/C/D): mismo chip en el embudo, las agendas del mes y las últimas llamadas */
+const TIPO_CLASE = {"LEAD S":"ok","LEAD A":"ok","LEAD B":"v","LEAD C":"warn","LEAD D":"bad"};
+const tipoChip = t => t ? '<span class="chip '+(TIPO_CLASE[t]||"n")+'" title="Tipo de lead según el scoring automático">'+esc(t.replace("LEAD ","Lead "))+"</span>" : '<span class="chip n" title="El formulario de agenda no tiene datos suficientes">Sin scoring</span>';
 const money = n => MON + miles(n);
 const moneyK = n => Math.abs(n) >= 1000000 ? MON + (n/1000000).toFixed(1).replace(".",",") + "M"
                  : Math.abs(n) >= 1000 ? MON + Math.round(n/1000) + "k" : MON + Math.round(n);
@@ -2110,24 +2123,30 @@ function fila(i, nombre, valor, sub, prop, color){
     + (g.sinDato ? ' · '+g.sinDato+' sin resultado' : '')+'<br>'
     + '<b>'+g.calificadas+'</b> calificadas · <b>'+g.cierres+'</b> cierres'
     + (g.presentadas ? ' · cierre '+tasa(g.cierres, g.presentadas) : '')+'</p></div>').join("");
+  document.getElementById("tiposMes").innerHTML = (D.tiposMes || []).map(t =>
+    '<div class="seg-card"><h4>'+tipoChip(t.tipo)+'</h4><div class="n">'+t.agendas+'</div>'
+    + '<p><b>'+t.vencidas+'</b> realizadas · <b>'+t.pendientes+'</b> pendientes<br>'
+    + 'Show rate <b>'+tasa(t.presentadas, t.vencidas)+'</b> ('+t.presentadas+' de '+t.vencidas+')'
+    + (t.sinDato ? ' · '+t.sinDato+' sin resultado' : '')+'<br>'
+    + '<b>'+t.cierres+'</b> cierres'+(t.presentadas ? ' · cierre '+tasa(t.cierres, t.presentadas) : '')+'</p></div>').join("");
   const estado = x => x.cerro ? '<span class="chip ok">Cerró</span>'
     : x.pendiente ? '<span class="chip warn">Pendiente</span>'
     : x.show === true ? '<span class="chip ok">Se presentó</span>'
     : x.show === false ? '<span class="chip bad">No se presentó</span>'
     : '<span class="chip n">Sin resultado</span>';
-  let vista = "todas", seg = "";
+  let vista = "todas", seg = "", tipo = "";
   function pinta(){
-    const F = L.filter(x => (vista === "todas" ? !x.pendiente : vista === "pendientes" ? x.pendiente : vista === "sin" ? (!x.pendiente && x.show === null) : true) && (!seg || x.segmento === seg));
+    const F = L.filter(x => (vista === "todas" ? !x.pendiente : vista === "pendientes" ? x.pendiente : vista === "sin" ? (!x.pendiente && x.show === null) : true) && (!seg || x.segmento === seg) && (!tipo || (tipo === "sin" ? !x.tipo : x.tipo === tipo)));
     const p = F.filter(x => x.show === true).length, v = F.filter(x => !x.pendiente).length;
     document.getElementById("pieAgendasMes").innerHTML = "<b>"+F.length+"</b> agendas en esta vista"+(v ? " · <b>"+p+"</b> presentadas de <b>"+v+"</b> realizadas (show rate <b>"+tasa(p, v)+"</b>)" : "")+".";
     document.getElementById("tablaAgendasMes").innerHTML =
-      "<thead><tr><th>Llamada</th><th>Lead</th><th>Closer</th><th>Setter</th><th>Origen</th><th>Fuente</th><th>Calificado</th><th>Estado</th><th>Resultado</th></tr></thead><tbody>"
+      "<thead><tr><th>Llamada</th><th>Lead</th><th>Closer</th><th>Setter</th><th>Origen</th><th>Fuente</th><th>Tipo de lead</th><th>Estado</th><th>Resultado</th></tr></thead><tbody>"
       + F.map(x => "<tr>"
         + '<td class="fecha">'+(x.fecha ? x.fecha.slice(8,10)+"/"+x.fecha.slice(5,7)+" "+x.fecha.slice(11,16) : "—")+"</td>"
         + "<td>"+x.lead+"</td><td>"+x.closer+"</td><td>"+x.setter+"</td>"
         + '<td><span class="chip v">'+x.segmento+"</span></td>"
         + '<td style="color:var(--muted-fg)">'+x.fuente+"</td>"
-        + "<td>"+(x.calificado ? '<span class="chip ok">Sí</span>' : '<span class="chip n">No</span>')+"</td>"
+        + "<td>"+tipoChip(x.tipo)+"</td>"
         + '<td style="color:var(--muted-fg)">'+(x.estado || "—")+"</td>"
         + "<td>"+estado(x)+"</td></tr>").join("") + "</tbody>";
   }
@@ -2135,6 +2154,7 @@ function fila(i, nombre, valor, sub, prop, color){
     const b = ev.target.closest("button"); if (!b) return;
     if (b.dataset.v !== undefined) { vista = b.dataset.v; b.parentNode.querySelectorAll("[data-v]").forEach(o => o.classList.toggle("act", o === b)); }
     if (b.dataset.s !== undefined) { seg = b.dataset.s; b.parentNode.querySelectorAll("[data-s]").forEach(o => o.classList.toggle("act", o === b)); }
+    if (b.dataset.t !== undefined) { tipo = b.dataset.t; b.parentNode.querySelectorAll("[data-t]").forEach(o => o.classList.toggle("act", o === b)); }
     pinta();
   });
   pinta();
@@ -2148,13 +2168,13 @@ function fila(i, nombre, valor, sub, prop, color){
     : '<span class="chip n">'+s+"</span>";
   document.getElementById("tablaLlamadas").innerHTML =
     "<thead><tr><th>Fecha</th><th>Lead</th><th>Closer</th><th>Fuente</th><th>Estrategia</th>"
-    + "<th>Calificado</th><th>Situación</th><th class='num'>Monto</th></tr></thead><tbody>"
+    + "<th>Tipo de lead</th><th>Situación</th><th class='num'>Monto</th></tr></thead><tbody>"
     + D.llamadas.map(l => "<tr>"
       + '<td class="fecha">'+l.fecha.split("-").reverse().slice(0,2).join("/")+"</td>"
       + "<td>"+l.lead+"</td><td>"+l.closer+"</td>"
       + '<td style="color:var(--muted-fg)">'+l.fuente+"</td>"
       + '<td><span class="chip v">'+l.estrategia+"</span></td>"
-      + "<td>"+(l.calificado ? '<span class="chip ok">Sí</span>' : '<span class="chip n">No</span>')+"</td>"
+      + "<td>"+tipoChip(l.tipo)+"</td>"
       + "<td>"+chip(l.situacion)+"</td>"
       + '<td class="num">'+(l.monto ? money(l.monto) : "—")+"</td></tr>").join("") + "</tbody>";
   const cerradas = D.llamadas.filter(l => l.situacion.startsWith("Adentro"));

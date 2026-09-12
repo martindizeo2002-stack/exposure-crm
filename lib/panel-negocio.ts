@@ -29,6 +29,8 @@ export type AgendaPanel = {
   recurso?: string | null
   angulo_entrada?: string | null
   calificacion?: string | null
+  lead_score_grade?: string | null
+  lead_score?: number | null
   calificaba_realmente?: string | null
   show?: boolean | null
   cerro?: boolean | null
@@ -111,7 +113,9 @@ export type DatosPanel = {
     dias?: number; diasTotal?: number
   }>
   // todas las agendas del mes en curso, una por fila, para la vista "todas / pendientes / sin resultado"
-  agendasMes: Array<{ fecha: string; lead: string; closer: string; setter: string; fuente: string; segmento: string; estado: string; show: boolean | null; cerro: boolean; pendiente: boolean; calificado: boolean }>
+  agendasMes: Array<{ fecha: string; lead: string; closer: string; setter: string; fuente: string; segmento: string; estado: string; show: boolean | null; cerro: boolean; pendiente: boolean; calificado: boolean; tipo: string | null }>
+  // el mes en curso por tipo de lead (scoring automático S/A/B/C/D; null = sin scoring)
+  tiposMes: Array<{ tipo: string | null; agendas: number; vencidas: number; pendientes: number; presentadas: number; noShow: number; sinDato: number; cierres: number }>
   // el mes en curso por segmento de origen (Webinar, Orgánico, Ads, Outbound…)
   segmentos: Array<{ segmento: string; agendas: number; vencidas: number; pendientes: number; presentadas: number; noShow: number; sinDato: number; calificadas: number; cierres: number }>
   closers: Array<{ nombre: string; presentadas: number; calificadas: number; cierres: number; cobrado: number }>
@@ -124,7 +128,7 @@ export type DatosPanel = {
   pipelineEtapas: Array<{ nombre: string; prob: number }>
   pipeline: Array<{ lead: string; closer: string; etapa: string; monto: number; dias: number; fuente: string; prox: string }>
   cuotas: Array<{ alumno: string; monto: number; vence: string; closer: string; estado: "cobrado" | "por-cobrar" | "vencida" | "protocolo" }>
-  llamadas: Array<{ fecha: string; lead: string; closer: string; fuente: string; estrategia: string; calificado: boolean; situacion: string; monto: number }>
+  llamadas: Array<{ fecha: string; lead: string; closer: string; fuente: string; estrategia: string; calificado: boolean; tipo: string | null; situacion: string; monto: number }>
 }
 
 // ── fechas ──────────────────────────────────────────────────────────────────
@@ -152,6 +156,15 @@ const limpio = (s: string | null | undefined) => String(s || "").trim()
 const minus = (s: string | null | undefined) => limpio(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
 // Calificada = LEAD A, B o C (D no). En EXPOSURE la mayoría de los cierres son LEAD C (29 de 44 desde junio 2026).
 const CALIF_AB = new Set(["lead a", "lead b", "lead c", "a", "b", "c", "s"])
+// tipo de lead: el scoring automático (S/A/B/C/D) o, si no corrió, la calificación cargada si tiene esa forma
+const tipoDeLead = (a: AgendaPanel): string | null => {
+  const g = String(a.lead_score_grade || "").toUpperCase().trim()
+  if (/^LEAD [SABCD]$/.test(g)) return g
+  const c = String(a.calificacion || "").toUpperCase().trim()
+  if (/^LEAD [SABCD]$/.test(c)) return c
+  if (/^[SABCD]$/.test(c)) return `LEAD ${c}`
+  return null
+}
 const esCalificada = (a: AgendaPanel) => {
   const real = minus(a.calificaba_realmente)
   if (real) return real.startsWith("s") || real === "true"
@@ -405,6 +418,7 @@ export function armarDatosPanel(e: EntradaPanel): DatosPanel {
       fuente: canalDe(a.fuente),
       estrategia: limpio(a.recurso) || limpio(a.angulo_entrada) || "—",
       calificado: esCalificada(a),
+      tipo: tipoDeLead(a),
       situacion,
       monto,
     }
@@ -430,7 +444,19 @@ export function armarDatosPanel(e: EntradaPanel): DatosPanel {
       cerro: Boolean(a.cerro),
       pendiente: !!d && d > hoy,
       calificado: esCalificada(a),
+      tipo: tipoDeLead(a),
     }))
+  const tiposMap = new Map<string | null, DatosPanel["tiposMes"][number]>()
+  for (const x of agendasMes) {
+    if (!tiposMap.has(x.tipo)) tiposMap.set(x.tipo, { tipo: x.tipo, agendas: 0, vencidas: 0, pendientes: 0, presentadas: 0, noShow: 0, sinDato: 0, cierres: 0 })
+    const t = tiposMap.get(x.tipo)!
+    t.agendas++
+    if (x.pendiente) t.pendientes++
+    else { t.vencidas++; if (x.show === true) t.presentadas++; else if (x.show === false) t.noShow++; else t.sinDato++ }
+    if (x.cerro) t.cierres++
+  }
+  const ORDEN_TIPOS = ["LEAD S", "LEAD A", "LEAD B", "LEAD C", "LEAD D", null]
+  const tiposMes = [...tiposMap.values()].sort((a, b) => ORDEN_TIPOS.indexOf(a.tipo) - ORDEN_TIPOS.indexOf(b.tipo))
   const segmentos = new Map<string, DatosPanel["segmentos"][number]>()
   for (const x of agendasMes) {
     if (!segmentos.has(x.segmento)) segmentos.set(x.segmento, { segmento: x.segmento, agendas: 0, vencidas: 0, pendientes: 0, presentadas: 0, noShow: 0, sinDato: 0, calificadas: 0, cierres: 0 })
@@ -465,6 +491,7 @@ export function armarDatosPanel(e: EntradaPanel): DatosPanel {
     cuotas,
     llamadas,
     agendasMes,
+    tiposMes,
     segmentos: [...segmentos.values()].sort((x, y) => y.agendas - x.agendas),
   }
 }

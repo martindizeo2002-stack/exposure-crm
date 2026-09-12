@@ -4,6 +4,10 @@
   },
   "crons": [
     {
+      "path": "/api/lead-scoring-sync",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/sheet-sync",
       "schedule": "*/5 * * * *"
     },
