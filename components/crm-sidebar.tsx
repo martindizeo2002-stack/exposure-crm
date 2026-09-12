@@ -39,7 +39,6 @@ import {
   BookOpenCheck,
   Menu,
   X,
-  Sparkles,
   Zap,
 } from "lucide-react"
 
@@ -201,5 +200,12 @@ export function CRMSidebar({ rol = "", nombre = "", email = "" }: { rol?: string
 }
 
 function CRMBaseMark() {
-  return <div className="relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-red-500 to-red-700 shadow-lg shadow-red-950/30"><Sparkles className="absolute -right-1 -top-1 h-3 w-3 text-orange-300" /><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="h-7 w-7"><circle cx="50" cy="50" r="48" fill="white" /><path d="M50,2 A24,24,0,0,0,50,50 A24,24,0,0,1,50,98 A48,48,0,0,0,50,2 Z" fill="#18181b" /><circle cx="50" cy="26" r="8" fill="#18181b" /><circle cx="50" cy="74" r="8" fill="white" /></svg></div>
+  return (
+    <div className="grid h-10 w-10 shrink-0 place-items-center">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="h-9 w-9 text-foreground" aria-label="EXPOSURE">
+        <path d="M 79.70 79.70 Q 50.00 59.00 20.30 79.70 Q 41.00 50.00 20.30 20.30 Q 50.00 41.00 79.70 20.30 Q 59.00 50.00 79.70 79.70 Z M 99.00 50.00 Q 51.13 51.13 50.00 99.00 Q 48.87 51.13 1.00 50.00 Q 48.87 48.87 50.00 1.00 Q 51.13 48.87 99.00 50.00 Z" fill="currentColor" />
+      </svg>
+    </div>
+  )
 }
+

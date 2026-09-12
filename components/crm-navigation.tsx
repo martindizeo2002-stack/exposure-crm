@@ -13,6 +13,7 @@ import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, C
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
+import { LogoExposure } from "@/components/logo-exposure"
 import {
   BarChart3, Bell, BellRing, Calendar, ChartSpline, ChevronDown, CircleDollarSign, Clapperboard, FileText, Gauge, GraduationCap, LayoutGrid, ListChecks, Network, PhoneCall, Users, Wrench,
   Eye, LogOut, Menu, Monitor, Moon, Palette, Radar, RotateCcw, Search, Settings2, Sparkles, Sun, Trophy, Type, UserRound,
@@ -180,7 +181,7 @@ export function CRMNavigation({ rol = "", nombre = "", email = "" }: { rol?: str
             </SheetTrigger>
             <SheetContent side="left" className="w-[min(320px,calc(100vw-12px))] max-w-full overflow-x-hidden overflow-y-auto border-[#202027] bg-[#0b0b0d] p-4 text-white">
               <SheetTitle className="mb-5 flex items-center gap-3 text-left text-white">
-                <NavIcon ramp={ramps.logo} size={38} radius={12}><Sparkles size={19} strokeWidth={2} /></NavIcon>
+                <LogoExposure size={38} radius={12} />
                 Exposure OS
               </SheetTitle>
               <div className="space-y-4">
@@ -201,7 +202,7 @@ export function CRMNavigation({ rol = "", nombre = "", email = "" }: { rol?: str
           </Sheet>
 
           <Link href="/asistente" aria-label="Abrir Asistente CRM" title="Asistente CRM" className="flex shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
-            <NavIcon ramp={ramps.logo} size={34} radius={11}><Sparkles size={18} strokeWidth={2} /></NavIcon>
+            <LogoExposure size={34} radius={11} />
             <span className="hidden text-[13px] font-extrabold tracking-[.08em] sm:inline">Exposure OS</span>
           </Link>
 

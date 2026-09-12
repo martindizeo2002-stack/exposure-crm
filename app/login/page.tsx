@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { LogoExposure } from "@/components/logo-exposure"
 import { createSupabaseBrowser } from "@/lib/supabase-browser"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 
@@ -65,9 +66,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <span className="mb-3 grid place-items-center" style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(160deg,#2a2419,#141414)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 0 28px rgba(200,169,93,0.18)' }}>
-            <svg width="30" height="30" viewBox="0 0 16 16" fill="none"><path d="M8 1.4 L14 8 L8 14.6 L2 8 Z" stroke="#c8a95d" strokeWidth="1" opacity="0.95" /><path d="M8 4.6 L11.4 8 L8 11.4 L4.6 8 Z" fill="#dec27c" opacity="0.3" /><circle cx="8" cy="8" r="1.5" fill="#dec27c" /></svg>
-          </span>
+          <LogoExposure size={56} radius={16} className="mb-3" />
           <h1 className="text-xl font-bold text-foreground">Exposure OS</h1>
           <p className="text-sm text-muted-foreground">Ingresá con tu cuenta</p>
         </div>
