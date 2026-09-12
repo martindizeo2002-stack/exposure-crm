@@ -1,5 +1,6 @@
 'use client'
 import type { ReactNode, CSSProperties } from 'react'
+import { LogoExposure } from "@/components/logo-exposure"
 import { ChartNoAxesColumnIncreasing, Crown, Megaphone, Radar, Target } from 'lucide-react'
 
 /* ══ identidad de agentes ═══════════════════════════════════
@@ -427,23 +428,7 @@ export function Spark({
 }
 
 /* ══ marca ══════════════════════════════════════════════════ */
+// Marca de EXPOSURE (la misma del header, el login y los íconos): baldosa clara con la estrella.
 export function Mark({ size = 30 }: { size?: number }) {
-  return (
-    <div
-      className="flex items-center justify-center flex-none"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 9,
-        background: 'linear-gradient(160deg,#2a2419,#141414)',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 0 20px rgba(200,169,93,0.14)',
-      }}
-    >
-      <svg width={size * 0.54} height={size * 0.54} viewBox="0 0 16 16" fill="none">
-        <path d="M8 1.4 L14 8 L8 14.6 L2 8 Z" stroke="#c8a95d" strokeWidth="1" opacity="0.95" />
-        <path d="M8 4.6 L11.4 8 L8 11.4 L4.6 8 Z" fill="#dec27c" opacity="0.3" />
-        <circle cx="8" cy="8" r="1.5" fill="#dec27c" />
-      </svg>
-    </div>
-  )
+  return <LogoExposure size={size} radius={Math.round(size * 0.28)} />
 }
