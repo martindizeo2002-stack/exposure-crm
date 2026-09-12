@@ -9,6 +9,7 @@ import { Loader2, Sparkles, MessageCircle } from "lucide-react"
 
 type Chat = { chat_id: string; chat_name: string | null; mensajes: number; ultimo: string; is_group: boolean }
 type Mensaje = { sender: string | null; sender_name: string | null; text: string | null; media_type: string | null; from_me: boolean; sent_at: string }
+type Estado = { conectado?: boolean; qr?: string | null; numero?: string | null; hora?: string; visto?: string; motivo?: string | null; cola?: number }
 
 const fetcher = (url: string) => fetch(url).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error || "No se pudo cargar"); return b })
 const iso = (d: Date) => d.toISOString().slice(0, 10)
@@ -22,7 +23,10 @@ export default function WhatsappPage() {
   const [resumen, setResumen] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { data: chats, error: eChats } = useSWR<{ chats: Chat[]; total: number }>("/api/whatsapp", fetcher, { refreshInterval: 60000 })
+  const { data: chats, error: eChats } = useSWR<{ chats: Chat[]; total: number; estado: Estado | null }>("/api/whatsapp", fetcher, { refreshInterval: 15000 })
+  const estado = chats?.estado || null
+  const minutos = estado?.visto ? Math.round((Date.now() - new Date(estado.visto).getTime()) / 60000) : null
+  const vivo = estado?.conectado && minutos !== null && minutos <= 12
   const rango = `desde=${desde}T00:00:00&hasta=${hasta}T23:59:59`
   const { data: msgs, isLoading } = useSWR<{ mensajes: Mensaje[] }>(chat ? `/api/whatsapp?chat=${encodeURIComponent(chat)}&${rango}` : null, fetcher)
   const actual = chats?.chats.find((c) => c.chat_id === chat)
@@ -44,10 +48,23 @@ export default function WhatsappPage() {
       <p className="max-w-3xl text-sm text-muted-foreground">Los grupos donde está el número del bot. Elegí un grupo y un rango, leé los mensajes o pedí un resumen con IA (qué pasó, leads mencionados, pendientes, alertas).</p>
     </div>
     {eChats && <p className="text-sm text-red-300">{String(eChats.message || eChats)}</p>}
-    {chats && !chats.chats.length && <Card className="border-amber-400/30 bg-amber-400/10"><CardContent className="space-y-2 py-5 text-sm">
-      <p className="font-semibold text-amber-100">Todavía no llegó ningún mensaje.</p>
-      <p className="text-amber-100/80">El bot corre en la computadora de Alex: <code className="rounded bg-black/30 px-1.5 py-0.5 text-xs">node scripts/whatsapp/bot.mjs</code> dentro de <code className="rounded bg-black/30 px-1.5 py-0.5 text-xs">EXPOSURE\Central Negocio</code>. La primera vez muestra un QR para vincular el número; después, cada mensaje de los grupos donde está ese número llega acá solo.</p>
+    {chats && !estado && <Card className="border-amber-400/30 bg-amber-400/10"><CardContent className="space-y-2 py-5 text-sm">
+      <p className="font-semibold text-amber-100">El bot de WhatsApp todavía no se prendió.</p>
+      <p className="text-amber-100/80">Corre en la PC de Alex o en la nube (ver scripts/whatsapp/README.md). Cuando arranque, acá aparece el QR para vincular el número.</p>
     </CardContent></Card>}
+    {estado && !vivo && estado.qr && <Card className="border-emerald-500/30 bg-emerald-500/[.06]"><CardContent className="flex flex-wrap items-center gap-6 py-5">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={estado.qr} alt="QR para vincular WhatsApp" width={220} height={220} className="rounded-xl bg-white p-2" />
+      <div className="max-w-md space-y-2 text-sm">
+        <p className="text-base font-bold">Vinculá el número del bot</p>
+        <p className="text-muted-foreground">En el teléfono del número del bot: WhatsApp → ⋮ → <b>Dispositivos vinculados</b> → <b>Vincular un dispositivo</b> → escaneá este código. Se renueva solo cada un rato; si vence, esperá el siguiente.</p>
+        <p className="text-xs text-muted-foreground">Usá un número aparte del personal.</p>
+      </div>
+    </CardContent></Card>}
+    {estado && !vivo && !estado.qr && <Card className="border-amber-400/30 bg-amber-400/10"><CardContent className="py-4 text-sm text-amber-100">
+      El bot no está conectado{estado.motivo ? ` (${estado.motivo})` : ""}. Último aviso {minutos !== null ? `hace ${minutos} min` : "desconocido"}. Si está corriendo, en breve aparece el QR acá.
+    </CardContent></Card>}
+    {vivo && <p className="text-xs text-emerald-300">● Bot conectado{estado?.numero ? ` como ${String(estado.numero).split(":")[0].split("@")[0]}` : ""} · último aviso hace {minutos} min</p>}
     <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
       <Card className="border-white/10 bg-white/[.035] lg:self-start">
         <CardHeader className="pb-2"><CardTitle className="text-base">Grupos</CardTitle><p className="text-xs text-muted-foreground">{chats ? `${chats.chats.length} chats` : "Cargando…"}</p></CardHeader>

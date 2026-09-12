@@ -182,3 +182,8 @@ número se agrega a los grupos que quieras leer y cada mensaje llega al CRM (`/a
 CRON_SECRET). Opcional: `datos/whatsapp/grupos.txt` con un nombre de grupo por línea para limitar cuáles.
 La sesión queda en `datos/whatsapp/.auth` (no se sube a ningún lado). Mientras la PC esté apagada no entra
 nada; cuando vuelve, WhatsApp le manda lo pendiente.
+
+**Sin depender de tu PC (recomendado):** el mismo bot corre 24/7 en la nube con Docker (Fly.io, Railway o un VPS):
+`scripts/whatsapp/Dockerfile`, `fly.toml` y `README.md` tienen los pasos. El QR ya no se lee en la terminal:
+el bot lo manda al CRM y aparece en Ventas → WhatsApp, junto con el estado (conectado / desconectado / último aviso).
+Hace falta una cuenta en el servicio (unos USD 2 a 5 por mes) y cargarle `CRON_SECRET` y `CRM_URL`.

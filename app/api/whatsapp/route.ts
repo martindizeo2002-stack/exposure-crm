@@ -42,7 +42,9 @@ export async function GET(request: Request) {
         if (!c.chat_name && m.chat_name) c.chat_name = m.chat_name
         chats.set(m.chat_id, c)
       }
-      return NextResponse.json({ chats: [...chats.values()].sort((a, b) => b.ultimo.localeCompare(a.ultimo)), total: (data || []).length })
+      const { data: bot } = await sb.from("crm_integration_assets").select("metadata,last_seen_at").eq("source", "whatsapp").eq("asset_type", "estado").eq("source_id", "bot").maybeSingle()
+      const estado = bot ? { ...(bot.metadata as Record<string, unknown>), visto: bot.last_seen_at } : null
+      return NextResponse.json({ chats: [...chats.values()].sort((a, b) => b.ultimo.localeCompare(a.ultimo)), total: (data || []).length, estado })
     }
     const { data, error } = await sb.from("crm_whatsapp_messages").select("chat_id,chat_name,sender,sender_name,text,media_type,from_me,sent_at").eq("chat_id", chat).gte("sent_at", desde).lte("sent_at", hasta).order("sent_at", { ascending: true }).limit(3000)
     if (error) throw new Error(error.message)

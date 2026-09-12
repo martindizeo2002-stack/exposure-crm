@@ -15,6 +15,16 @@ export async function POST(request: Request) {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
     const body = await request.json().catch(() => ({}))
+    const sb = createSupabaseAdmin()
+    // estado del bot (QR para vincular, conectado, último latido): lo lee la pantalla Ventas → WhatsApp
+    if (body?.estado && typeof body.estado === "object") {
+      const e = body.estado as Record<string, unknown>
+      const { data: previo } = await sb.from("crm_integration_assets").select("metadata").eq("source", "whatsapp").eq("asset_type", "estado").eq("source_id", "bot").maybeSingle()
+      const metadata = { ...((previo?.metadata as Record<string, unknown>) || {}), ...e, qr: e.qr === undefined ? (previo?.metadata as Record<string, unknown> | null)?.qr ?? null : e.qr }
+      const { error } = await sb.from("crm_integration_assets").upsert({ source: "whatsapp", asset_type: "estado", source_id: "bot", name: "Bot de WhatsApp", metadata, last_seen_at: new Date().toISOString() }, { onConflict: "source,asset_type,source_id" })
+      if (error) throw new Error(error.message)
+      if (!Array.isArray(body?.mensajes)) return NextResponse.json({ ok: true, estado: true })
+    }
     const mensajes: Mensaje[] = Array.isArray(body?.mensajes) ? body.mensajes : []
     const filas = mensajes
       .filter((m) => m && m.chat_id && m.msg_id && m.sent_at)
@@ -25,7 +35,6 @@ export async function POST(request: Request) {
         is_group: m.is_group !== false, from_me: m.from_me === true, sent_at: new Date(m.sent_at).toISOString(), raw: m.raw ?? null,
       }))
     if (!filas.length) return NextResponse.json({ ok: true, recibidos: 0 })
-    const sb = createSupabaseAdmin()
     let guardados = 0
     for (let i = 0; i < filas.length; i += 200) {
       const { error, data } = await sb.from("crm_whatsapp_messages").upsert(filas.slice(i, i + 200), { onConflict: "chat_id,msg_id", ignoreDuplicates: true }).select("id")
