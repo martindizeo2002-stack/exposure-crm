@@ -25,10 +25,15 @@ function ms(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : NaN
 }
 
-// fecha_closer se guarda como hora local de Argentina sin offset; Fathom usa UTC.
+// `fecha_closer` es `timestamp` sin zona y guarda UTC, no hora local de Argentina.
+// Verificado el 14/09/2026 contra las agendas ya conciliadas: la diferencia con el
+// occurred_at de Fathom es 0.00 h en la mayoría. Antes se le sumaban 3 h y eso corría
+// todas las agendas fuera de la ventana horaria, así que no cruzaba ninguna.
 function scheduledUtcMs(value: string | null | undefined) {
-  const parsed = ms(value)
-  return Number.isFinite(parsed) ? parsed + 3 * 60 * 60 * 1000 : NaN
+  const raw = String(value || "").trim()
+  if (!raw) return NaN
+  const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(raw) ? raw : `${raw.replace(" ", "T")}Z`
+  return ms(iso)
 }
 
 function norm(value: unknown) {
@@ -63,6 +68,34 @@ function containsFullName(haystack: unknown, name: unknown) {
 function containsFirstName(haystack: unknown, name: unknown) {
   const first = norm(name).split(" ").find((word) => word.length >= 3)
   return Boolean(first && ` ${norm(haystack)} `.includes(` ${first} `))
+}
+
+// Fathom abrevia el apellido en el titulo ("Leonardo R X Cristian" por "Leonardo Ricaldi"),
+// asi que el nombre de pila es a veces lo unico que hay. Pide 4 letras para no cruzar por "ana" o "luz".
+function containsFirstNameStrict(haystack: unknown, name: unknown) {
+  const first = norm(name).split(" ").find((word) => word.length >= 4)
+  return Boolean(first && ` ${norm(haystack)} `.includes(` ${first} `))
+}
+
+const HORA = 60 * 60 * 1000
+
+// Por que esta grabacion corresponde a esta agenda, o "" si no corresponde. Una sola funcion
+// para las dos direcciones del cruce (agenda -> call y call -> agenda), asi no pueden divergir.
+// Los identificadores fuertes valen dentro de las 24 h; los cruces por nombre exigen cercania
+// horaria, porque un nombre repetido en otra llamada marcaria un "se presento" falso.
+function matchReason(agenda: { id: unknown; nombre: unknown; person_id: unknown; link_fathom: unknown }, call: any, scheduled: number) {
+  if (String(call.transcript || "").length < 200) return ""
+  if (call.call_type !== "sales") return ""
+  const delta = Math.abs(ms(call.occurred_at) - scheduled)
+  if (!Number.isFinite(delta) || delta > 24 * HORA) return ""
+  if (call.agenda_id && call.agenda_id === agenda.id) return "agenda_id"
+  if (urlKey(agenda.link_fathom) && urlKey(agenda.link_fathom) === urlKey(call.fathom_url)) return "link_fathom"
+  if (agenda.person_id && call.person_id === agenda.person_id && call.needs_review === false && Number(call.match_confidence || 0) >= 0.9) return "person_id"
+  if (externalNames(call.participants).includes(norm(agenda.nombre))) return "participant_name"
+  if (delta <= 3 * HORA && containsFullName(call.title, agenda.nombre)) return "title_name"
+  if (delta <= 3 * HORA && containsFullName(call.transcript, agenda.nombre)) return "transcript_name"
+  if (delta <= 1.5 * HORA && containsFirstNameStrict(call.title, agenda.nombre)) return "title_first_name"
+  return ""
 }
 
 function mentionExcerpt(haystack: unknown, name: unknown) {
@@ -105,34 +138,14 @@ async function runReconcile(request: Request) {
   for (const agenda of agendas || []) {
     const scheduled = scheduledUtcMs(agenda.fecha_closer)
     if (!Number.isFinite(scheduled)) continue
-    const candidates = (calls || []).map((call) => {
-      if (String(call.transcript || "").length < 200) return false
-      if (call.call_type !== "sales") return false
-      if (Math.abs(ms(call.occurred_at) - scheduled) > 24 * 60 * 60 * 1000) return false
-      const exactAgenda = call.agenda_id && call.agenda_id === agenda.id
-      const exactLink = urlKey(agenda.link_fathom) && urlKey(agenda.link_fathom) === urlKey(call.fathom_url)
-      const exactPerson = agenda.person_id && call.person_id === agenda.person_id
-        && call.needs_review === false && Number(call.match_confidence || 0) >= 0.9
-      const exactExternalName = externalNames(call.participants).includes(norm(agenda.nombre))
-      const nameInTitle = containsFullName(call.title, agenda.nombre)
-      const nameInTranscript = containsFullName(call.transcript, agenda.nombre)
-      const reason = exactAgenda ? "agenda_id" : exactLink ? "link_fathom" : exactPerson ? "person_id" : exactExternalName ? "participant_name" : nameInTitle ? "title_name" : nameInTranscript ? "transcript_name" : ""
-      return reason ? { call, reason } : false
-    }).filter(Boolean) as Array<{ call: any; reason: string }>
+    const candidates = (calls || [])
+      .map((call) => { const reason = matchReason(agenda, call, scheduled); return reason ? { call, reason } : null })
+      .filter(Boolean) as Array<{ call: any; reason: string }>
+    // Cruce 1:1 estricto en las dos direcciones: si una agenda tiene dos grabaciones posibles,
+    // o una grabacion sirve para dos agendas, no se toca nada y queda para revision humana.
     if (candidates.length !== 1) continue
     const { call, reason } = candidates[0]
-    const agendasForCall = (agendas || []).filter((candidate) =>
-      Number.isFinite(scheduledUtcMs(candidate.fecha_closer))
-      && Math.abs(ms(call.occurred_at) - scheduledUtcMs(candidate.fecha_closer)) <= 24 * 60 * 60 * 1000
-      && (
-        (call.agenda_id && call.agenda_id === candidate.id)
-        || (urlKey(candidate.link_fathom) && urlKey(candidate.link_fathom) === urlKey(call.fathom_url))
-        || (candidate.person_id && candidate.person_id === call.person_id && call.needs_review === false && Number(call.match_confidence || 0) >= 0.9)
-        || externalNames(call.participants).includes(norm(candidate.nombre))
-        || containsFullName(call.title, candidate.nombre)
-        || containsFullName(call.transcript, candidate.nombre)
-      )
-    )
+    const agendasForCall = (agendas || []).filter((candidate) => matchReason(candidate, call, scheduledUtcMs(candidate.fecha_closer)) !== "")
     if (agendasForCall.length !== 1) continue
     proposals.push({ agenda, call, reason, delta_hours: Math.round(Math.abs(ms(call.occurred_at) - scheduled) / 36_000) / 100 })
   }
@@ -165,7 +178,7 @@ async function runReconcile(request: Request) {
           fathom_url: proposal.call.fathom_url,
           delta_hours: proposal.delta_hours,
           match_reason: proposal.reason,
-          rule: "person_id exacto + sales + transcript >=200 + confidence >=0.9 + horario <=24h + match 1:1",
+          rule: "sales + transcript >=200 + cruce 1:1 en ambas direcciones; identificador fuerte <=24h, nombre completo <=3h, nombre de pila <=1.5h",
         },
         dedupe_key: `fathom:show_reconcile:${proposal.agenda.id}:${proposal.call.id}`,
       }, { onConflict: "dedupe_key" })
