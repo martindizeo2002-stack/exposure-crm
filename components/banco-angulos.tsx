@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils"
 import { Loader2, Plus, Save, Trash2, EyeOff, Eye, X } from "lucide-react"
 import { useAngulos } from "@/lib/use-angulos"
+import { colorAngulo, CATEGORIAS_CON_COLOR } from "@/lib/colores-angulo"
 import type { AnguloBanco } from "@/lib/angulos-exposure"
 
 // Banco de ángulos: la lista que alimenta el desplegable de ángulo de cada pieza de contenido
@@ -74,7 +75,7 @@ export function BancoAngulos() {
           <h2 className="text-lg font-black">Banco de ángulos</h2>
           <p className="max-w-3xl text-sm text-muted-foreground">
             Los ángulos que aparecen para elegir en cada pieza de contenido y los que rota el Volumen semanal.
-            Editá el título, cambiá el dolor o agregá uno nuevo. El número es la clave: si renombrás un ángulo,
+            Editá el título, cambiá la categoría o agregá uno nuevo. El número es la clave: si renombrás un ángulo,
             las piezas viejas lo siguen y las métricas no se parten.
           </p>
         </div>
@@ -92,7 +93,16 @@ export function BancoAngulos() {
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-300">No se pudo cargar el banco: {String(error.message || error)}. Se muestran los 25 originales.</p>}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-muted-foreground">Cada categoría tiene su color en todo el CRM:</span>
+        {CATEGORIAS_CON_COLOR.map((c) => (
+          <span key={c} className={cn("inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-semibold", colorAngulo(c).chip)}>
+            <span className={cn("h-2 w-2 rounded-full", colorAngulo(c).punto)} />{c}
+          </span>
+        ))}
+      </div>
+
+      {error && <p className="text-sm text-red-300">No se pudo cargar el banco: {String(error.message || error)}. Se muestra la lista de respaldo.</p>}
       {aviso && <p className={cn("text-sm", aviso.ok ? "text-emerald-400" : "text-red-300")}>{aviso.texto}</p>}
 
       {creando && (
@@ -106,10 +116,14 @@ export function BancoAngulos() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <Label className="text-xs text-muted-foreground">Dolor</Label>
+                <Label className="text-xs text-muted-foreground">Categoría</Label>
                 <Select value={nuevo.dolor} onValueChange={(v) => setNuevo((x) => ({ ...x, dolor: v }))}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Elegí el dolor" /></SelectTrigger>
-                  <SelectContent>{dolores.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Elegí la categoría" /></SelectTrigger>
+                  <SelectContent>{dolores.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      <span className="flex items-center gap-2"><span className={cn("h-2.5 w-2.5 rounded-full", colorAngulo(d).punto)} />{d}</span>
+                    </SelectItem>
+                  ))}</SelectContent>
                 </Select>
               </div>
               <div>
@@ -139,8 +153,12 @@ export function BancoAngulos() {
                       <Textarea value={borrador.titulo} onChange={(e) => setBorrador((v) => ({ ...v, titulo: e.target.value }))} rows={2} className="text-sm" />
                       <div className="grid gap-3 sm:grid-cols-2">
                         <Select value={borrador.dolor} onValueChange={(v) => setBorrador((x) => ({ ...x, dolor: v }))}>
-                          <SelectTrigger><SelectValue placeholder="Dolor" /></SelectTrigger>
-                          <SelectContent>{dolores.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                          <SelectTrigger><SelectValue placeholder="Categoría" /></SelectTrigger>
+                          <SelectContent>{dolores.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      <span className="flex items-center gap-2"><span className={cn("h-2.5 w-2.5 rounded-full", colorAngulo(d).punto)} />{d}</span>
+                    </SelectItem>
+                  ))}</SelectContent>
                         </Select>
                         <Input value={borrador.notas} onChange={(e) => setBorrador((v) => ({ ...v, notas: e.target.value }))} placeholder="Notas (opcional)" />
                       </div>
@@ -155,11 +173,13 @@ export function BancoAngulos() {
                 </div>
               ) : (
                 <div className="flex flex-wrap items-start gap-3">
-                  <span className="mt-0.5 w-8 shrink-0 text-center font-mono text-sm font-bold text-muted-foreground">{a.numero}</span>
+                  <span className="mt-0.5 flex w-8 shrink-0 items-center justify-center gap-1.5 font-mono text-sm font-bold text-muted-foreground">
+                    <span className={cn("h-2.5 w-2.5 rounded-full", colorAngulo(a.dolor).punto)} />{a.numero}
+                  </span>
                   <button type="button" onClick={() => abrirEdicion(a)} className="min-w-0 flex-1 text-left">
                     <p className="text-sm font-semibold leading-snug">{a.titulo}</p>
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="rounded-md bg-white/[.07] px-2 py-0.5">{a.dolor}</span>
+                      <span className={cn("rounded-md border px-2 py-0.5 font-semibold", colorAngulo(a.dolor).chip)}>{a.dolor}</span>
                       <span>{a.usos === 0 ? "sin piezas todavía" : a.usos === 1 ? "1 pieza" : `${a.usos} piezas`}</span>
                       {!a.activo && <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-amber-300">inactivo</span>}
                       {a.notas && <span className="italic">{a.notas}</span>}

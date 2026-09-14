@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useAngulos } from "@/lib/use-angulos"
+import { colorAngulo } from "@/lib/colores-angulo"
 
 type StoryRow = {
   id: string; title: string; format: string | null; angle: string | null; planned_at: string | null
@@ -119,7 +120,7 @@ function StoryDialog({ row, onClose, onSave }: { row: StoryRow | null; onClose: 
   const [dragging, setDragging] = useState<number | null>(null)
   const [date, setDate] = useState(String(row?.planned_at || "").slice(0, 10))
   const needsAvatar = ["Hand Raiser", "Caso de éxito"].includes(format)
-  const { etiquetas } = useAngulos()
+  const { etiquetas, categoriaDe } = useAngulos()
   const angleOptions = anglesFor(avatar, etiquetas)
   const changeAvatar = (value: string) => { setAvatar(value); setAngle(anglesFor(value, etiquetas)[0] || "") }
   const day = date ? new Date(`${date}T12:00:00`).toLocaleDateString("es-AR", { weekday: "long" }) : ""
@@ -140,7 +141,7 @@ function StoryDialog({ row, onClose, onSave }: { row: StoryRow | null; onClose: 
     <div className="grid gap-4">
       <div><Label>Formato</Label><Select value={format} onValueChange={(v) => { setFormat(v); if (!["Hand Raiser", "Caso de éxito"].includes(v)) { setAvatar(""); setAngle("") } }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FORMATS.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
       {needsAvatar && <><div><Label>Avatar *</Label><Select value={avatar} onValueChange={changeAvatar}><SelectTrigger><SelectValue placeholder="Elegí avatar" /></SelectTrigger><SelectContent>{AVATARS.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
-      <div><Label>Ángulo *</Label><Select value={angle} onValueChange={setAngle} disabled={!avatar}><SelectTrigger><SelectValue placeholder="Elegí ángulo" /></SelectTrigger><SelectContent>{angleOptions.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div></>}
+      <div><Label>Ángulo *</Label><Select value={angle} onValueChange={setAngle} disabled={!avatar}><SelectTrigger><SelectValue placeholder="Elegí ángulo" /></SelectTrigger><SelectContent>{angleOptions.map(v => <SelectItem key={v} value={v}><span className="flex min-w-0 items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${colorAngulo(categoriaDe(v)).punto}`} /><span className="truncate">{v}</span></span></SelectItem>)}</SelectContent></Select></div></>}
       <div className="space-y-2">
         <Label>Idea de guion</Label>
         {blocks.map((block, index) => <div

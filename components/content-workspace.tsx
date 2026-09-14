@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useSession } from "@/components/session-provider"
 import { useAngulos } from "@/lib/use-angulos"
+import { colorAngulo } from "@/lib/colores-angulo"
 import { StoriesCalendar } from "@/components/stories-calendar"
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter"
 import { RECORDING_WINDOW } from "@/lib/recording-window"
@@ -184,6 +185,7 @@ function formatWeekLabel(iso: string) {
 }
 
 export function ContentWorkspace() {
+  const { categoriaDe: categoriaDeAngulo } = useAngulos()
   const session = useSession()
   const searchParams = useSearchParams()
   const canEdit = session.email !== "preview@yin-yang.local"
@@ -448,7 +450,7 @@ export function ContentWorkspace() {
                 {recordingGroups.reels.map((row, index) => (
                   <div key={row.id} className="flex min-w-0 items-start gap-2 rounded-xl border border-white/10 bg-black/20 p-3 hover:border-red-400/40">
                     <button onClick={() => { setRecordingKind("reels"); setRecordingIndex(index); setEditing(row) }} className="min-w-0 flex-1 text-left" aria-label={`Abrir pieza completa: ${row.title}`}>
-                      <div className="flex min-w-0 flex-wrap gap-1.5"><Badge variant="outline">{formatDay(String(row.planned_at || ""))}</Badge>{row.angle && <Badge variant="outline" className="max-w-full truncate">{row.angle}</Badge>}<Badge variant="outline" className="border-zinc-400/30 bg-zinc-400/10 text-zinc-300">Estado: Idea</Badge></div>
+                      <div className="flex min-w-0 flex-wrap gap-1.5"><Badge variant="outline">{formatDay(String(row.planned_at || ""))}</Badge>{row.angle && <Badge variant="outline" className={cn("max-w-full truncate", colorAngulo(categoriaDeAngulo(row.angle)).chip)}>{row.angle}</Badge>}<Badge variant="outline" className="border-zinc-400/30 bg-zinc-400/10 text-zinc-300">Estado: Idea</Badge></div>
                       <p className="mt-2 break-words text-sm font-black">{row.title}</p>
                       <p className="mt-1 line-clamp-2 break-words text-xs text-white/45">{row.format || "Formato sin definir"} · {row.script_text || row.insight_notes || "Idea de guion pendiente"}</p>
                       <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-fuchsia-300">Ver pieza completa <ArrowUpRight className="h-3 w-3" /></span>
@@ -558,13 +560,15 @@ export function ContentWorkspace() {
 }
 
 function ContentCalendarCard({ row, onOpen, detailed = false }: { row: ContentRow; onOpen: () => void; detailed?: boolean }) {
+  // El color del ángulo sale de su categoría en el banco (ver lib/colores-angulo).
+  const { categoriaDe: categoriaDeAngulo } = useAngulos()
   const meta = statusMeta(row.status)
   const StatusIcon = meta.icon
   const managed = isManaged(row.source_key)
   return (
     <button onClick={onOpen} className={cn("group flex min-w-0 flex-col gap-2 rounded-2xl border bg-black/20 p-3.5 text-left transition hover:bg-black/30", contentCardBorder(row))}>
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        {row.angle && !hasNoAngle(row.format) && <Badge variant="outline" className="max-w-full border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-200">{row.angle}</Badge>}
+        {row.angle && !hasNoAngle(row.format) && <Badge variant="outline" className={cn("max-w-full", colorAngulo(categoriaDeAngulo(row.angle)).chip)}>{row.angle}</Badge>}
         {row.format && <Badge variant="outline" className="text-white/55">{row.format}</Badge>}
         <Badge variant="outline" className={cn("ml-auto gap-1", meta.tone)}><StatusIcon className="h-3 w-3" />{meta.label}</Badge>
       </div>
@@ -596,6 +600,7 @@ function recordingInsights(row: ContentRow) {
 }
 
 function RecordingBrief({ row }: { row: ContentRow }) {
+  const { categoriaDe: categoriaDeAngulo } = useAngulos()
   const insights = recordingInsights(row)
   const reaction = /REACCIÓN/i.test(recordingFormat(row))
   const link = /^https?:\/\//i.test(String(row.source_url || "")) ? String(row.source_url) : ""
@@ -606,8 +611,10 @@ function RecordingBrief({ row }: { row: ContentRow }) {
       <p className="mt-1 text-sm text-white/60">{reaction ? "Abrí el video, reaccioná y desarrollá tu lectura." : "Una toma simple, directa y sin edición pesada."}</p>
       {reaction && (link ? <a href={link} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-cyan-200">Abrir video de reacción <ArrowUpRight className="h-4 w-4" /></a> : <p className="mt-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs font-bold text-amber-200">Todavía no se cargó el video de reacción.</p>)}
     </div>
-    <div className="rounded-2xl border border-orange-400/25 bg-orange-400/[.08] p-4">
-      <p className="text-[10px] font-black uppercase tracking-[.18em] text-orange-300">Ángulo</p>
+    <div className={cn("rounded-2xl border p-4", colorAngulo(categoriaDeAngulo(row.angle)).panel)}>
+      <p className={cn("text-[10px] font-black uppercase tracking-[.18em]", colorAngulo(categoriaDeAngulo(row.angle)).titulo)}>
+        Ángulo{categoriaDeAngulo(row.angle) ? ` · ${categoriaDeAngulo(row.angle)}` : ""}
+      </p>
       <p className="mt-2 text-lg font-black leading-snug text-white">{row.angle || "Ángulo pendiente de cargar"}</p>
     </div>
     <div className="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-400/[.07] p-4">
@@ -643,7 +650,7 @@ function ContentEditDialog({
   const readOnly = forceReadOnly || (!!row && !isManaged(row.source_key))
   // Banco de ángulos editable (Contenido → Banco de ángulos); incluye el del row aunque esté inactivo,
   // para no vaciar el campo de una pieza vieja al abrirla.
-  const { etiquetas } = useAngulos()
+  const { etiquetas, categoriaDe } = useAngulos()
   const etiquetasAngulo = row?.angle && !etiquetas.includes(row.angle) ? [row.angle, ...etiquetas] : etiquetas
   const initialStage = String(row?.metadata?.funnel_stage || "")
   const [formatOpen, setFormatOpen] = useState(false)
@@ -818,10 +825,17 @@ function ContentEditDialog({
             {!noAngle && <div className="min-w-0">
               <Label>Ángulo *</Label>
               <Select disabled={readOnly} value={form.angle} onValueChange={set("angle")}>
-                <SelectTrigger className="w-full min-w-0 overflow-hidden [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate">
+                <SelectTrigger className={cn("w-full min-w-0 overflow-hidden [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate", form.angle && colorAngulo(categoriaDe(form.angle)).borde)}>
                   <SelectValue placeholder="Elegí un ángulo oficial" />
                 </SelectTrigger>
-                <SelectContent>{etiquetasAngulo.map((angle) => <SelectItem key={angle} value={angle}>{angle}</SelectItem>)}</SelectContent>
+                <SelectContent>{etiquetasAngulo.map((angle) => (
+                  <SelectItem key={angle} value={angle}>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", colorAngulo(categoriaDe(angle)).punto)} />
+                      <span className="truncate">{angle}</span>
+                    </span>
+                  </SelectItem>
+                ))}</SelectContent>
               </Select>
             </div>}
             <div className="min-w-0">

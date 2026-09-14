@@ -18,10 +18,28 @@ const fetcher = (url: string) => fetch(url).then(async (r) => {
   return b as { angulos: AnguloBanco[]; dolores: string[] }
 })
 
+// Número de la etiqueta "12 · título", para poder resolver la categoría aunque el título
+// haya cambiado después de que la pieza se guardó.
+const numeroDe = (etiqueta: string) => {
+  const m = etiqueta.trim().match(/^#?\s*(\d{1,3})\s*(?:[·—\-:)]|$)/)
+  return m ? Number(m[1]) : null
+}
+
 export function useAngulos() {
   const { data, error, isLoading, mutate } = useSWR("/api/angulos", fetcher, { revalidateOnFocus: false })
   const angulos = data?.angulos?.length ? data.angulos : RESPALDO
+  // Categoría de un ángulo guardado (PROBLEMA, SOLUCIÓN, PRODUCTO, MENTALIDAD, VOLUMEN/TOFU).
+  // Es lo que define el color en las pantallas (ver lib/colores-angulo).
+  const categoriaDe = (etiqueta: string | null | undefined): string | null => {
+    const texto = String(etiqueta || "").trim()
+    if (!texto) return null
+    const exacta = angulos.find((a) => a.etiqueta === texto)
+    if (exacta) return exacta.dolor
+    const numero = numeroDe(texto)
+    return (numero !== null && angulos.find((a) => a.numero === numero)?.dolor) || null
+  }
   return {
+    categoriaDe,
     angulos,
     activos: angulos.filter((a) => a.activo),
     // Lo que va en los desplegables donde se elige el ángulo de una pieza.
