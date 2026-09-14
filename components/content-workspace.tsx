@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useSession } from "@/components/session-provider"
-import { SALES_ANGLES } from "@/lib/sales-angles"
+import { useAngulos } from "@/lib/use-angulos"
 import { StoriesCalendar } from "@/components/stories-calendar"
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter"
 import { RECORDING_WINDOW } from "@/lib/recording-window"
@@ -641,6 +641,10 @@ function ContentEditDialog({
   allowGenerator?: boolean
 }) {
   const readOnly = forceReadOnly || (!!row && !isManaged(row.source_key))
+  // Banco de ángulos editable (Contenido → Banco de ángulos); incluye el del row aunque esté inactivo,
+  // para no vaciar el campo de una pieza vieja al abrirla.
+  const { etiquetas } = useAngulos()
+  const etiquetasAngulo = row?.angle && !etiquetas.includes(row.angle) ? [row.angle, ...etiquetas] : etiquetas
   const initialStage = String(row?.metadata?.funnel_stage || "")
   const [formatOpen, setFormatOpen] = useState(false)
   const [formatQuery, setFormatQuery] = useState("")
@@ -817,7 +821,7 @@ function ContentEditDialog({
                 <SelectTrigger className="w-full min-w-0 overflow-hidden [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate">
                   <SelectValue placeholder="Elegí un ángulo oficial" />
                 </SelectTrigger>
-                <SelectContent>{SALES_ANGLES.map((angle) => <SelectItem key={angle} value={angle}>{angle}</SelectItem>)}</SelectContent>
+                <SelectContent>{etiquetasAngulo.map((angle) => <SelectItem key={angle} value={angle}>{angle}</SelectItem>)}</SelectContent>
               </Select>
             </div>}
             <div className="min-w-0">

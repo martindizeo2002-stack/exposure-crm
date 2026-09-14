@@ -1,66 +1,72 @@
 import { ANGULOS_EXPOSURE } from "@/lib/angulos-exposure"
-import { salesAngleId, salesAngleLabel } from "@/lib/sales-angles"
+import { salesAngleId } from "@/lib/sales-angles"
 
 // Los 12 dolores del banco de 25 ángulos (lib/angulos-exposure), en el orden
 // en que rota el Volumen semanal. Reemplaza la taxonomía P/M/S/PR de la
 // plantilla original: acá el grupo de un ángulo es su dolor.
-export const VOLUME_DOLORES = [
-  "techo operativo", "falta de vehículo", "procrastinación", "falta de sistema",
-  "oferta pobre", "adquisición sin control", "impostor", "autoestima",
-  "marca personal", "identidad", "parálisis", "confianza",
-] as const
+// Las categorías del banco de ángulos vigente (ver lib/angulos-exposure). Antes eran los 12
+// dolores del banco viejo; ahora el grupo de un ángulo es su etapa de consciencia.
+export const VOLUME_DOLORES = ["PROBLEMA", "MENTALIDAD", "SOLUCIÓN", "PRODUCTO", "VOLUMEN/TOFU"] as const
 
 type AngleGroup = typeof VOLUME_DOLORES[number]
 
-// Mix parejo: cada dolor pesa lo mismo, así el Volumen de la semana pasa por
-// todos antes de repetir uno.
-export const VOLUME_ANGLE_MIX = Object.fromEntries(
-  VOLUME_DOLORES.map((dolor) => [dolor, Math.round((100 / VOLUME_DOLORES.length) * 100) / 100]),
-) as Record<AngleGroup, number>
-
-// Nivel de consciencia que se guarda en awareness_level según el dolor: los
-// dolores de negocio son PROBLEMA, los de cabeza son MENTALIDAD.
-const GROUP_AWARENESS: Record<AngleGroup, "PROBLEMA" | "MENTALIDAD"> = {
-  "techo operativo": "PROBLEMA",
-  "falta de vehículo": "PROBLEMA",
-  "falta de sistema": "PROBLEMA",
-  "oferta pobre": "PROBLEMA",
-  "adquisición sin control": "PROBLEMA",
-  "procrastinación": "MENTALIDAD",
-  impostor: "MENTALIDAD",
-  autoestima: "MENTALIDAD",
-  "marca personal": "MENTALIDAD",
-  identidad: "MENTALIDAD",
-  "parálisis": "MENTALIDAD",
-  confianza: "MENTALIDAD",
+// Mix de contenido documentado en CLAUDE.md: 40% problema, 30% mentalidad, 20% solución, 10% producto.
+// VOLUMEN/TOFU va en 0 a propósito: se elige a mano y no entra en la rotación automática del Volumen.
+export const VOLUME_ANGLE_MIX: Record<AngleGroup, number> = {
+  PROBLEMA: 40,
+  MENTALIDAD: 30,
+  "SOLUCIÓN": 20,
+  PRODUCTO: 10,
+  "VOLUMEN/TOFU": 0,
 }
 
-const GROUP_ANGLES = {} as Record<AngleGroup, readonly string[]>
-for (const dolor of VOLUME_DOLORES) {
-  GROUP_ANGLES[dolor] = ANGULOS_EXPOSURE.filter((a) => a.dolor === dolor).map((a) => salesAngleLabel(a.id) || "").filter(Boolean)
+// Nivel de consciencia que se guarda en awareness_level. Con el banco nuevo la categoría ya ES el
+// nivel; VOLUMEN/TOFU no es una opción de awareness, así que se guarda como PROBLEMA (tope de embudo).
+const GROUP_AWARENESS: Record<AngleGroup, string> = {
+  PROBLEMA: "PROBLEMA",
+  MENTALIDAD: "MENTALIDAD",
+  "SOLUCIÓN": "SOLUCIÓN",
+  PRODUCTO: "PRODUCTO",
+  "VOLUMEN/TOFU": "PROBLEMA",
 }
 
 function isGroup(value: string): value is AngleGroup {
   return (VOLUME_DOLORES as readonly string[]).includes(value)
 }
 
-// Dolor de un ángulo canónico ("12 · ..."). Etiquetas viejas de la plantilla
-// (P2, M1...) no mapean y vuelven null, igual que antes con texto desconocido.
-export function angleGroup(angle: string | null | undefined): AngleGroup | null {
+// Un ángulo del banco vivo (tabla crm_angulos). Cuando no se pasa banco, se usa la semilla
+// de lib/angulos-exposure, que es lo que había antes de que el banco fuera editable.
+export type AnguloRotacion = { numero: number; titulo: string; dolor: string }
+const SEMILLA: AnguloRotacion[] = ANGULOS_EXPOSURE.map((a) => ({ numero: a.id, titulo: a.titulo, dolor: a.dolor }))
+
+function anglesPorDolor(banco: AnguloRotacion[]) {
+  const porDolor = {} as Record<AngleGroup, string[]>
+  for (const dolor of VOLUME_DOLORES) porDolor[dolor] = []
+  for (const a of banco) {
+    if (!isGroup(a.dolor)) continue
+    porDolor[a.dolor].push(`${a.numero} · ${a.titulo}`)
+  }
+  return porDolor
+}
+
+// Categoría de un ángulo canónico ("12 · ..."). Etiquetas viejas de la plantilla
+// ("12 · ..."). Un número que no está en el banco vuelve null, igual que cualquier texto desconocido.
+export function angleGroup(angle: string | null | undefined, banco: AnguloRotacion[] = SEMILLA): AngleGroup | null {
   const id = salesAngleId(angle)
   if (!id) return null
-  const dolor = ANGULOS_EXPOSURE.find((a) => a.id === id)?.dolor || ""
+  const dolor = banco.find((a) => a.numero === id)?.dolor || ""
   return isGroup(dolor) ? dolor : null
 }
 
-export function nextVolumeAngle(existingAngles: Array<string | null | undefined>) {
+export function nextVolumeAngle(existingAngles: Array<string | null | undefined>, banco: AnguloRotacion[] = SEMILLA) {
+  const GROUP_ANGLES = anglesPorDolor(banco)
   const totalAfterInsert = existingAngles.length + 1
   const groupCounts = Object.fromEntries(
     VOLUME_DOLORES.map((group) => [group, 0]),
   ) as Record<AngleGroup, number>
 
   for (const angle of existingAngles) {
-    const group = angleGroup(angle)
+    const group = angleGroup(angle, banco)
     if (group) groupCounts[group]++
   }
 

@@ -1,33 +1,52 @@
-// Banco fijo de 25 ángulos de contenido de EXPOSURE (doc "Avatar Pibardo - BIZOP", sección "25 ÁNGULOS DE CONTENIDO").
-// Regla de la casa: no se inventan ángulos nuevos; todo contenido se mapea contra este inventario.
+// Banco de ángulos de EXPOSURE, vigente desde el 14/09/2026 (planilla de Alex).
+// Reemplazó a los 25 del doc "Avatar Pibardo": la taxonomía dejó de ser por dolor y pasó a ser por
+// etapa de consciencia, la misma que usan las etiquetas de ManyChat (🔴Problema, 🟢Solución,
+// 🔵Producto, 🟣Volumen/TOFU).
+//
+// El banco VIVO está en la tabla `crm_angulos` y se edita desde Contenido → Banco de ángulos
+// (/api/angulos). Esta lista es la semilla de esa tabla y el respaldo si la base no respondiera,
+// para que ningún desplegable quede vacío.
 export type AnguloExposure = { id: number; titulo: string; dolor: string }
 
 export const ANGULOS_EXPOSURE: AnguloExposure[] = [
-  { id: 1, titulo: "El techo del rol operativo: ser el mejor editando, cerrando o seteando no te saca de los 1.500", dolor: "techo operativo" },
-  { id: 2, titulo: "Sos el mejor empleado del negocio de otro y el peor jefe de vos mismo", dolor: "techo operativo" },
-  { id: 3, titulo: "Llevás dos años \"metido en lo digital\" y todavía no tenés un negocio. ¿Por qué?", dolor: "falta de vehículo" },
-  { id: 4, titulo: "Tenés las ganas, el tiempo y la habilidad. Lo único que te falta es el vehículo", dolor: "falta de vehículo" },
-  { id: 5, titulo: "\"Me falta información\" es la mentira que te contás para no arrancar", dolor: "procrastinación" },
-  { id: 6, titulo: "Consumiste 2 años de contenido de negocios y seguís en cero. El consumo no es acción", dolor: "procrastinación" },
-  { id: 7, titulo: "Tocaste un pico una vez y bajaste: el pico sin sistema es peor que nunca subir", dolor: "falta de sistema" },
-  { id: 8, titulo: "Vender tu habilidad barata vs. usarla para operar lo tuyo: la diferencia de 300 a 3.000", dolor: "oferta pobre" },
-  { id: 9, titulo: "El cliente que regatea es culpa de tu oferta, no del cliente", dolor: "oferta pobre" },
-  { id: 10, titulo: "La trampa de laburar en el negocio de otro: cobrás lo que él decide", dolor: "techo operativo" },
-  { id: 11, titulo: "Probaste dropshipping, afiliados, trading y no pegaste. No era vos, era el vehículo", dolor: "falta de vehículo" },
-  { id: 12, titulo: "Prospección en frío: cinco \"no\" por día te están quemando", dolor: "adquisición sin control" },
-  { id: 13, titulo: "El miedo al high ticket no es por la plata, es porque te sentís un impostor", dolor: "impostor" },
-  { id: 14, titulo: "10K te parece imposible solo porque nadie de tu entorno lo gana", dolor: "autoestima" },
-  { id: 15, titulo: "El pueblo, el bullying y por qué todavía no te mostrás", dolor: "marca personal" },
-  { id: 16, titulo: "\"Quiero disfrutar la vida\" vs. \"quiero comerme el mundo\": el subibaja que te traba", dolor: "identidad" },
-  { id: 17, titulo: "No querés un negocio. Querés demostrarte que podés", dolor: "identidad" },
-  { id: 18, titulo: "El verdadero lujo no es el Lambo: es reponer un celu robado sin que duela", dolor: "identidad" },
-  { id: 19, titulo: "Ves 20 caminos y no sabés cuál tomar. El problema no es falta de opciones", dolor: "parálisis" },
-  { id: 20, titulo: "La diferencia entre el que arranca y el que \"piensa el negocio\" dos años", dolor: "procrastinación" },
-  { id: 21, titulo: "Estudiás algo que ya sabés que no vas a ejercer. ¿Por qué seguís ahí?", dolor: "falta de vehículo" },
-  { id: 22, titulo: "El costo de oportunidad de tus últimos 5 meses, en dólares", dolor: "procrastinación" },
-  { id: 23, titulo: "Tenés habilidades reales y las estás regalando como servicio barato", dolor: "oferta pobre" },
-  { id: 24, titulo: "Los referentes te inspiran pero no te sirven de espejo (y quién sí)", dolor: "autoestima" },
-  { id: 25, titulo: "La estafa que te hicieron y por qué ahora no confiás en nadie (y cómo elegir bien)", dolor: "confianza" },
+  { id: 1, titulo: "SABES IA PERO NO COMO VENDERLA", dolor: "PROBLEMA" },
+  { id: 2, titulo: "DEPENDER DE REFERIDOS", dolor: "PROBLEMA" },
+  { id: 3, titulo: "ANTI-ECOM", dolor: "PROBLEMA" },
+  { id: 4, titulo: "SATURADO DE CLIENTES POR HORAS", dolor: "PROBLEMA" },
+  { id: 5, titulo: "SALARIO PROMEDIO EN ARG", dolor: "PROBLEMA" },
+  { id: 6, titulo: "NECESITAS UN 2DO SALARIO", dolor: "PROBLEMA" },
+  { id: 7, titulo: "PROSPECCIÓN EN FRIO", dolor: "PROBLEMA" },
+  { id: 8, titulo: "COMO CERRAR CLIENTES CON IG", dolor: "SOLUCIÓN" },
+  { id: 9, titulo: "CÓMO GANAR DINERO CON IA", dolor: "SOLUCIÓN" },
+  { id: 10, titulo: "INGRESO EXTRA IA", dolor: "SOLUCIÓN" },
+  { id: 11, titulo: "CASO DE ÉXITO: BAUTISTA QUILEZ", dolor: "PRODUCTO" },
+  { id: 12, titulo: "CASO DE ÉXITO: FLEX", dolor: "PRODUCTO" },
+  { id: 13, titulo: "CASO DE ÉXITO: FRAN PULEO", dolor: "PRODUCTO" },
+  { id: 14, titulo: "CASO DE ÉXITO: TOTO BAEZ", dolor: "PRODUCTO" },
+  { id: 15, titulo: "MI PROGRAMA 1-1", dolor: "PRODUCTO" },
+  { id: 16, titulo: "MI HISTORIA", dolor: "MENTALIDAD" },
+  { id: 17, titulo: "DEJA DE PROCASTINAR", dolor: "MENTALIDAD" },
+  { id: 18, titulo: "VES 20 MIL TUTORIALES Y NO HACES NADA", dolor: "MENTALIDAD" },
+  { id: 19, titulo: "MOSTRALES QUE ESTÁN EQUIVOCADOS", dolor: "MENTALIDAD" },
+  { id: 20, titulo: "HERRAMIENTAS IA", dolor: "VOLUMEN/TOFU" },
 ]
 
 export const ANGULOS_EXPOSURE_TITULOS = ANGULOS_EXPOSURE.map((a) => a.titulo)
+
+// Misma lista con el nombre de campo que usa la tabla (`numero`), para sembrarla y para el respaldo.
+export const ANGULOS_SEED = ANGULOS_EXPOSURE.map((a) => ({ numero: a.id, titulo: a.titulo, dolor: a.dolor }))
+
+// Las categorías vigentes. La pantalla ofrece estas más cualquiera que Alex haya agregado.
+export const DOLORES_SEED = ["PROBLEMA", "SOLUCIÓN", "PRODUCTO", "MENTALIDAD", "VOLUMEN/TOFU"] as const
+
+// Un ángulo tal como lo devuelve /api/angulos.
+export type AnguloBanco = {
+  id: string
+  numero: number
+  titulo: string
+  dolor: string
+  activo: boolean
+  notas: string | null
+  etiqueta: string
+  usos: number
+}

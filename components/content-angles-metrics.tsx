@@ -7,7 +7,7 @@ import {
   Layers3, Radar, Receipt, Route, Sparkles, Tags, UsersRound,
 } from "lucide-react"
 import { BUYER_ARCHETYPES } from "@/lib/trace-intelligence"
-import { SALES_ANGLES } from "@/lib/sales-angles"
+import { useAngulos } from "@/lib/use-angulos"
 import { useSession } from "@/components/session-provider"
 
 const fetcher = (url: string) => fetch(url).then(async (response) => {
@@ -154,7 +154,8 @@ function ReviewQueue({ rows, onSaved }: { rows: ReviewItem[]; onSaved: () => voi
 }
 
 function ReviewCard({ row, onSaved }: { row: ReviewItem; onSaved: () => void }) {
-  const [angle, setAngle] = useState(row.candidateAngle && (SALES_ANGLES as readonly string[]).includes(row.candidateAngle) ? row.candidateAngle : "")
+  const { etiquetas } = useAngulos()
+  const [angle, setAngle] = useState(row.candidateAngle && etiquetas.includes(row.candidateAngle) ? row.candidateAngle : "")
   const [archetype, setArchetype] = useState(row.candidateArchetype || "")
   const [saving, setSaving] = useState(false)
   async function save(status: "resolved" | "ignored") {
@@ -166,7 +167,7 @@ function ReviewCard({ row, onSaved }: { row: ReviewItem; onSaved: () => void }) 
       onSaved()
     } finally { setSaving(false) }
   }
-  return <article className="rounded-[24px] border border-amber-500/20 bg-amber-500/[.045] p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex items-center gap-2"><CircleAlert className="h-4 w-4 text-amber-300"/><h3 className="font-black">{row.name}</h3>{row.cash > 0 && <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-black text-emerald-300">{money(row.cash)}</span>}</div><p className="mt-2 text-sm text-amber-100/70">{row.reason}</p>{!!row.evidence.length && <p className="mt-2 text-xs text-white/35">Evidencia: {row.evidence.join(" · ")}</p>}</div>{row.fathomUrl && <a href={row.fathomUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-fuchsia-300 hover:underline">Ver Fathom</a>}</div><div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_auto]"><select value={angle} onChange={(event) => setAngle(event.target.value)} className="rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm"><option value="">Sin override de ángulo</option>{SALES_ANGLES.map((item) => <option key={item}>{item}</option>)}</select><select value={archetype} onChange={(event) => setArchetype(event.target.value)} className="rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm"><option value="">Sin arquetipo</option>{BUYER_ARCHETYPES.map((item) => <option key={item}>{item}</option>)}</select><div className="flex gap-2"><button disabled={saving} onClick={() => save("resolved")} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-zinc-950 disabled:opacity-50">Validar</button><button disabled={saving} onClick={() => save("ignored")} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/55 disabled:opacity-50">Ignorar</button></div></div></article>
+  return <article className="rounded-[24px] border border-amber-500/20 bg-amber-500/[.045] p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex items-center gap-2"><CircleAlert className="h-4 w-4 text-amber-300"/><h3 className="font-black">{row.name}</h3>{row.cash > 0 && <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-black text-emerald-300">{money(row.cash)}</span>}</div><p className="mt-2 text-sm text-amber-100/70">{row.reason}</p>{!!row.evidence.length && <p className="mt-2 text-xs text-white/35">Evidencia: {row.evidence.join(" · ")}</p>}</div>{row.fathomUrl && <a href={row.fathomUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-fuchsia-300 hover:underline">Ver Fathom</a>}</div><div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_auto]"><select value={angle} onChange={(event) => setAngle(event.target.value)} className="rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm"><option value="">Sin override de ángulo</option>{etiquetas.map((item) => <option key={item}>{item}</option>)}</select><select value={archetype} onChange={(event) => setArchetype(event.target.value)} className="rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm"><option value="">Sin arquetipo</option>{BUYER_ARCHETYPES.map((item) => <option key={item}>{item}</option>)}</select><div className="flex gap-2"><button disabled={saving} onClick={() => save("resolved")} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-zinc-950 disabled:opacity-50">Validar</button><button disabled={saving} onClick={() => save("ignored")} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/55 disabled:opacity-50">Ignorar</button></div></div></article>
 }
 
 function Metric({ label, value, icon: Icon, tone = "default" }: { label: string; value: string; icon: typeof Radar; tone?: string }) {

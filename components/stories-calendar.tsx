@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { SALES_ANGLES } from "@/lib/sales-angles"
+import { useAngulos } from "@/lib/use-angulos"
 
 type StoryRow = {
   id: string; title: string; format: string | null; angle: string | null; planned_at: string | null
@@ -44,10 +44,15 @@ const PRIORITY_ANGLES: Record<string, number[]> = {
   [AVATARS[3]]: [11, 25, 19, 24, 6],
   [AVATARS[4]]: [4, 22, 14, 16, 17, 18, 15],
 }
-const ANGLES: Record<string, string[]> = Object.fromEntries(AVATARS.map((avatar) => {
-  const priority = PRIORITY_ANGLES[avatar].map((id) => SALES_ANGLES[id - 1])
-  return [avatar, [...priority, ...SALES_ANGLES.filter((angle) => !priority.includes(angle))]]
-}))
+// Ángulos ofrecidos para un avatar: primero los prioritarios de PRIORITY_ANGLES (por número),
+// después el resto del banco. El banco es editable (Contenido → Banco de ángulos), así que se
+// resuelve en cada render y no como constante de módulo.
+function anglesFor(avatar: string, etiquetas: string[]) {
+  const priority = (PRIORITY_ANGLES[avatar] || [])
+    .map((id) => etiquetas.find((etiqueta) => etiqueta.startsWith(`${id} ·`)))
+    .filter((etiqueta): etiqueta is string => Boolean(etiqueta))
+  return [...priority, ...etiquetas.filter((etiqueta) => !priority.includes(etiqueta))]
+}
 
 function week(base: Date) {
   const d = new Date(base); const offset = (d.getDay() + 6) % 7
@@ -114,8 +119,9 @@ function StoryDialog({ row, onClose, onSave }: { row: StoryRow | null; onClose: 
   const [dragging, setDragging] = useState<number | null>(null)
   const [date, setDate] = useState(String(row?.planned_at || "").slice(0, 10))
   const needsAvatar = ["Hand Raiser", "Caso de éxito"].includes(format)
-  const angleOptions = ANGLES[avatar] || []
-  const changeAvatar = (value: string) => { setAvatar(value); setAngle(ANGLES[value]?.[0] || "") }
+  const { etiquetas } = useAngulos()
+  const angleOptions = anglesFor(avatar, etiquetas)
+  const changeAvatar = (value: string) => { setAvatar(value); setAngle(anglesFor(value, etiquetas)[0] || "") }
   const day = date ? new Date(`${date}T12:00:00`).toLocaleDateString("es-AR", { weekday: "long" }) : ""
   const dayLabel = day ? day[0].toUpperCase() + day.slice(1) : ""
   const updateBlock = (index: number, value: string) => setBlocks(current => current.map((block, i) => i === index ? value : block))

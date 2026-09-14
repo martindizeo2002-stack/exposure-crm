@@ -55,7 +55,10 @@ async function volumeAngleAssignment(sb: ReturnType<typeof getSupabase>, planned
   if (excludeId) query = query.neq("id", excludeId)
   const { data, error } = await query.limit(500)
   if (error) throw new Error(error.message)
-  return nextVolumeAngle((data || []).map((item) => item.angle))
+  // El banco de ángulos es editable (tabla crm_angulos): la rotación de Volumen tiene que
+  // contemplar los que Alex agregó, no solo los 25 de la semilla.
+  const { data: banco } = await sb.from("crm_angulos").select("numero,titulo,dolor").eq("activo", true).order("numero")
+  return nextVolumeAngle((data || []).map((item) => item.angle), banco?.length ? banco : undefined)
 }
 
 const SELECT_COLS =

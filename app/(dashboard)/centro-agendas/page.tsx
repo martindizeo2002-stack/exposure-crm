@@ -22,7 +22,7 @@ import type { Agenda } from "@/lib/supabase"
 import { exportRowsToCSV, exportRowsToXLSX } from "@/lib/csv-export"
 import { FuenteSelect, FuenteInlineCell, FuenteFilter } from "@/components/fuente-picker"
 import { HelpHint } from "@/components/help-hint"
-import { SALES_ANGLES } from "@/lib/sales-angles"
+import { useAngulos } from "@/lib/use-angulos"
 import { getPrecallSequence } from "@/lib/precall-angle-sequences"
 
 const norm = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
@@ -742,6 +742,9 @@ const leadStatus = (a: Agenda) => {
 }
 
 export default function CentroAgendasPage() {
+  // Ángulo de entrada de la agenda: sale del banco editable (Contenido → Banco de ángulos).
+  // Se suma el valor ya guardado aunque el ángulo esté inactivo, para no vaciarlo al editar.
+  const { etiquetas: etiquetasBanco } = useAngulos()
   // Arranca en el mes actual (no "all") para no disparar la consulta de 1000 filas al abrir
   const [dateFilter, setDateFilter] = useState(() => {
     const n = new Date()
@@ -1225,7 +1228,7 @@ export default function CentroAgendasPage() {
               <Sel label="Closer" value={form.closer} options={CLOSERS} onChange={v => setF("closer", v)} />
               <Sel label="Cuenta" value={form.cuenta} options={CUENTA} onChange={v => setF("cuenta", v)} />
               <Sel label="Calificación" value={form.calificacion} options={CALIFICACION} onChange={v => setF("calificacion", v)} />
-              <Sel label="Ángulo de entrada" value={form.angulo_entrada} options={[...SALES_ANGLES.slice(0, 8)]} onChange={v => setF("angulo_entrada", v)} />
+              <Sel label="Ángulo de entrada" value={form.angulo_entrada} options={form.angulo_entrada && !etiquetasBanco.includes(String(form.angulo_entrada)) ? [String(form.angulo_entrada), ...etiquetasBanco] : etiquetasBanco} onChange={v => setF("angulo_entrada", v)} />
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Fecha de agenda</Label>
                 <Input type="date" className="h-9 text-sm" value={form.fecha_agenda?.split("T")[0] || ""} onChange={e => setF("fecha_agenda", e.target.value ? `${e.target.value}T00:00:00` : null)} />
