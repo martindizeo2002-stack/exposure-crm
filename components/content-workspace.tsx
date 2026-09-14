@@ -116,10 +116,16 @@ function hasNoAngle(format: string | null | undefined) {
   return isClipFormat(format) || /TESTIMONIO/i.test(String(format || ""))
 }
 
+// Pieza que graba Alex: todo lo que no es historia y no es pieza de edición (volumen, carrusel,
+// testimonio). Antes exigía slot 7-9 o la palabra "REEL" en el título, y las piezas cargadas a mano
+// con formato Talking Head o Cámara + PC no entraban en ninguna de las dos secciones del día: se
+// contaban en el resumen de arriba pero no se dibujaban abajo (reportado el 14/09).
+const ES_HISTORIA = (row: ContentRow) =>
+  /HISTORIA|STORY/i.test(`${row.format || ""} ${row.platform || ""} ${row.title || ""} ${String(row.metadata?.content_type || "")}`)
+const KINDS_EDICION = ["VOLUMEN", "CARRUSEL", "TESTIMONIO"]
+
 function isReel(row: ContentRow) {
-  const slot = Number(row.metadata?.slot)
-  return !/HISTORIA|STORY/i.test(`${row.format || ""} ${row.platform || ""} ${row.title || ""} ${String(row.metadata?.content_type || "")}`)
-    && ((slot >= 7 && slot <= 9) || /REEL/i.test(row.title || ""))
+  return !ES_HISTORIA(row) && !KINDS_EDICION.includes(contentPieceKind(row))
 }
 
 function contentPieceKind(row: ContentRow) {
@@ -496,10 +502,10 @@ export function ContentWorkspace() {
       ) : (
         <div className="space-y-4">
           {grouped.map(([dateKey, items]) => {
-            const reels = items.filter(isReel)
-            const editingItems = items.filter((row) =>
-              ["VOLUMEN", "CARRUSEL", "TESTIMONIO"].includes(contentPieceKind(row)),
-            )
+            // Partición exhaustiva del día: o es pieza de edición, o va a la sección de grabar.
+            // Así ninguna pieza puede quedar fuera de las dos secciones y desaparecer de la vista.
+            const editingItems = items.filter((row) => KINDS_EDICION.includes(contentPieceKind(row)))
+            const reels = items.filter((row) => !KINDS_EDICION.includes(contentPieceKind(row)))
             return (
             <div key={dateKey} className="rounded-[22px] border border-white/10 bg-white/[.03] p-4">
               <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-white/50">
@@ -517,7 +523,7 @@ export function ContentWorkspace() {
                   </div>
                 </section>
                 <div>
-                  <p className="mb-2 px-1 text-xs font-black uppercase tracking-wider text-fuchsia-300">ALEX · {reels.length} reels para grabar</p>
+                  <p className="mb-2 px-1 text-xs font-black uppercase tracking-wider text-fuchsia-300">ALEX · {reels.length} para grabar</p>
                   <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                     {reels.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} detailed />)}
                   </div>
