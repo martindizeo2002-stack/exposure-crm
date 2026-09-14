@@ -112,7 +112,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // todo menos assets estaticos, PWA (manifest/service worker) y rutas de auth publicas
-    "/((?!_next|_vercel/static|_next/image|favicon.ico|opengraph-image|login|pendiente|solicitar-acceso|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // todo menos assets estaticos, PWA (manifest/service worker), rutas de auth publicas y las
+    // paginas legales que Meta exige publicas (privacidad y eliminacion de datos de la app EXPOSURE Ads)
+    "/((?!_next|_vercel/static|_next/image|favicon.ico|opengraph-image|login|pendiente|solicitar-acceso|privacidad|eliminar-datos|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 }
