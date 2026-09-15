@@ -41,6 +41,11 @@ const ESTADO_CLIP: Record<string, { label: string; tono: string }> = {
 }
 const clipMeta = (s: string) => ESTADO_CLIP[s] || { label: s || "Sin estado", tono: "border-zinc-400/40 bg-zinc-400/10 text-zinc-500" }
 const ESTADOS_CLIP_OPCIONES = ["idea", "en_produccion", "en_revision", "completo", "publicado"]
+const SIN_ASIGNAR = "SIN ASIGNAR"
+// Quién puede quedar a cargo: los editores aprobados del equipo salen de team_members, así que
+// alcanza con dar de alta al editor para que aparezca acá. Se conserva lo ya cargado a mano.
+const responsablesCon = (editores: string[] | undefined, actual?: string | null) =>
+  [...new Set([SIN_ASIGNAR, "ALEX", "NAHUEL", ...(editores || []), ...(actual ? [actual] : [])])]
 
 const fecha = (iso: string | null | undefined) => {
   if (!iso) return null
@@ -411,7 +416,12 @@ function VideoDialog({ video, esAdmin, puedeEditar, editores, onClose, onCambio 
                         <SelectContent>{ESTADOS_YT.map((e) => <SelectItem key={e.id} value={e.id}>{e.label}</SelectItem>)}</SelectContent>
                       </Select>
                     </Campo>
-                    <Campo label="Responsable"><Input value={borrador.responsable} onChange={(e) => setBorrador({ ...borrador, responsable: e.target.value })} placeholder="Quién lo produce" /></Campo>
+                    <Campo label="Responsable" hint="quién lo produce o lo edita">
+                      <Select value={borrador.responsable || SIN_ASIGNAR} onValueChange={(v) => setBorrador({ ...borrador, responsable: v === SIN_ASIGNAR ? "" : v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{responsablesCon(editores, video.responsable).map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </Campo>
                     <Campo label="Fecha objetivo"><Input type="date" value={borrador.fecha_objetivo?.slice(0, 10) || ""} onChange={(e) => setBorrador({ ...borrador, fecha_objetivo: e.target.value })} /></Campo>
                     <Campo label="Link del guion"><Input value={borrador.guion_url} onChange={(e) => setBorrador({ ...borrador, guion_url: e.target.value })} placeholder="Doc de Google" /></Campo>
                     <Campo label="Miniatura" hint="subila de la compu o pegá el link">
@@ -461,7 +471,7 @@ function ClipFila({ clip, editores, puedeEditar, onCambio }: { clip: ClipYoutube
   const [error, setError] = useState("")
   const numeroClip = Number((clip.metadata as Record<string, unknown>)?.clip_numero || 0)
   const meta = clipMeta(clip.status)
-  const responsables = [...new Set(["SIN ASIGNAR", "ALEX", ...editores, ...(clip.assigned_to ? [clip.assigned_to] : [])])]
+  const responsables = responsablesCon(editores, clip.assigned_to)
   const sucio = titulo !== clip.title || linkFinal !== (clip.source_url || "")
 
   async function patch(cambios: Record<string, unknown>) {
