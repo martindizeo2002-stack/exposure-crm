@@ -12,6 +12,7 @@ export type FormatoBanco = {
   tipo: string
   descripcion: string | null
   referencia_url: string | null
+  portada_url: string | null
   notas: string | null
   activo: boolean
   orden: number
@@ -23,7 +24,7 @@ const RESPALDO: FormatoBanco[] = [
   "VOLUMEN", "PIZARRÓN", "MIRO", "HORIZONTAL", "TOP TIER", "TESTIMONIO", "CASO DE ÉXITO", "ESTRATEGIA", "CARRUSEL",
 ].map((nombre, i) => ({
   id: nombre, nombre, tipo: nombre === "CARRUSEL" ? "Carrusel" : "Reel",
-  descripcion: null, referencia_url: null, notas: null, activo: true, orden: (i + 1) * 10, usos: 0,
+  descripcion: null, referencia_url: null, portada_url: null, notas: null, activo: true, orden: (i + 1) * 10, usos: 0,
 }))
 
 const fetcher = (url: string) => fetch(url).then(async (r) => {
@@ -48,6 +49,15 @@ export function useFormatos() {
     error,
     recargar: mutate,
   }
+}
+
+// Vista previa de la referencia de un formato. Manda la portada cargada (subida a mano o bajada
+// una vez del posteo); si no hay, se intenta derivar del link: las imágenes se muestran y de
+// YouTube o Drive se saca la miniatura. Instagram y TikTok no dejan incrustar, así que sin portada
+// quedan como botón: una miniatura rota se ve peor que un botón honesto.
+export function previewFormato(f: Pick<FormatoBanco, "portada_url" | "referencia_url">) {
+  const portada = previewDe(f.portada_url)
+  return portada.tipo === "imagen" ? portada : previewDe(f.referencia_url)
 }
 
 // Vista previa de la referencia de un formato. Las imágenes se muestran; de YouTube se saca la

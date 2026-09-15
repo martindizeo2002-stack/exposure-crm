@@ -22,7 +22,7 @@ const EXT_POR_MIME: Record<string, string> = {
 }
 const DESTINOS = {
   youtube: { tabla: "crm_youtube_videos", campo: "miniatura_url" },
-  formato: { tabla: "crm_formatos", campo: "referencia_url" },
+  formato: { tabla: "crm_formatos", campo: "portada_url" },
 } as const
 type Destino = keyof typeof DESTINOS
 

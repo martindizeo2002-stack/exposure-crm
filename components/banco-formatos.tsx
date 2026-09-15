@@ -9,37 +9,41 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { Loader2, Plus, Save, Trash2, EyeOff, Eye, X, ExternalLink, ImageOff, Lock } from "lucide-react"
-import { useFormatos, previewDe, type FormatoBanco } from "@/lib/use-formatos"
+import { useFormatos, previewFormato, type FormatoBanco } from "@/lib/use-formatos"
 import { SubirImagen } from "@/components/subir-imagen"
 
 // Panel de formatos: el catálogo de formatos elegibles para una pieza, con la referencia visual de
 // cada uno agrupada por tipo (reels, carruseles, historias). Solo el admin puede agregar, editar,
 // desactivar o borrar; el resto del equipo lo usa como panel de referencia.
 
-type Borrador = { nombre: string; tipo: string; descripcion: string; referencia_url: string; notas: string }
-const VACIO: Borrador = { nombre: "", tipo: "Reel", descripcion: "", referencia_url: "", notas: "" }
+type Borrador = { nombre: string; tipo: string; descripcion: string; referencia_url: string; portada_url: string; notas: string }
+const VACIO: Borrador = { nombre: "", tipo: "Reel", descripcion: "", referencia_url: "", portada_url: "", notas: "" }
 
-function Referencia({ url, nombre }: { url: string | null; nombre: string }) {
-  const p = previewDe(url)
+// La portada es lo que se ve; el click siempre lleva al ejemplo real (el reel, el carrusel, el
+// archivo de Drive). Si no hay portada ni imagen derivable, queda el botón para abrirlo.
+function Referencia({ formato }: { formato: Pick<FormatoBanco, "nombre" | "portada_url" | "referencia_url"> }) {
+  const p = previewFormato(formato)
+  const destino = formato.referencia_url || formato.portada_url
   const [rota, setRota] = useState(false)
   if (p.tipo === "imagen" && !rota) {
-    return (
-      <a href={url!} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-border bg-muted">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={p.src} alt={`Referencia de ${nombre}`} className="h-32 w-full object-cover transition hover:scale-[1.03]" onError={() => setRota(true)} loading="lazy" />
-      </a>
+    const imagen = (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img src={p.src} alt={`Portada de ${formato.nombre}`} className="h-32 w-full object-cover transition hover:scale-[1.03]" onError={() => setRota(true)} loading="lazy" />
     )
+    return destino
+      ? <a href={destino} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-border bg-muted">{imagen}</a>
+      : <div className="overflow-hidden rounded-lg border border-border bg-muted">{imagen}</div>
   }
-  if (p.tipo === "link" || rota) {
+  if ((p.tipo === "link" || rota) && destino) {
     return (
-      <a href={url!} target="_blank" rel="noreferrer" className="flex h-32 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/50 text-xs font-semibold text-muted-foreground transition hover:border-foreground/30 hover:text-foreground">
-        <ExternalLink className="h-4 w-4" />Ver referencia{p.dominio ? ` en ${p.dominio}` : ""}
+      <a href={destino} target="_blank" rel="noreferrer" className="flex h-32 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/50 text-xs font-semibold text-muted-foreground transition hover:border-foreground/30 hover:text-foreground">
+        <ExternalLink className="h-4 w-4" />Ver referencia{p.tipo === "link" && p.dominio ? ` en ${p.dominio}` : ""}
       </a>
     )
   }
   return (
     <div className="flex h-32 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 text-xs text-muted-foreground">
-      <ImageOff className="h-4 w-4" />Sin referencia cargada
+      <ImageOff className="h-4 w-4" />Sin portada cargada
     </div>
   )
 }
@@ -78,7 +82,7 @@ export function BancoFormatos() {
 
   function abrirEdicion(f: FormatoBanco) {
     setEditando(f.id)
-    setBorrador({ nombre: f.nombre, tipo: f.tipo, descripcion: f.descripcion || "", referencia_url: f.referencia_url || "", notas: f.notas || "" })
+    setBorrador({ nombre: f.nombre, tipo: f.tipo, descripcion: f.descripcion || "", referencia_url: f.referencia_url || "", portada_url: f.portada_url || "", notas: f.notas || "" })
     setAviso(null)
   }
   async function guardar(f: FormatoBanco) {
@@ -121,9 +125,11 @@ export function BancoFormatos() {
         <Label className="text-xs text-muted-foreground">Portada de referencia</Label>
         <Input value={valor.referencia_url} onChange={(e) => set({ ...valor, referencia_url: e.target.value })} className="mt-1" placeholder="Link al reel, carrusel, imagen o Drive que sirve de ejemplo" />
         <SubirImagen destino="formato" id={id} titulo={valor.nombre} className="mt-1.5"
-          etiqueta="Subir la portada desde la compu"
-          onSubido={async (url) => { set({ ...valor, referencia_url: url }); await recargar() }} />
-        <p className="mt-1 text-[11px] text-muted-foreground">La captura que subís se ve como portada del formato. Un link de imagen, de YouTube o de Drive también muestra miniatura; el resto queda como botón para abrir.</p>
+          etiqueta={valor.portada_url ? "Cambiar la portada" : "Subir la portada desde la compu"}
+          onSubido={async (url) => { set({ ...valor, portada_url: url }); await recargar() }} />
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {valor.portada_url ? "Ya tiene portada cargada: es la imagen que se ve en el panel. El link de arriba es el ejemplo que se abre al tocarla." : "El link de Instagram o TikTok no se puede incrustar: subí una captura y esa es la portada que se ve. Un link de imagen, de YouTube o de Drive muestra miniatura solo."}
+        </p>
       </div>
     </div>
   )
@@ -193,7 +199,7 @@ export function BancoFormatos() {
                     </>
                   ) : (
                     <>
-                      <Referencia url={f.referencia_url} nombre={f.nombre} />
+                      <Referencia formato={f} />
                       <div>
                         <p className="text-sm font-black leading-tight">{f.nombre}</p>
                         <p className="mt-1 text-[11px] text-muted-foreground">

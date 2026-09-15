@@ -43,7 +43,7 @@ async function usos(sb: ReturnType<typeof createSupabaseAdmin>) {
 export async function GET() {
   try {
     const sb = createSupabaseAdmin()
-    const { data, error } = await sb.from("crm_formatos").select("id,nombre,tipo,descripcion,referencia_url,notas,activo,orden,updated_at").order("orden").order("nombre")
+    const { data, error } = await sb.from("crm_formatos").select("id,nombre,tipo,descripcion,referencia_url,portada_url,notas,activo,orden,updated_at").order("orden").order("nombre")
     if (error) throw new Error(error.message)
     const cuenta = await usos(sb)
     return NextResponse.json({
@@ -69,9 +69,10 @@ export async function POST(request: Request) {
       nombre, tipo,
       descripcion: texto(b.descripcion, 400) || null,
       referencia_url: texto(b.referencia_url, 600) || null,
+      portada_url: texto(b.portada_url, 600) || null,
       notas: texto(b.notas, 400) || null,
       orden: Number(ultimo?.orden || 0) + 10,
-    }).select("id,nombre,tipo,descripcion,referencia_url,notas,activo,orden").single()
+    }).select("id,nombre,tipo,descripcion,referencia_url,portada_url,notas,activo,orden").single()
     if (error) {
       if (/duplicate|unique/i.test(error.message)) return NextResponse.json({ error: `Ya existe un formato llamado "${nombre}"` }, { status: 409 })
       throw new Error(error.message)
@@ -105,11 +106,12 @@ export async function PATCH(request: Request) {
     if (b.tipo !== undefined && TIPOS.has(String(b.tipo))) cambios.tipo = String(b.tipo)
     if (b.descripcion !== undefined) cambios.descripcion = texto(b.descripcion, 400) || null
     if (b.referencia_url !== undefined) cambios.referencia_url = texto(b.referencia_url, 600) || null
+    if (b.portada_url !== undefined) cambios.portada_url = texto(b.portada_url, 600) || null
     if (b.notas !== undefined) cambios.notas = texto(b.notas, 400) || null
     if (b.activo !== undefined) cambios.activo = Boolean(b.activo)
     if (b.orden !== undefined && Number.isFinite(Number(b.orden))) cambios.orden = Number(b.orden)
     if (!Object.keys(cambios).length) return NextResponse.json({ error: "Nada para cambiar" }, { status: 400 })
-    const { data, error } = await sb.from("crm_formatos").update(cambios).eq("id", id).select("id,nombre,tipo,descripcion,referencia_url,notas,activo,orden").single()
+    const { data, error } = await sb.from("crm_formatos").update(cambios).eq("id", id).select("id,nombre,tipo,descripcion,referencia_url,portada_url,notas,activo,orden").single()
     if (error) throw new Error(error.message)
     return NextResponse.json({ ok: true, formato: data })
   } catch (e) {
