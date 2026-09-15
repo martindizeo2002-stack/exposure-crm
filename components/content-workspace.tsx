@@ -6,7 +6,7 @@ import useSWR from "swr"
 import { toast } from "sonner"
 import {
   CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronsUpDown, CircleDashed, Clapperboard,
-  ArrowUpRight, FileText, Loader2, Pencil, Play, Plus, Radio, Search, Sparkles, Trash2, User,
+  ArrowUpRight, Eye, FileText, Loader2, Pencil, Play, Plus, Radio, Search, Send, Sparkles, Trash2, User, Link2,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,8 @@ import { cn } from "@/lib/utils"
 import { useSession } from "@/components/session-provider"
 import { useAngulos } from "@/lib/use-angulos"
 import { colorAngulo } from "@/lib/colores-angulo"
-import { TableroSemana, CalendarioSemana } from "@/components/content-semana"
+import { TableroSemana, CalendarioSemana, PipelineContenido } from "@/components/content-semana"
+import { useFormatos } from "@/lib/use-formatos"
 import { StoriesCalendar } from "@/components/stories-calendar"
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter"
 import { RECORDING_WINDOW } from "@/lib/recording-window"
@@ -55,13 +56,15 @@ type ContentRow = {
 }
 
 type ApiResponse = { schemaReady: boolean; rows: ContentRow[]; total: number }
-type FormatOptionsResponse = { formats: string[] }
+type FormatOptionsResponse = { formats: string[]; editores?: string[] }
 
 const STATUS_META: Record<string, { label: string; tone: string; icon: typeof CircleDashed }> = {
   idea: { label: "Idea", tone: "border-zinc-400/30 bg-zinc-400/10 text-zinc-300", icon: CircleDashed },
   guion_listo: { label: "Guion listo", tone: "border-blue-400/30 bg-blue-400/10 text-blue-300", icon: FileText },
   para_grabar: { label: "Para grabar", tone: "border-amber-400/30 bg-amber-400/10 text-amber-300", icon: Clapperboard },
   grabado: { label: "Grabado", tone: "border-violet-400/30 bg-violet-400/10 text-violet-300", icon: Radio },
+  en_produccion: { label: "En producción", tone: "border-sky-400/30 bg-sky-400/10 text-sky-700 dark:text-sky-300", icon: Pencil },
+  en_revision: { label: "En revisión", tone: "border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-700 dark:text-fuchsia-300", icon: Eye },
   edicion: { label: "Edición", tone: "border-amber-400/30 bg-amber-400/10 text-amber-300", icon: Pencil },
   completo: { label: "Completo", tone: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300", icon: CheckCircle2 },
   publicado: { label: "Publicado", tone: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300", icon: CheckCircle2 },
@@ -71,9 +74,15 @@ function statusMeta(status: string) {
   return STATUS_META[status] || { label: status || "Sin estado", tone: "border-zinc-400/30 bg-zinc-400/10 text-zinc-400", icon: CircleDashed }
 }
 
-const STATUS_OPTIONS = ["idea", "guion_listo", "para_grabar", "grabado", "publicado"]
-const REEL_STATUS_OPTIONS = ["idea", "grabado", "edicion", "completo"]
-const RESPONSABLE_OPTIONS = ["SIN ASIGNAR", "ALEX", "NAHUEL", "EDITOR", "MAXIMO"]
+// El recorrido de una pieza, en orden. "En producción" es el editor trabajando y "En revisión" es
+// el editor entregando: de ahí sale con el link del video final cargado.
+const STATUS_OPTIONS = ["idea", "guion_listo", "para_grabar", "grabado", "en_produccion", "en_revision", "completo", "publicado"]
+export const PIPELINE = ["idea", "guion_listo", "para_grabar", "grabado", "en_produccion", "en_revision", "completo", "publicado"]
+const REEL_STATUS_OPTIONS = ["idea", "grabado", "en_produccion", "en_revision", "completo"]
+// Base fija de responsables; los editores del equipo se suman en tiempo real (ver responsablesCon).
+const RESPONSABLE_OPTIONS = ["SIN ASIGNAR", "ALEX", "NAHUEL", "MAXIMO"]
+const responsablesCon = (editores: string[] | undefined, actual?: string | null) =>
+  [...new Set([...RESPONSABLE_OPTIONS, ...(editores || []), ...(actual ? [actual] : [])])]
 // Quién graba los reels de "Grabar ya".
 const RECORDING_ASSIGNEES = ["ALEX"]
 // Catálogo base propio de Preview. No puede depender solo de las piezas que
@@ -198,7 +207,7 @@ export function ContentWorkspace() {
   const canEdit = session.email !== "preview@yin-yang.local"
   const canCreateOrDelete = canEdit && session.rol !== "Editor"
   const initialRecordingView = searchParams.get("view") === "grabar"
-  const [view, setView] = useState<"semana" | "calendario" | "stories" | "grabar" | "biblioteca">(initialRecordingView ? "grabar" : "semana")
+  const [view, setView] = useState<"semana" | "calendario" | "pipeline" | "stories" | "grabar" | "biblioteca">(initialRecordingView ? "grabar" : "semana")
   const [weekOffset, setWeekOffset] = useState(0)
   const [editing, setEditing] = useState<ContentRow | null>(null)
   const [creating, setCreating] = useState(false)
@@ -218,6 +227,9 @@ export function ContentWorkspace() {
   // Vista "Esta semana": solo piezas gestionables del workspace (manual +
   // planificador importado), no el árbol de páginas stub de Notion.
   const weekKey = `/api/content-workspace?managed_only=1&content_kind=feed&start=${start}&end=${end}&limit=200`
+  // El pipeline no se limita a la semana: muestra todo lo que está en curso.
+  const pipelineKey = "/api/content-workspace?managed_only=1&content_kind=feed&limit=300"
+  const { data: pipelineData, isLoading: pipelineLoading } = useSWR<ApiResponse>(view === "pipeline" ? pipelineKey : null, fetcher)
   const { data: weekData, isLoading: weekLoading, mutate: mutateWeek } = useSWR<ApiResponse>(
     view === "semana" || view === "calendario" ? weekKey : null, fetcher,
   )
@@ -388,9 +400,10 @@ export function ContentWorkspace() {
         <span className="rounded-xl bg-fuchsia-400 px-4 py-2.5 text-xs font-black text-zinc-950">CONTENIDO EXPOSURE</span>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="grid w-full max-w-3xl grid-cols-2 gap-1.5 rounded-2xl border border-border bg-muted/40 p-1.5 sm:grid-cols-3 lg:w-auto lg:grid-cols-5">
+        <div className="grid w-full max-w-3xl grid-cols-2 gap-1.5 rounded-2xl border border-border bg-muted/40 p-1.5 sm:grid-cols-3 lg:w-auto lg:grid-cols-6">
           <button onClick={() => setView("semana")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "semana" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60")}>Esta semana</button>
           <button onClick={() => setView("calendario")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "calendario" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60")}>Calendario</button>
+          <button onClick={() => setView("pipeline")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "pipeline" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60")}>Pipeline</button>
           <button onClick={() => setView("stories")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "stories" ? "bg-fuchsia-500 text-white shadow" : "text-muted-foreground hover:bg-background/60")}>Calendario Stories</button>
           <button onClick={() => { setWeekOffset(0); setView("grabar") }} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "grabar" ? "bg-red-500 text-white shadow shadow-red-500/25" : "text-muted-foreground hover:bg-muted")}><Play className="mr-1 inline h-3.5 w-3.5" />Grabar ya</button>
           <button onClick={() => setView("biblioteca")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "biblioteca" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60")}>Biblioteca / Calendario</button>
@@ -406,6 +419,18 @@ export function ContentWorkspace() {
         <div className="rounded-2xl border border-blue-400/25 bg-blue-400/10 px-4 py-3 text-xs text-blue-100">
           Estás viendo el Preview público. Iniciá sesión con una cuenta aprobada del equipo para crear, editar y calendarizar piezas.
         </div>
+      )}
+
+      {view === "pipeline" && (
+        pipelineLoading ? (
+          <div className="flex items-center justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <PipelineContenido
+            rows={pipelineData?.rows || []}
+            editor={session.rol === "Editor" ? session.nombre : null}
+            onOpen={(row) => setEditing((pipelineData?.rows || []).find((r) => r.id === row.id) || null)}
+          />
+        )
       )}
 
       {view === "semana" && (
@@ -434,12 +459,13 @@ export function ContentWorkspace() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Buscar en título o guion…" className="pl-9" value={libQuery} onChange={(e) => setLibQuery(e.target.value)} />
           </div>
-          <MultiSelectFilter values={libAssignee} options={RESPONSABLE_OPTIONS} onChange={setLibAssignee} />
+          <MultiSelectFilter values={libAssignee} options={responsablesCon(formatOptionsData?.editores)} onChange={setLibAssignee} />
           <MultiSelectFilter values={libStatus} options={STATUS_OPTIONS} onChange={setLibStatus} />
         </div>
       )}
 
-      {view === "stories" ? (
+      {/* El pipeline ya se dibujó arriba: acá se corta para no mostrar además el vacío de las otras vistas. */}
+      {view === "pipeline" ? null : view === "stories" ? (
         <StoriesCalendar canEdit={canCreateOrDelete} />
       ) : view === "grabar" && !isLoading ? (
         <div className="space-y-4">
@@ -541,6 +567,7 @@ export function ContentWorkspace() {
         <ContentEditDialog
           row={editing}
           formatOptions={formatOptionsData?.formats || []}
+          editores={formatOptionsData?.editores || []}
           forceReadOnly={!canEdit}
           allowGenerator={session.rol !== "Editor"}
           onClose={() => setEditing(null)}
@@ -552,6 +579,7 @@ export function ContentWorkspace() {
         <ContentEditDialog
           row={null}
           formatOptions={formatOptionsData?.formats || []}
+          editores={formatOptionsData?.editores || []}
           fechaInicial={fechaNueva}
           onClose={() => { setCreating(false); setFechaNueva("") }}
           onSave={(payload) => saveRow(null, payload)}
@@ -641,6 +669,7 @@ function RecordingPieceDialog({ row, busy, canEdit, onClose, onRecorded }: { row
 function ContentEditDialog({
   row, formatOptions, onClose, onSave, onDelete, forceReadOnly = false, allowGenerator = true,
   fechaInicial = "",
+  editores = [],
 }: {
   row: ContentRow | null
   formatOptions: string[]
@@ -650,11 +679,14 @@ function ContentEditDialog({
   forceReadOnly?: boolean
   allowGenerator?: boolean
   fechaInicial?: string
+  editores?: string[]
 }) {
   const readOnly = forceReadOnly || (!!row && !isManaged(row.source_key))
   // Banco de ángulos editable (Contenido → Banco de ángulos); incluye el del row aunque esté inactivo,
   // para no vaciar el campo de una pieza vieja al abrirla.
   const { etiquetas, categoriaDe } = useAngulos()
+  // Catálogo de formatos editable (Contenido → Formatos → Catálogo).
+  const { nombres: nombresDeFormato } = useFormatos()
   const etiquetasAngulo = row?.angle && !etiquetas.includes(row.angle) ? [row.angle, ...etiquetas] : etiquetas
   const initialStage = String(row?.metadata?.funnel_stage || "")
   const [formatOpen, setFormatOpen] = useState(false)
@@ -679,12 +711,12 @@ function ContentEditDialog({
   const set = (field: string) => (value: string) => setForm((f) => ({ ...f, [field]: value }))
   const availableFormats = useMemo(() => {
     const formats = [...new Set([
-      ...OFFICIAL_FORMAT_OPTIONS,
+      ...nombresDeFormato,
       ...formatOptions,
       ...(form.format ? [form.format] : []),
     ].map(canonicalFormatLabel).filter((format) => !STORY_ONLY_FORMATS.test(format)))]
     return [...formats].sort((a, b) => a.localeCompare(b, "es"))
-  }, [form.format, formatOptions])
+  }, [form.format, formatOptions, nombresDeFormato])
   const cleanFormatQuery = formatQuery.trim()
   const matchingFormat = availableFormats.find(
     (format) => format.toLocaleLowerCase("es") === cleanFormatQuery.toLocaleLowerCase("es"),
@@ -905,7 +937,7 @@ function ContentEditDialog({
               <Label>Responsable</Label>
               <Select disabled={readOnly} value={form.assigned_to} onValueChange={set("assigned_to")}>
                 <SelectTrigger><SelectValue placeholder="SIN ASIGNAR" /></SelectTrigger>
-                <SelectContent>{RESPONSABLE_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                <SelectContent>{responsablesCon(editores, form.assigned_to).map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
@@ -932,6 +964,43 @@ function ContentEditDialog({
             <div>
               <Label>{isCarousel ? "Hook sugerido + idea del carrusel" : "Dirección de grabación / notas"}</Label>
               <Textarea disabled={readOnly} rows={4} value={form.insight_notes} onChange={(e) => set("insight_notes")(e.target.value)} placeholder={isCarousel ? "Hook de portada y concepto visual; sin guion." : "Idea central, prueba, ejemplo y dirección de la pieza; sin escribir el guion completo."} />
+            </div>
+          )}
+
+          {/* Entrega del editor: aparece cuando la pieza está en producción o ya entregada. El editor
+              pega el link del video final y la pasa a revisión de una sola vez, sin tocar el estado a mano. */}
+          {(form.status === "en_produccion" || form.status === "en_revision") && (
+            <div className={cn("rounded-xl border p-3", form.status === "en_revision" ? "border-fuchsia-400/40 bg-fuchsia-400/[.07]" : "border-sky-400/40 bg-sky-400/[.07]")}>
+              <p className="flex items-center gap-2 text-sm font-black">
+                {form.status === "en_revision" ? <Eye className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                {form.status === "en_revision" ? "Entregada, esperando revisión" : "En producción"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {form.status === "en_revision"
+                  ? "Ya está entregada. Si la volvés a editar, actualizá el link y avisá."
+                  : "Cuando el video esté listo, pegá el link final y pasala a revisión."}
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-end gap-2">
+                <div className="min-w-[240px] flex-1">
+                  <Label className="text-xs text-muted-foreground">Link del video final</Label>
+                  <Input disabled={readOnly} value={form.source_url} onChange={(e) => set("source_url")(e.target.value)} placeholder="https://drive.google.com/… o el link de la pieza" className="mt-1" />
+                </div>
+                {form.status === "en_produccion" && (
+                  <Button
+                    type="button"
+                    disabled={readOnly || !form.source_url.trim()}
+                    onClick={() => onSave({ ...payload("en_revision"), source_url: form.source_url })}
+                    title={form.source_url.trim() ? "" : "Pegá primero el link del video final"}
+                  >
+                    <Send className="mr-2 h-4 w-4" />Pasar a revisión
+                  </Button>
+                )}
+                {form.source_url.trim() && /^https?:\/\//i.test(form.source_url.trim()) && (
+                  <Button type="button" variant="outline" asChild>
+                    <a href={form.source_url.trim()} target="_blank" rel="noreferrer"><Link2 className="mr-2 h-4 w-4" />Abrir</a>
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

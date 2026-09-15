@@ -46,6 +46,7 @@ const HOY = () => new Date().toISOString().slice(0, 10)
 
 const ESTADOS: Record<string, string> = {
   idea: "Idea", guion_listo: "Guion", para_grabar: "Grabar", grabado: "Grabado",
+  en_produccion: "En producción", en_revision: "En revisión",
   edicion: "Edición", completo: "Completo", publicado: "Publicado", historical: "Histórico",
 }
 const LISTO = new Set(["completo", "publicado"])
@@ -258,6 +259,66 @@ export function CalendarioSemana({ start, rows, onOpen }: {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+
+// ───────────────────────────── vista 3: pipeline de producción ─────────────────────────────
+
+// Las columnas del recorrido. "En producción" es el editor trabajando; "En revisión" es lo que el
+// editor ya entregó con el link del video final y está esperando el ok.
+const COLUMNAS: Array<{ id: string; label: string; estados: string[]; acento: string }> = [
+  { id: "idea", label: "Idea", estados: ["idea"], acento: "bg-zinc-400" },
+  { id: "guion", label: "Guion listo", estados: ["guion_listo"], acento: "bg-blue-500" },
+  { id: "grabar", label: "Para grabar", estados: ["para_grabar"], acento: "bg-amber-500" },
+  { id: "grabado", label: "Grabado", estados: ["grabado"], acento: "bg-violet-500" },
+  { id: "produccion", label: "En producción", estados: ["en_produccion", "edicion"], acento: "bg-sky-500" },
+  { id: "revision", label: "En revisión", estados: ["en_revision"], acento: "bg-fuchsia-500" },
+  { id: "listo", label: "Listo", estados: ["completo", "publicado"], acento: "bg-emerald-500" },
+]
+
+export function PipelineContenido({ rows, onOpen, editor }: {
+  rows: PiezaSemana[]
+  onOpen: (row: PiezaSemana) => void
+  editor?: string | null
+}) {
+  const { categoriaDe } = useAngulos()
+  // Si quien mira es un editor, sus piezas van primero: es lo que tiene que hacer hoy.
+  const orden = (a: PiezaSemana, b: PiezaSemana) => {
+    const mia = (p: PiezaSemana) => (editor && p.assigned_to === editor ? 0 : 1)
+    return mia(a) - mia(b) || String(a.planned_at || "").localeCompare(String(b.planned_at || ""))
+  }
+  return (
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      {COLUMNAS.map((col) => {
+        const piezas = rows.filter((r) => col.estados.includes(r.status)).sort(orden)
+        return (
+          <section key={col.id} className="flex min-h-[140px] flex-col rounded-xl border border-border bg-muted/30 p-2">
+            <header className="mb-2 flex items-center gap-1.5 px-1">
+              <span className={cn("h-2 w-2 rounded-full", col.acento)} />
+              <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">{col.label}</span>
+              <span className="ml-auto text-[11px] font-bold text-muted-foreground">{piezas.length || ""}</span>
+            </header>
+            <div className="flex flex-1 flex-col gap-1.5">
+              {piezas.map((row) => {
+                const mia = editor && row.assigned_to === editor
+                return (
+                  <div key={row.id} className={cn("rounded-lg", mia && "ring-1 ring-primary/50")}>
+                    <Pieza row={row} categoria={categoriaDe(row.angle)} onOpen={() => onOpen(row)} compacta />
+                    {row.assigned_to && row.assigned_to !== "SIN ASIGNAR" && (
+                      <p className={cn("px-2 pb-1 pt-0.5 text-[10px] font-semibold", mia ? "text-primary" : "text-muted-foreground")}>
+                        {mia ? "Tuya · " : ""}{row.assigned_to}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+              {!piezas.length && <p className="px-1 py-3 text-center text-[11px] text-muted-foreground/70">Vacío</p>}
+            </div>
+          </section>
+        )
+      })}
     </div>
   )
 }

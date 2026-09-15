@@ -87,7 +87,10 @@ export async function GET(request: Request) {
       const formats = [...new Set(
         (data || []).map((row) => canonicalFeedFormat(String(row.format || ""))).filter((format) => format && !storyOnly.test(format)),
       )].sort((a, b) => a.localeCompare(b, "es"))
-      return NextResponse.json({ formats })
+      // El desplegable de responsable necesita los editores reales del equipo, no una lista fija.
+      const { data: equipo } = await sb.from("team_members").select("nombre,rol,estado").eq("estado", "aprobado")
+      const editores = (equipo || []).filter((m) => m.rol === "Editor").map((m) => String(m.nombre || "").trim()).filter(Boolean).sort((a, b) => a.localeCompare(b, "es"))
+      return NextResponse.json({ formats, editores })
     }
     const start = searchParams.get("start")
     const end = searchParams.get("end")

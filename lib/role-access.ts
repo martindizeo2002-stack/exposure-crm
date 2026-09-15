@@ -67,6 +67,7 @@ const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/panel", [...OPERATIONS, "Contaduria"]],  // datos del Panel del negocio
   ["/api/formatos", [...OPERATIONS, "Editor"]],   // rendimiento por pieza de contenido
   ["/api/angulos", [...OPERATIONS, "Editor"]],    // banco de ángulos editable
+  ["/api/banco-formatos", [...OPERATIONS, "Editor"]],  // catálogo de formatos (escritura solo CEO, se valida en la ruta)
   ["/api/angulos-manychat", OPERATIONS],
   ["/api/setting-resumen", SALES_OPERATIONS],
   ["/api/whatsapp", OPERATIONS],

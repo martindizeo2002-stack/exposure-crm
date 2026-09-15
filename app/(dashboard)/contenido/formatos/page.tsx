@@ -5,6 +5,9 @@ import useSWR from "swr"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { ModuleTabs } from "@/components/module-tabs"
+import { BancoFormatos } from "@/components/banco-formatos"
+import { BarChart3, LayoutGrid } from "lucide-react"
 
 type Fila = { nombre: string; formato?: string; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number; ultima?: string | null }
 type Datos = { desde: string; dias: number; total: number; formatos: Fila[]; piezas: Fila[]; canales: Fila[] }
@@ -46,12 +49,14 @@ function Tabla({ filas, titulo, sub, conFormato }: { filas: Fila[]; titulo: stri
   </Card>
 }
 
-export default function FormatosPage() {
+// La pantalla tiene dos pestañas: el rendimiento medido de cada formato (lo que ya existía) y el
+// catálogo editable con las referencias visuales (solo el admin lo modifica).
+function RendimientoFormatos() {
   const [dias, setDias] = useState(90)
   const { data, error, isLoading } = useSWR<Datos>(`/api/formatos?dias=${dias}`, fetcher)
   return <div className="mx-auto w-full max-w-[1800px] space-y-6 px-4 py-5 sm:px-6 lg:px-[1.5cm]">
     <div className="flex flex-wrap items-end justify-between gap-3">
-      <div><h1 className="text-2xl font-black">Formatos</h1><p className="text-sm text-muted-foreground">Qué tipo de pieza y qué pieza concreta traen agendas, llamadas presentadas y ventas. Sale del cruce de cada agenda con su contacto de ManyChat (el tag de la pieza que la trajo).</p></div>
+      <div><h2 className="text-lg font-black">Rendimiento por formato</h2><p className="max-w-3xl text-sm text-muted-foreground">Qué tipo de pieza y qué pieza concreta traen agendas, llamadas presentadas y ventas. Sale del cruce de cada agenda con su contacto de ManyChat (el tag de la pieza que la trajo).</p></div>
       <div className="flex gap-2">{[30, 90, 180, 365].map((d) => <button key={d} type="button" onClick={() => setDias(d)} className={cn("rounded-full border px-3 py-1.5 text-xs font-bold uppercase tracking-wide", dias === d ? "border-white bg-white text-black" : "border-white/15 text-white/60 hover:bg-white/5")}>{d} días</button>)}</div>
     </div>
     {error && <p className="text-sm text-red-300">No se pudo cargar: {String(error)}</p>}
@@ -63,4 +68,15 @@ export default function FormatosPage() {
       <Tabla filas={data.canales} titulo="Por canal de origen" sub="Agrupa la fuente de la agenda: Instagram orgánico, ads, webinar, outbound, referidos." />
     </>}
   </div>
+}
+
+export default function FormatosPage() {
+  return <ModuleTabs
+    title="Formatos"
+    subtitle="Qué rinde cada formato y el catálogo con la referencia de cómo se ve cada uno"
+    tabs={[
+      { id: "catalogo", label: "Catálogo", hint: "formatos y sus referencias", icon: <LayoutGrid className="h-4 w-4" />, content: <div className="mx-auto w-full max-w-[1800px] px-4 py-5 sm:px-6 lg:px-[1.5cm]"><BancoFormatos /></div> },
+      { id: "rendimiento", label: "Rendimiento", hint: "qué formato trae ventas", icon: <BarChart3 className="h-4 w-4" />, content: <RendimientoFormatos /> },
+    ]}
+  />
 }
