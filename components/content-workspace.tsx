@@ -232,7 +232,7 @@ export function ContentWorkspace() {
   const weekKey = `/api/content-workspace?managed_only=1&content_kind=feed&start=${start}&end=${end}&limit=200`
   // El pipeline no se limita a la semana: muestra todo lo que está en curso.
   const pipelineKey = "/api/content-workspace?managed_only=1&content_kind=feed&limit=300"
-  const { data: pipelineData, isLoading: pipelineLoading } = useSWR<ApiResponse>(view === "pipeline" ? pipelineKey : null, fetcher)
+  const { data: pipelineData, isLoading: pipelineLoading, mutate: mutatePipeline } = useSWR<ApiResponse>(view === "pipeline" ? pipelineKey : null, fetcher)
   const { data: weekData, isLoading: weekLoading, mutate: mutateWeek } = useSWR<ApiResponse>(
     view === "semana" || view === "calendario" ? weekKey : null, fetcher,
   )
@@ -280,7 +280,7 @@ export function ContentWorkspace() {
 
   const data = view === "biblioteca" ? libData : view === "grabar" ? recordingData : weekData
   const isLoading = view === "biblioteca" ? libLoading : view === "grabar" ? recordingLoading : weekLoading
-  const mutateAll = () => { mutateWeek(); mutateLib(); mutateRecording() }
+  const mutateAll = () => { mutateWeek(); mutateLib(); mutateRecording(); mutatePipeline() }
 
   const rows = data?.rows || []
   const grouped = useMemo(() => {
@@ -365,6 +365,23 @@ export function ContentWorkspace() {
     }
   }
 
+  // Arrastrar una pieza de una columna a otra del pipeline es cambiarle el estado. El tablero ya
+  // la movió en pantalla; acá se guarda y, si falla, se recarga para que vuelva a su lugar.
+  async function moverPieza(row: { id: string }, status: string) {
+    const res = await fetch("/api/content-workspace", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: row.id, status }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      mutatePipeline()
+      throw new Error(json.error || "No se pudo mover la pieza")
+    }
+    await mutatePipeline()
+    mutateWeek(); mutateLib()
+  }
+
   async function saveRow(id: string | null, payload: Record<string, unknown>) {
     try {
       const res = await fetch("/api/content-workspace", {
@@ -436,6 +453,7 @@ export function ContentWorkspace() {
             editor={session.rol === "Editor" ? session.nombre : null}
             responsables={formatOptionsData?.editores || []}
             onOpen={(row) => setEditing((pipelineData?.rows || []).find((r) => r.id === row.id) || null)}
+            onMover={canEdit ? moverPieza : undefined}
           />
         )
       )}

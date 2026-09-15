@@ -1,11 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { colorAngulo } from "@/lib/colores-angulo"
 import { useAngulos } from "@/lib/use-angulos"
 import { SIN_ASIGNAR, claveNombre, responsableDe as nombreResponsable, unificarResponsables } from "@/lib/responsables"
-import { Plus } from "lucide-react"
+import { GripVertical, Plus } from "lucide-react"
+import { toast } from "sonner"
 
 // Las dos vistas de la semana de Contenido:
 //  · TableroSemana: una columna por día, y adentro un bloquecito por pieza. Se ve la semana entera
@@ -283,15 +284,51 @@ const COLUMNAS: Array<{ id: string; label: string; estados: string[]; acento: st
 // "Ian Algue" son la misma persona y tienen que dar un solo chip en el filtro.
 const responsableDe = (p: PiezaSemana) => nombreResponsable(p.assigned_to)
 
-export function PipelineContenido({ rows, onOpen, editor, responsables = [] }: {
+export function PipelineContenido({ rows, onOpen, editor, responsables = [], onMover }: {
   rows: PiezaSemana[]
   onOpen: (row: PiezaSemana) => void
   editor?: string | null
   responsables?: string[]
+  // Arrastrar una pieza a otra columna le cambia el estado. Sin esta prop el tablero es de lectura.
+  onMover?: (row: PiezaSemana, estado: string) => Promise<void> | void
 }) {
   const { categoriaDe } = useAngulos()
   // Un editor entra viendo lo suyo; el resto del equipo entra viendo todo.
   const [filtro, setFiltro] = useState<string | null>(editor || null)
+  // Mientras se guarda el cambio, la pieza ya se dibuja en la columna nueva: si el guardado falla
+  // se recarga y vuelve sola a donde estaba.
+  const [arrastrando, setArrastrando] = useState<string | null>(null)
+  const [encima, setEncima] = useState<string | null>(null)
+  const [movidas, setMovidas] = useState<Record<string, string>>({})
+  const estadoDe = (row: PiezaSemana) => movidas[row.id] || row.status
+  // Cuando el servidor ya devolvió la pieza con el estado nuevo, se suelta el provisorio.
+  useEffect(() => {
+    setMovidas((previas) => {
+      const quedan = Object.fromEntries(
+        Object.entries(previas).filter(([id, estado]) => {
+          const row = rows.find((r) => r.id === id)
+          return row && row.status !== estado
+        }),
+      )
+      return Object.keys(quedan).length === Object.keys(previas).length ? previas : quedan
+    })
+  }, [rows])
+
+  async function soltar(col: (typeof COLUMNAS)[number]) {
+    const id = arrastrando
+    setArrastrando(null); setEncima(null)
+    if (!id || !onMover) return
+    const row = rows.find((r) => r.id === id)
+    if (!row || col.estados.includes(estadoDe(row))) return
+    const destino = col.estados[0]
+    setMovidas((p) => ({ ...p, [id]: destino }))
+    try {
+      await onMover(row, destino)
+    } catch (e) {
+      setMovidas((p) => { const { [id]: _, ...resto } = p; return resto })
+      toast.error(e instanceof Error ? e.message : "No se pudo mover la pieza")
+    }
+  }
 
   // Los chips del filtro: quien tenga piezas, más los editores del equipo aunque no tengan nada
   // asignado todavía (así se ve de un vistazo quién está libre).
@@ -356,9 +393,18 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [] }: {
     )}
     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
       {COLUMNAS.map((col) => {
-        const piezas = visibles.filter((r) => col.estados.includes(r.status)).sort(orden)
+        const piezas = visibles.filter((r) => col.estados.includes(estadoDe(r))).sort(orden)
+        const recibe = Boolean(onMover) && arrastrando !== null
         return (
-          <section key={col.id} className="flex min-h-[140px] flex-col rounded-xl border border-border bg-muted/30 p-2">
+          <section
+            key={col.id}
+            onDragOver={(e) => { if (!recibe) return; e.preventDefault(); setEncima(col.id) }}
+            onDragLeave={() => setEncima((c) => (c === col.id ? null : c))}
+            onDrop={(e) => { if (!recibe) return; e.preventDefault(); void soltar(col) }}
+            className={cn("flex min-h-[140px] flex-col rounded-xl border border-border bg-muted/30 p-2 transition",
+              recibe && "border-dashed",
+              encima === col.id && "border-primary bg-primary/10 ring-2 ring-primary/40")}
+          >
             <header className="mb-2 flex items-center gap-1.5 px-1">
               <span className={cn("h-2 w-2 rounded-full", col.acento)} />
               <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">{col.label}</span>
@@ -366,19 +412,44 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [] }: {
             </header>
             <div className="flex flex-1 flex-col gap-1.5">
               {piezas.map((row) => {
-                const mia = editor && row.assigned_to === editor
+                const mia = editor && claveNombre(row.assigned_to) === claveNombre(editor)
+                const guardando = Boolean(movidas[row.id])
+                const indice = COLUMNAS.findIndex((c) => c.estados.includes(estadoDe(row)))
                 return (
-                  <div key={row.id} className={cn("rounded-lg", mia && "ring-1 ring-primary/50")}>
+                  <div
+                    key={row.id}
+                    draggable={Boolean(onMover)}
+                    onDragStart={(e) => { setArrastrando(row.id); e.dataTransfer.effectAllowed = "move" }}
+                    onDragEnd={() => { setArrastrando(null); setEncima(null) }}
+                    className={cn("group/pieza relative rounded-lg transition", mia && "ring-1 ring-primary/50",
+                      onMover && "cursor-grab active:cursor-grabbing",
+                      arrastrando === row.id && "opacity-40",
+                      guardando && "animate-pulse")}
+                  >
+                    {onMover && <GripVertical className="pointer-events-none absolute right-1 top-1 h-3.5 w-3.5 text-muted-foreground opacity-0 transition group-hover/pieza:opacity-60" />}
                     <Pieza row={row} categoria={categoriaDe(row.angle)} onOpen={() => onOpen(row)} compacta />
-                    {row.assigned_to && row.assigned_to !== "SIN ASIGNAR" && (
-                      <p className={cn("px-2 pb-1 pt-0.5 text-[10px] font-semibold", mia ? "text-primary" : "text-muted-foreground")}>
-                        {mia ? "Tuya · " : ""}{row.assigned_to}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-1 px-2 pb-1 pt-0.5">
+                      {row.assigned_to && responsableDe(row) !== SIN_ASIGNAR && (
+                        <p className={cn("min-w-0 flex-1 truncate text-[10px] font-semibold", mia ? "text-primary" : "text-muted-foreground")}>
+                          {mia ? "Tuya · " : ""}{row.assigned_to}
+                        </p>
+                      )}
+                      {/* En el celular no se puede arrastrar: estas flechas mueven de columna igual. */}
+                      {onMover && (
+                        <span className="ml-auto flex shrink-0 gap-0.5 opacity-0 transition group-hover/pieza:opacity-100">
+                          <button type="button" aria-label="Mover a la columna anterior" disabled={indice <= 0}
+                            onClick={() => { setArrastrando(row.id); void soltar(COLUMNAS[indice - 1]) }}
+                            className="rounded px-1 text-[11px] font-black text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25">‹</button>
+                          <button type="button" aria-label="Mover a la columna siguiente" disabled={indice < 0 || indice >= COLUMNAS.length - 1}
+                            onClick={() => { setArrastrando(row.id); void soltar(COLUMNAS[indice + 1]) }}
+                            className="rounded px-1 text-[11px] font-black text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25">›</button>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )
               })}
-              {!piezas.length && <p className="px-1 py-3 text-center text-[11px] text-muted-foreground/70">Vacío</p>}
+              {!piezas.length && <p className="px-1 py-3 text-center text-[11px] text-muted-foreground/70">{recibe ? "Soltá acá" : "Vacío"}</p>}
             </div>
           </section>
         )
