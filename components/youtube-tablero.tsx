@@ -420,7 +420,7 @@ function VideoDialog({ video, esAdmin, puedeEditar, editores, onClose, onCambio 
                         <SubirImagen destino="youtube" id={video.id} titulo={video.titulo} onSubido={async (url) => { setBorrador((b) => ({ ...b, miniatura_url: url })); await onCambio() }} />
                       </div>
                     </Campo>
-                    <Campo label="Link del video" hint={delCanal ? "Viene del canal" : "Drive, o el link de YouTube ya publicado"}>
+                    <Campo label="Link del video" hint={delCanal ? "Viene del canal" : "Drive o YouTube"}>
                       <Input value={borrador.video_url} onChange={(e) => setBorrador({ ...borrador, video_url: e.target.value })} disabled={delCanal} />
                     </Campo>
                   </div>
@@ -440,9 +440,14 @@ function VideoDialog({ video, esAdmin, puedeEditar, editores, onClose, onCambio 
   )
 }
 
+// La ayuda va en su propio renglón: pegada a la etiqueta hacía que el título se partiera en dos
+// líneas y descuadraba la grilla de campos.
 function Campo({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return <div className="space-y-1">
-    <Label className="text-xs">{label}{hint ? <span className="ml-1 font-normal text-muted-foreground">· {hint}</span> : null}</Label>
+    <div>
+      <Label className="text-xs">{label}</Label>
+      {hint ? <p className="text-[11px] leading-tight text-muted-foreground">{hint}</p> : null}
+    </div>
     {children}
   </div>
 }

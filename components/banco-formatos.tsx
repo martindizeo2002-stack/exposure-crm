@@ -200,6 +200,10 @@ export function BancoFormatos() {
                   ) : (
                     <>
                       <Referencia formato={f} />
+                      {admin ? <SubirImagen destino="formato" id={f.id} titulo={f.nombre}
+                        variant={f.portada_url ? "ghost" : "outline"}
+                        etiqueta={f.portada_url ? "Cambiar la portada" : "Subir la portada"}
+                        onSubido={() => { recargar() }} /> : null}
                       <div>
                         <p className="text-sm font-black leading-tight">{f.nombre}</p>
                         <p className="mt-1 text-[11px] text-muted-foreground">
@@ -211,8 +215,6 @@ export function BancoFormatos() {
                       {admin && (
                         <div className="flex gap-1 border-t border-border pt-2">
                           <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => abrirEdicion(f)}>Editar</Button>
-                          <SubirImagen destino="formato" id={f.id} titulo={f.nombre} variant="ghost" full={false}
-                            etiqueta={f.referencia_url ? "Cambiar portada" : "Subir portada"} onSubido={() => { recargar() }} />
                           <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => llamar("PATCH", { id: f.id, activo: !f.activo }, f.id)} disabled={ocupado !== null} title={f.activo ? "Dejar de ofrecerlo" : "Volver a ofrecerlo"}>
                             {f.activo ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                           </Button>
