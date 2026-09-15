@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { colorAngulo } from "@/lib/colores-angulo"
 import { useAngulos } from "@/lib/use-angulos"
@@ -278,21 +278,80 @@ const COLUMNAS: Array<{ id: string; label: string; estados: string[]; acento: st
   { id: "listo", label: "Listo", estados: ["completo", "publicado"], acento: "bg-emerald-500" },
 ]
 
-export function PipelineContenido({ rows, onOpen, editor }: {
+const SIN_ASIGNAR = "SIN ASIGNAR"
+const responsableDe = (p: PiezaSemana) => {
+  const r = String(p.assigned_to || "").trim()
+  return !r || r.toLocaleUpperCase("es") === SIN_ASIGNAR ? SIN_ASIGNAR : r
+}
+
+export function PipelineContenido({ rows, onOpen, editor, responsables = [] }: {
   rows: PiezaSemana[]
   onOpen: (row: PiezaSemana) => void
   editor?: string | null
+  responsables?: string[]
 }) {
   const { categoriaDe } = useAngulos()
+  // Un editor entra viendo lo suyo; el resto del equipo entra viendo todo.
+  const [filtro, setFiltro] = useState<string | null>(editor || null)
+
+  // Los chips del filtro: quien tenga piezas, más los editores del equipo aunque no tengan nada
+  // asignado todavía (así se ve de un vistazo quién está libre).
+  const gente = useMemo(() => {
+    const cuenta = new Map<string, number>()
+    for (const nombre of responsables) cuenta.set(nombre, 0)
+    for (const row of rows) {
+      const r = responsableDe(row)
+      cuenta.set(r, (cuenta.get(r) || 0) + 1)
+    }
+    const sin = cuenta.get(SIN_ASIGNAR) || 0
+    cuenta.delete(SIN_ASIGNAR)
+    const lista = [...cuenta.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"))
+    return sin ? [...lista, [SIN_ASIGNAR, sin] as [string, number]] : lista
+  }, [rows, responsables])
+
+  const visibles = useMemo(() => (filtro ? rows.filter((r) => responsableDe(r) === filtro) : rows), [rows, filtro])
+
   // Si quien mira es un editor, sus piezas van primero: es lo que tiene que hacer hoy.
   const orden = (a: PiezaSemana, b: PiezaSemana) => {
     const mia = (p: PiezaSemana) => (editor && p.assigned_to === editor ? 0 : 1)
     return mia(a) - mia(b) || String(a.planned_at || "").localeCompare(String(b.planned_at || ""))
   }
+
   return (
+    <div className="space-y-3">
+    <div className="flex flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setFiltro(null)}
+        className={cn("rounded-full border px-3 py-1 text-xs font-bold transition",
+          filtro === null ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-muted")}
+      >
+        Todos <span className="opacity-70">{rows.length}</span>
+      </button>
+      {gente.map(([nombre, n]) => (
+        <button
+          key={nombre}
+          type="button"
+          onClick={() => setFiltro(filtro === nombre ? null : nombre)}
+          className={cn("rounded-full border px-3 py-1 text-xs font-bold transition",
+            filtro === nombre ? "border-foreground bg-foreground text-background"
+              : n === 0 ? "border-dashed border-border text-muted-foreground/70 hover:bg-muted"
+              : "border-border text-muted-foreground hover:bg-muted",
+            nombre === editor && filtro !== nombre && "border-primary/50 text-primary")}
+          title={n === 0 ? `${nombre} no tiene piezas asignadas` : `${n} piezas de ${nombre}`}
+        >
+          {nombre === SIN_ASIGNAR ? "Sin asignar" : nombre}{nombre === editor ? " (vos)" : ""} <span className="opacity-70">{n}</span>
+        </button>
+      ))}
+    </div>
+    {filtro && !visibles.length && (
+      <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
+        {filtro === SIN_ASIGNAR ? "No hay piezas sin asignar." : `${filtro} no tiene piezas asignadas todavía.`}
+      </p>
+    )}
     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
       {COLUMNAS.map((col) => {
-        const piezas = rows.filter((r) => col.estados.includes(r.status)).sort(orden)
+        const piezas = visibles.filter((r) => col.estados.includes(r.status)).sort(orden)
         return (
           <section key={col.id} className="flex min-h-[140px] flex-col rounded-xl border border-border bg-muted/30 p-2">
             <header className="mb-2 flex items-center gap-1.5 px-1">
@@ -319,6 +378,7 @@ export function PipelineContenido({ rows, onOpen, editor }: {
           </section>
         )
       })}
+    </div>
     </div>
   )
 }

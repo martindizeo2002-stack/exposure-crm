@@ -428,6 +428,7 @@ export function ContentWorkspace() {
           <PipelineContenido
             rows={pipelineData?.rows || []}
             editor={session.rol === "Editor" ? session.nombre : null}
+            responsables={formatOptionsData?.editores || []}
             onOpen={(row) => setEditing((pipelineData?.rows || []).find((r) => r.id === row.id) || null)}
           />
         )
