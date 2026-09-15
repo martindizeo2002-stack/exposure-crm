@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { Loader2, Plus, Save, Trash2, EyeOff, Eye, X, ExternalLink, ImageOff, Lock } from "lucide-react"
-import { useFormatos, previewFormato, type FormatoBanco } from "@/lib/use-formatos"
+import { useFormatos, previewFormato, primerLink, type FormatoBanco } from "@/lib/use-formatos"
 import { SubirImagen } from "@/components/subir-imagen"
 
 // Panel de formatos: el catálogo de formatos elegibles para una pieza, con la referencia visual de
@@ -23,7 +23,7 @@ const VACIO: Borrador = { nombre: "", tipo: "Reel", descripcion: "", referencia_
 // archivo de Drive). Si no hay portada ni imagen derivable, queda el botón para abrirlo.
 function Referencia({ formato }: { formato: Pick<FormatoBanco, "nombre" | "portada_url" | "referencia_url"> }) {
   const p = previewFormato(formato)
-  const destino = formato.referencia_url || formato.portada_url
+  const destino = primerLink(formato.referencia_url) || formato.portada_url
   const [rota, setRota] = useState(false)
   if (p.tipo === "imagen" && !rota) {
     const imagen = (

@@ -55,9 +55,13 @@ export function useFormatos() {
 // una vez del posteo); si no hay, se intenta derivar del link: las imágenes se muestran y de
 // YouTube o Drive se saca la miniatura. Instagram y TikTok no dejan incrustar, así que sin portada
 // quedan como botón: una miniatura rota se ve peor que un botón honesto.
+// El campo de referencia a veces junta varios ejemplos pegados con espacios (el formato EXPOSURE
+// tiene nueve). Para abrir y para derivar la miniatura vale el primero.
+export const primerLink = (url: string | null | undefined) => String(url || "").trim().split(/\s+/)[0] || null
+
 export function previewFormato(f: Pick<FormatoBanco, "portada_url" | "referencia_url">) {
   const portada = previewDe(f.portada_url)
-  return portada.tipo === "imagen" ? portada : previewDe(f.referencia_url)
+  return portada.tipo === "imagen" ? portada : previewDe(primerLink(f.referencia_url))
 }
 
 // Vista previa de la referencia de un formato. Las imágenes se muestran; de YouTube se saca la
