@@ -28,7 +28,7 @@ function Referencia({ formato }: { formato: Pick<FormatoBanco, "nombre" | "porta
   if (p.tipo === "imagen" && !rota) {
     const imagen = (
       /* eslint-disable-next-line @next/next/no-img-element */
-      <img src={p.src} alt={`Portada de ${formato.nombre}`} className="h-32 w-full object-cover transition hover:scale-[1.03]" onError={() => setRota(true)} loading="lazy" />
+      <img src={p.src} alt={`Portada de ${formato.nombre}`} className="aspect-[9/16] w-full object-cover transition hover:scale-[1.03]" onError={() => setRota(true)} loading="lazy" />
     )
     return destino
       ? <a href={destino} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-border bg-muted">{imagen}</a>
@@ -36,14 +36,14 @@ function Referencia({ formato }: { formato: Pick<FormatoBanco, "nombre" | "porta
   }
   if ((p.tipo === "link" || rota) && destino) {
     return (
-      <a href={destino} target="_blank" rel="noreferrer" className="flex h-32 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/50 text-xs font-semibold text-muted-foreground transition hover:border-foreground/30 hover:text-foreground">
-        <ExternalLink className="h-4 w-4" />Ver referencia{p.tipo === "link" && p.dominio ? ` en ${p.dominio}` : ""}
+      <a href={destino} target="_blank" rel="noreferrer" className="flex aspect-[9/16] items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/50 px-2 text-center text-xs font-semibold text-muted-foreground transition hover:border-foreground/30 hover:text-foreground">
+        <span className="flex flex-col items-center gap-1.5"><ExternalLink className="h-4 w-4" />Ver el ejemplo{p.tipo === "link" && p.dominio ? <span className="block font-normal opacity-70">{p.dominio}</span> : null}</span>
       </a>
     )
   }
   return (
-    <div className="flex h-32 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 text-xs text-muted-foreground">
-      <ImageOff className="h-4 w-4" />Sin portada cargada
+    <div className="flex aspect-[9/16] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/30 px-2 text-center text-xs text-muted-foreground">
+      <ImageOff className="h-4 w-4" />Sin portada
     </div>
   )
 }
@@ -183,10 +183,10 @@ export function BancoFormatos() {
       {porTipo.map(([tipo, lista]) => (
         <section key={tipo} className="space-y-2">
           <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">{tipo} · {lista.length}</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {lista.map((f) => (
               <Card key={f.id} className={cn("overflow-hidden", !f.activo && "opacity-60")}>
-                <CardContent className="space-y-2.5 p-3">
+                <CardContent className="space-y-2 p-2.5">
                   {editando === f.id ? (
                     <>
                       {campos(borrador, setBorrador, f.id)}
@@ -202,7 +202,7 @@ export function BancoFormatos() {
                       <Referencia formato={f} />
                       {admin ? <SubirImagen destino="formato" id={f.id} titulo={f.nombre}
                         variant={f.portada_url ? "ghost" : "outline"}
-                        etiqueta={f.portada_url ? "Cambiar la portada" : "Subir la portada"}
+                        etiqueta={f.portada_url ? "Cambiar portada" : "Subir portada"}
                         onSubido={() => { recargar() }} /> : null}
                       <div>
                         <p className="text-sm font-black leading-tight">{f.nombre}</p>
