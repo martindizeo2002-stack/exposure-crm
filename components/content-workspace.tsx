@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useSession } from "@/components/session-provider"
 import { useAngulos } from "@/lib/use-angulos"
+import { unificarResponsables } from "@/lib/responsables"
 import { colorAngulo } from "@/lib/colores-angulo"
 import { TableroSemana, CalendarioSemana, PipelineContenido } from "@/components/content-semana"
 import { useFormatos } from "@/lib/use-formatos"
@@ -81,8 +82,10 @@ export const PIPELINE = ["idea", "guion_listo", "para_grabar", "grabado", "en_pr
 const REEL_STATUS_OPTIONS = ["idea", "grabado", "en_produccion", "en_revision", "completo"]
 // Base fija de responsables; los editores del equipo se suman en tiempo real (ver responsablesCon).
 const RESPONSABLE_OPTIONS = ["SIN ASIGNAR", "ALEX", "NAHUEL", "MAXIMO"]
+// unificarResponsables colapsa el mismo nombre escrito distinto (acentos, mayúsculas), así que un
+// editor no aparece dos veces por lo que quedó tipeado a mano en una pieza vieja.
 const responsablesCon = (editores: string[] | undefined, actual?: string | null) =>
-  [...new Set([...RESPONSABLE_OPTIONS, ...(editores || []), ...(actual ? [actual] : [])])]
+  unificarResponsables(RESPONSABLE_OPTIONS, editores, actual ? [actual] : [])
 // Quién graba los reels de "Grabar ya".
 const RECORDING_ASSIGNEES = ["ALEX"]
 // Catálogo base propio de Preview. No puede depender solo de las piezas que

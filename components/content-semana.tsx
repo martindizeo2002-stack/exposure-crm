@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { colorAngulo } from "@/lib/colores-angulo"
 import { useAngulos } from "@/lib/use-angulos"
+import { SIN_ASIGNAR, claveNombre, responsableDe as nombreResponsable, unificarResponsables } from "@/lib/responsables"
 import { Plus } from "lucide-react"
 
 // Las dos vistas de la semana de Contenido:
@@ -278,14 +279,9 @@ const COLUMNAS: Array<{ id: string; label: string; estados: string[]; acento: st
   { id: "listo", label: "Listo", estados: ["completo", "publicado"], acento: "bg-emerald-500" },
 ]
 
-const SIN_ASIGNAR = "SIN ASIGNAR"
-// "EDITOR" era el responsable genérico de la plantilla vieja: no es una persona, así que cuenta
-// como sin asignar. Vacío y null, lo mismo.
-const GENERICOS = new Set([SIN_ASIGNAR, "EDITOR", "SIN RESPONSABLE"])
-const responsableDe = (p: PiezaSemana) => {
-  const r = String(p.assigned_to || "").trim()
-  return !r || GENERICOS.has(r.toLocaleUpperCase("es")) ? SIN_ASIGNAR : r
-}
+// El nombre del responsable se normaliza en lib/responsables: "Ian Algué", "IAN ALGUE" e
+// "Ian Algue" son la misma persona y tienen que dar un solo chip en el filtro.
+const responsableDe = (p: PiezaSemana) => nombreResponsable(p.assigned_to)
 
 export function PipelineContenido({ rows, onOpen, editor, responsables = [] }: {
   rows: PiezaSemana[]
@@ -300,10 +296,16 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [] }: {
   // Los chips del filtro: quien tenga piezas, más los editores del equipo aunque no tengan nada
   // asignado todavía (así se ve de un vistazo quién está libre).
   const gente = useMemo(() => {
+    // Se cuenta por clave normalizada y se muestra el nombre de la cuenta del equipo, que va
+    // primero en unificarResponsables y por eso gana sobre lo escrito a mano en una pieza.
+    const canonico = new Map<string, string>()
+    for (const nombre of unificarResponsables(responsables, rows.map((r) => r.assigned_to))) {
+      canonico.set(claveNombre(nombre), nombre)
+    }
     const cuenta = new Map<string, number>()
-    for (const nombre of responsables) cuenta.set(nombre, 0)
+    for (const nombre of canonico.values()) cuenta.set(nombre, 0)
     for (const row of rows) {
-      const r = responsableDe(row)
+      const r = canonico.get(claveNombre(responsableDe(row))) || responsableDe(row)
       cuenta.set(r, (cuenta.get(r) || 0) + 1)
     }
     const sin = cuenta.get(SIN_ASIGNAR) || 0
@@ -312,11 +314,11 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [] }: {
     return sin ? [...lista, [SIN_ASIGNAR, sin] as [string, number]] : lista
   }, [rows, responsables])
 
-  const visibles = useMemo(() => (filtro ? rows.filter((r) => responsableDe(r) === filtro) : rows), [rows, filtro])
+  const visibles = useMemo(() => (filtro ? rows.filter((r) => claveNombre(responsableDe(r)) === claveNombre(filtro)) : rows), [rows, filtro])
 
   // Si quien mira es un editor, sus piezas van primero: es lo que tiene que hacer hoy.
   const orden = (a: PiezaSemana, b: PiezaSemana) => {
-    const mia = (p: PiezaSemana) => (editor && p.assigned_to === editor ? 0 : 1)
+    const mia = (p: PiezaSemana) => (editor && claveNombre(p.assigned_to) === claveNombre(editor) ? 0 : 1)
     return mia(a) - mia(b) || String(a.planned_at || "").localeCompare(String(b.planned_at || ""))
   }
 

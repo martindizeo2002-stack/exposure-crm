@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { cn } from "@/lib/utils"
 import { useSession } from "@/components/session-provider"
 import { SubirImagen } from "@/components/subir-imagen"
+import { SIN_ASIGNAR, unificarResponsables } from "@/lib/responsables"
 import {
   Loader2, Plus, RefreshCw, ExternalLink, Trash2, Save, Scissors, Film, ImageOff,
   Eye, ThumbsUp, MessageSquare, Clock, PlayCircle, X, Link2, CheckCircle2, AlertTriangle,
@@ -41,11 +42,11 @@ const ESTADO_CLIP: Record<string, { label: string; tono: string }> = {
 }
 const clipMeta = (s: string) => ESTADO_CLIP[s] || { label: s || "Sin estado", tono: "border-zinc-400/40 bg-zinc-400/10 text-zinc-500" }
 const ESTADOS_CLIP_OPCIONES = ["idea", "en_produccion", "en_revision", "completo", "publicado"]
-const SIN_ASIGNAR = "SIN ASIGNAR"
 // Quién puede quedar a cargo: los editores aprobados del equipo salen de team_members, así que
-// alcanza con dar de alta al editor para que aparezca acá. Se conserva lo ya cargado a mano.
+// alcanza con dar de alta al editor para que aparezca acá. Lo ya cargado a mano se conserva, salvo
+// que sea el mismo nombre escrito distinto: en ese caso gana el de la cuenta y no se duplica.
 const responsablesCon = (editores: string[] | undefined, actual?: string | null) =>
-  [...new Set([SIN_ASIGNAR, "ALEX", "NAHUEL", ...(editores || []), ...(actual ? [actual] : [])])]
+  unificarResponsables([SIN_ASIGNAR, "ALEX", "NAHUEL"], editores, actual ? [actual] : [])
 
 const fecha = (iso: string | null | undefined) => {
   if (!iso) return null
