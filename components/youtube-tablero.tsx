@@ -52,7 +52,9 @@ function Chip({ children, className }: { children: React.ReactNode; className?: 
 }
 
 // ── la vista previa que va adentro de la tarjeta ──────────────────────────────
-function Vista({ video, alto = "h-40" }: { video: VideoYoutube; alto?: string }) {
+// `interactivo` en false cuando la vista va adentro de un botón: un <a> anidado en un <button> es
+// HTML inválido y el click deja de comportarse igual en todos los navegadores.
+function Vista({ video, alto = "h-40", interactivo = true }: { video: VideoYoutube; alto?: string; interactivo?: boolean }) {
   const [rota, setRota] = useState(false)
   const p: Preview = previewVideo(video)
   const base = cn("relative w-full overflow-hidden rounded-xl border border-border bg-muted", alto)
@@ -70,9 +72,11 @@ function Vista({ video, alto = "h-40" }: { video: VideoYoutube; alto?: string })
     </div>
   }
   if (p.tipo === "link" && !rota) {
-    return <a href={p.href} target="_blank" rel="noreferrer" className={cn(base, "flex items-center justify-center gap-2 border-dashed text-xs font-semibold text-muted-foreground hover:text-foreground")}>
-      <ExternalLink className="h-4 w-4" />Ver el video en {p.dominio}
-    </a>
+    const contenido = <><ExternalLink className="h-4 w-4" />Ver el video en {p.dominio}</>
+    const clases = cn(base, "flex items-center justify-center gap-2 border-dashed text-xs font-semibold text-muted-foreground hover:text-foreground")
+    return interactivo
+      ? <a href={p.href} target="_blank" rel="noreferrer" className={clases}>{contenido}</a>
+      : <span className={clases}>{contenido}</span>
   }
   return <div className={cn(base, "flex flex-col items-center justify-center gap-1 border-dashed text-xs text-muted-foreground")}>
     <ImageOff className="h-5 w-5" />Sin video ni miniatura cargada
@@ -86,7 +90,7 @@ function TarjetaVideo({ video, onOpen }: { video: VideoYoutube; onOpen: () => vo
   return (
     <Card className="group overflow-hidden border-border transition hover:border-foreground/25 hover:shadow-lg">
       <button type="button" onClick={onOpen} className="block w-full text-left">
-        <div className="p-3 pb-0"><Vista video={video} /></div>
+        <div className="p-3 pb-0"><Vista video={video} interactivo={false} /></div>
         <CardContent className="space-y-2 p-3">
           <div className="flex flex-wrap items-center gap-1.5">
             <Chip className={TONO_ESTADO[video.estado] || TONO_ESTADO.idea}>{etiquetaEstado(video.estado)}</Chip>
@@ -280,7 +284,7 @@ function Miniaturas({ videos, onOpen }: { videos: VideoYoutube[]; onOpen: (id: s
       {videos.map((v) => (
         <button key={v.id} type="button" onClick={() => onOpen(v.id)} className="group space-y-2 text-left">
           <div className={cn("rounded-xl p-1 transition", v.miniatura_url ? "border border-border" : "border border-dashed border-amber-500/50")}>
-            <Vista video={v} alto="h-44" />
+            <Vista video={v} alto="h-44" interactivo={false} />
           </div>
           <p className="line-clamp-2 px-1 text-xs font-bold leading-snug group-hover:underline">{v.titulo}</p>
           <div className="flex flex-wrap gap-1.5 px-1">
