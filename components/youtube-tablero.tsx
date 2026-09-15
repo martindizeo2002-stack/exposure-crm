@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useSession } from "@/components/session-provider"
+import { SubirImagen } from "@/components/subir-imagen"
 import {
   Loader2, Plus, RefreshCw, ExternalLink, Trash2, Save, Scissors, Film, ImageOff,
   Eye, ThumbsUp, MessageSquare, Clock, PlayCircle, X, Link2, CheckCircle2, AlertTriangle,
@@ -212,7 +213,7 @@ export function YoutubeTablero({ vista }: { vista: "produccion" | "ideas" | "min
       {cargando ? <div className="grid place-items-center py-16 text-sm text-muted-foreground"><Loader2 className="mb-2 h-5 w-5 animate-spin" />Cargando los videos…</div>
         : error ? <Aviso tono="error" texto={(error as Error).message} />
         : vista === "produccion" ? <Produccion videos={pendientes} onOpen={setAbierto} />
-        : vista === "miniaturas" ? <Miniaturas videos={videos} onOpen={setAbierto} />
+        : vista === "miniaturas" ? <Miniaturas videos={videos} onOpen={setAbierto} puedeEditar={puedeEditar} onCambio={recargar} />
         : <Grilla videos={listaVista} onOpen={setAbierto} vacio={vista === "ideas" ? "Todavía no hay ideas cargadas. Tocá “Nuevo video” y anotá la primera." : "No hay videos publicados sincronizados. Tocá “Sincronizar canal”."} />}
 
       {video ? <VideoDialog
@@ -275,23 +276,27 @@ function Produccion({ videos, onOpen }: { videos: VideoYoutube[]; onOpen: (id: s
 
 // Panel de miniaturas: el packaging de todos los videos junto, para ver si la portada se sostiene
 // al lado de las otras. Marca en rojo las que faltan.
-function Miniaturas({ videos, onOpen }: { videos: VideoYoutube[]; onOpen: (id: string) => void }) {
+function Miniaturas({ videos, onOpen, puedeEditar, onCambio }: { videos: VideoYoutube[]; onOpen: (id: string) => void; puedeEditar: boolean; onCambio: () => void }) {
   const sin = videos.filter((v) => !v.miniatura_url).length
   if (!videos.length) return <div className="grid place-items-center rounded-xl border border-dashed border-border py-16 text-sm text-muted-foreground">Todavía no hay videos cargados.</div>
   return <div className="space-y-3">
     {sin ? <Aviso tono="alerta" texto={`${sin} video${sin === 1 ? " no tiene" : "s no tienen"} miniatura cargada. Abrí el video y pegá el link de la imagen.`} /> : null}
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {videos.map((v) => (
-        <button key={v.id} type="button" onClick={() => onOpen(v.id)} className="group space-y-2 text-left">
-          <div className={cn("rounded-xl p-1 transition", v.miniatura_url ? "border border-border" : "border border-dashed border-amber-500/50")}>
-            <Vista video={v} alto="h-44" interactivo={false} />
-          </div>
-          <p className="line-clamp-2 px-1 text-xs font-bold leading-snug group-hover:underline">{v.titulo}</p>
-          <div className="flex flex-wrap gap-1.5 px-1">
-            <Chip className={TONO_ESTADO[v.estado]}>{etiquetaEstado(v.estado)}</Chip>
-            {!v.miniatura_url ? <Chip className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">Sin miniatura</Chip> : null}
-          </div>
-        </button>
+        <div key={v.id} className="group space-y-2">
+          <button type="button" onClick={() => onOpen(v.id)} className="block w-full space-y-2 text-left">
+            <div className={cn("rounded-xl p-1 transition", v.miniatura_url ? "border border-border" : "border border-dashed border-amber-500/50")}>
+              <Vista video={v} alto="h-44" interactivo={false} />
+            </div>
+            <p className="line-clamp-2 px-1 text-xs font-bold leading-snug group-hover:underline">{v.titulo}</p>
+            <div className="flex flex-wrap gap-1.5 px-1">
+              <Chip className={TONO_ESTADO[v.estado]}>{etiquetaEstado(v.estado)}</Chip>
+              {!v.miniatura_url ? <Chip className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">Sin miniatura</Chip> : null}
+            </div>
+          </button>
+          {puedeEditar ? <SubirImagen destino="youtube" id={v.id} titulo={v.titulo} variant="ghost"
+            etiqueta={v.miniatura_url ? "Cambiar miniatura" : "Subir miniatura"} onSubido={() => { onCambio() }} /> : null}
+        </div>
       ))}
     </div>
   </div>
@@ -409,7 +414,12 @@ function VideoDialog({ video, esAdmin, puedeEditar, editores, onClose, onCambio 
                     <Campo label="Responsable"><Input value={borrador.responsable} onChange={(e) => setBorrador({ ...borrador, responsable: e.target.value })} placeholder="Quién lo produce" /></Campo>
                     <Campo label="Fecha objetivo"><Input type="date" value={borrador.fecha_objetivo?.slice(0, 10) || ""} onChange={(e) => setBorrador({ ...borrador, fecha_objetivo: e.target.value })} /></Campo>
                     <Campo label="Link del guion"><Input value={borrador.guion_url} onChange={(e) => setBorrador({ ...borrador, guion_url: e.target.value })} placeholder="Doc de Google" /></Campo>
-                    <Campo label="Link de la miniatura"><Input value={borrador.miniatura_url} onChange={(e) => setBorrador({ ...borrador, miniatura_url: e.target.value })} placeholder="Imagen .jpg / .png" /></Campo>
+                    <Campo label="Miniatura" hint="subila de la compu o pegá el link">
+                      <div className="space-y-1.5">
+                        <Input value={borrador.miniatura_url} onChange={(e) => setBorrador({ ...borrador, miniatura_url: e.target.value })} placeholder="Imagen .jpg / .png" />
+                        <SubirImagen destino="youtube" id={video.id} titulo={video.titulo} onSubido={async (url) => { setBorrador((b) => ({ ...b, miniatura_url: url })); await onCambio() }} />
+                      </div>
+                    </Campo>
                     <Campo label="Link del video" hint={delCanal ? "Viene del canal" : "Drive, o el link de YouTube ya publicado"}>
                       <Input value={borrador.video_url} onChange={(e) => setBorrador({ ...borrador, video_url: e.target.value })} disabled={delCanal} />
                     </Campo>

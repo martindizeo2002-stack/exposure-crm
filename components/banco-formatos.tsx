@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils"
 import { Loader2, Plus, Save, Trash2, EyeOff, Eye, X, ExternalLink, ImageOff, Lock } from "lucide-react"
 import { useFormatos, previewDe, type FormatoBanco } from "@/lib/use-formatos"
+import { SubirImagen } from "@/components/subir-imagen"
 
 // Panel de formatos: el catálogo de formatos elegibles para una pieza, con la referencia visual de
 // cada uno agrupada por tipo (reels, carruseles, historias). Solo el admin puede agregar, editar,
@@ -97,7 +98,7 @@ export function BancoFormatos() {
     if (r) setAviso({ ok: true, texto: r.mensaje || `Formato ${f.nombre} borrado.` })
   }
 
-  const campos = (valor: Borrador, set: (b: Borrador) => void) => (
+  const campos = (valor: Borrador, set: (b: Borrador) => void, id?: string) => (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
         <div>
@@ -117,9 +118,12 @@ export function BancoFormatos() {
         <Textarea value={valor.descripcion} onChange={(e) => set({ ...valor, descripcion: e.target.value })} rows={2} className="mt-1" placeholder="Para qué sirve este formato y cuándo conviene usarlo" />
       </div>
       <div>
-        <Label className="text-xs text-muted-foreground">Link de la referencia</Label>
+        <Label className="text-xs text-muted-foreground">Portada de referencia</Label>
         <Input value={valor.referencia_url} onChange={(e) => set({ ...valor, referencia_url: e.target.value })} className="mt-1" placeholder="Link al reel, carrusel, imagen o Drive que sirve de ejemplo" />
-        <p className="mt-1 text-[11px] text-muted-foreground">Si es una imagen, un video de YouTube o un archivo de Drive, se muestra la miniatura. El resto queda como botón para abrir.</p>
+        <SubirImagen destino="formato" id={id} titulo={valor.nombre} className="mt-1.5"
+          etiqueta="Subir la portada desde la compu"
+          onSubido={async (url) => { set({ ...valor, referencia_url: url }); await recargar() }} />
+        <p className="mt-1 text-[11px] text-muted-foreground">La captura que subís se ve como portada del formato. Un link de imagen, de YouTube o de Drive también muestra miniatura; el resto queda como botón para abrir.</p>
       </div>
     </div>
   )
@@ -179,7 +183,7 @@ export function BancoFormatos() {
                 <CardContent className="space-y-2.5 p-3">
                   {editando === f.id ? (
                     <>
-                      {campos(borrador, setBorrador)}
+                      {campos(borrador, setBorrador, f.id)}
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => guardar(f)} disabled={ocupado !== null}>
                           {ocupado === f.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}Guardar
@@ -201,6 +205,8 @@ export function BancoFormatos() {
                       {admin && (
                         <div className="flex gap-1 border-t border-border pt-2">
                           <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => abrirEdicion(f)}>Editar</Button>
+                          <SubirImagen destino="formato" id={f.id} titulo={f.nombre} variant="ghost" full={false}
+                            etiqueta={f.referencia_url ? "Cambiar portada" : "Subir portada"} onSubido={() => { recargar() }} />
                           <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => llamar("PATCH", { id: f.id, activo: !f.activo }, f.id)} disabled={ocupado !== null} title={f.activo ? "Dejar de ofrecerlo" : "Volver a ofrecerlo"}>
                             {f.activo ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                           </Button>

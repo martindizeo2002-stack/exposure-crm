@@ -69,6 +69,7 @@ const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/formatos", [...OPERATIONS, "Editor"]],   // rendimiento por pieza de contenido
   ["/api/angulos", [...OPERATIONS, "Editor"]],    // banco de ángulos editable
   ["/api/youtube", [...OPERATIONS, "Editor"]],   // videos de YouTube y sus clips
+  ["/api/imagen", [...OPERATIONS, "Editor"]],   // subir miniaturas y portadas desde la compu
   ["/api/banco-formatos", [...OPERATIONS, "Editor"]],  // catálogo de formatos (escritura solo CEO, se valida en la ruta)
   ["/api/angulos-manychat", OPERATIONS],
   ["/api/setting-resumen", SALES_OPERATIONS],
