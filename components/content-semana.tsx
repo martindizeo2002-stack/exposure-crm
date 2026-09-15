@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { colorAngulo } from "@/lib/colores-angulo"
 import { useAngulos } from "@/lib/use-angulos"
 import { SIN_ASIGNAR, claveNombre, responsableDe as nombreResponsable, unificarResponsables } from "@/lib/responsables"
-import { GripVertical, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { toast } from "sonner"
 
 // Las dos vistas de la semana de Contenido:
@@ -78,7 +78,7 @@ function agrupar(rows: PiezaSemana[]) {
 
 // ───────────────────────────── el bloquecito de una pieza ─────────────────────────────
 
-function Pieza({ row, categoria, onOpen, compacta = false }: { row: PiezaSemana; categoria: string | null; onOpen: () => void; compacta?: boolean }) {
+function Pieza({ row, categoria, onOpen, compacta = false, dosLineas = false }: { row: PiezaSemana; categoria: string | null; onOpen: () => void; compacta?: boolean; dosLineas?: boolean }) {
   const color = colorAngulo(categoria)
   const hora = horaDe(row)
   const listo = LISTO.has(row.status)
@@ -97,7 +97,7 @@ function Pieza({ row, categoria, onOpen, compacta = false }: { row: PiezaSemana;
       <span className={cn("absolute inset-y-0 left-0 w-1.5", color.punto)} aria-hidden />
       <div className="flex items-baseline gap-1.5">
         {hora && <span className="shrink-0 font-mono text-[11px] font-bold text-muted-foreground">{hora.texto}</span>}
-        <span className={cn("min-w-0 flex-1 truncate text-[13px] font-semibold leading-tight", listo && "text-muted-foreground line-through decoration-1")}>
+        <span className={cn("min-w-0 flex-1 text-[13px] font-semibold leading-tight", dosLineas ? "line-clamp-2" : "truncate", listo && "text-muted-foreground line-through decoration-1")}>
           {row.title}
         </span>
       </div>
@@ -295,38 +295,93 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [], onM
   const { categoriaDe } = useAngulos()
   // Un editor entra viendo lo suyo; el resto del equipo entra viendo todo.
   const [filtro, setFiltro] = useState<string | null>(editor || null)
-  // Mientras se guarda el cambio, la pieza ya se dibuja en la columna nueva: si el guardado falla
-  // se recarga y vuelve sola a donde estaba.
-  const [arrastrando, setArrastrando] = useState<string | null>(null)
-  const [encima, setEncima] = useState<string | null>(null)
+
+  // Mientras se guarda el cambio, la pieza ya se dibuja en la columna nueva. Si el guardado falla,
+  // se borra el provisorio y vuelve sola a donde estaba.
   const [movidas, setMovidas] = useState<Record<string, string>>({})
   const estadoDe = (row: PiezaSemana) => movidas[row.id] || row.status
-  // Cuando el servidor ya devolvió la pieza con el estado nuevo, se suelta el provisorio.
   useEffect(() => {
+    // Cuando el servidor ya devuelve la pieza con el estado nuevo, se suelta el provisorio.
     setMovidas((previas) => {
-      const quedan = Object.fromEntries(
-        Object.entries(previas).filter(([id, estado]) => {
-          const row = rows.find((r) => r.id === id)
-          return row && row.status !== estado
-        }),
-      )
-      return Object.keys(quedan).length === Object.keys(previas).length ? previas : quedan
+      const quedan = Object.entries(previas).filter(([id, estado]) => {
+        const row = rows.find((r) => r.id === id)
+        return row ? row.status !== estado : true
+      })
+      return quedan.length === Object.keys(previas).length ? previas : Object.fromEntries(quedan)
     })
   }, [rows])
 
-  async function soltar(col: (typeof COLUMNAS)[number]) {
-    const id = arrastrando
-    setArrastrando(null); setEncima(null)
-    if (!id || !onMover) return
-    const row = rows.find((r) => r.id === id)
-    if (!row || col.estados.includes(estadoDe(row))) return
-    const destino = col.estados[0]
-    setMovidas((p) => ({ ...p, [id]: destino }))
+  // El arrastre es propio, con eventos de puntero, y no el del navegador: la tarjeta es un botón y
+  // el arrastre nativo se traba adentro de un botón. Además así funciona igual con el dedo.
+  const [arrastre, setArrastre] = useState<{ id: string; x: number; y: number; ancho: number } | null>(null)
+  const [destino, setDestino] = useState<string | null>(null)
+  const pendiente = useRef<{ id: string; x: number; y: number; ancho: number; dx: number; dy: number } | null>(null)
+  const arrastro = useRef(false)
+
+  async function mover(row: PiezaSemana, col: (typeof COLUMNAS)[number] | undefined) {
+    if (!onMover || !col || col.estados.includes(estadoDe(row))) return
+    const nuevo = col.estados[0]
+    setMovidas((p) => ({ ...p, [row.id]: nuevo }))
     try {
-      await onMover(row, destino)
+      await onMover(row, nuevo)
     } catch (e) {
-      setMovidas((p) => { const { [id]: _, ...resto } = p; return resto })
+      setMovidas((p) => { const copia = { ...p }; delete copia[row.id]; return copia })
       toast.error(e instanceof Error ? e.message : "No se pudo mover la pieza")
+    }
+  }
+
+  // Qué columna hay debajo del dedo. El fantasma no intercepta porque tiene pointer-events: none.
+  const columnaEn = (x: number, y: number) => {
+    const el = document.elementFromPoint(x, y)?.closest("[data-columna]")
+    const id = el?.getAttribute("data-columna")
+    return id ? COLUMNAS.find((c) => c.id === id) : undefined
+  }
+
+  useEffect(() => {
+    if (!onMover) return
+    const mover_ = (e: PointerEvent) => {
+      const p = pendiente.current
+      if (!p) return
+      // Recién se considera arrastre a partir de unos pixeles: si no, cada click arrastraría.
+      if (!arrastro.current && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 6) return
+      if (!arrastro.current) {
+        arrastro.current = true
+        document.body.style.userSelect = "none"
+      }
+      e.preventDefault()
+      setArrastre({ id: p.id, x: e.clientX - p.dx, y: e.clientY - p.dy, ancho: p.ancho })
+      setDestino(columnaEn(e.clientX, e.clientY)?.id ?? null)
+    }
+    const soltar = (e: PointerEvent) => {
+      const p = pendiente.current
+      pendiente.current = null
+      document.body.style.userSelect = ""
+      setArrastre(null); setDestino(null)
+      if (!p || !arrastro.current) { arrastro.current = false; return }
+      const row = rows.find((r) => r.id === p.id)
+      const col = columnaEn(e.clientX, e.clientY)
+      if (row) void mover(row, col)
+      // El click que viene después de soltar no tiene que abrir la pieza.
+      setTimeout(() => { arrastro.current = false }, 0)
+    }
+    window.addEventListener("pointermove", mover_, { passive: false })
+    window.addEventListener("pointerup", soltar)
+    window.addEventListener("pointercancel", soltar)
+    return () => {
+      window.removeEventListener("pointermove", mover_)
+      window.removeEventListener("pointerup", soltar)
+      window.removeEventListener("pointercancel", soltar)
+    }
+  })
+
+  function empezar(e: React.PointerEvent, row: PiezaSemana) {
+    // Con el dedo no se arrastra: si la tarjeta se queda con el gesto, el tablero deja de scrollear.
+    // En celular se mueve con las flechitas de cada tarjeta.
+    if (!onMover || e.button !== 0 || e.pointerType === "touch") return
+    const caja = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    pendiente.current = {
+      id: row.id, x: e.clientX, y: e.clientY, ancho: caja.width,
+      dx: e.clientX - caja.left, dy: e.clientY - caja.top,
     }
   }
 
@@ -351,7 +406,10 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [], onM
     return sin ? [...lista, [SIN_ASIGNAR, sin] as [string, number]] : lista
   }, [rows, responsables])
 
-  const visibles = useMemo(() => (filtro ? rows.filter((r) => claveNombre(responsableDe(r)) === claveNombre(filtro)) : rows), [rows, filtro])
+  const visibles = useMemo(
+    () => (filtro ? rows.filter((r) => claveNombre(responsableDe(r)) === claveNombre(filtro)) : rows),
+    [rows, filtro],
+  )
 
   // Si quien mira es un editor, sus piezas van primero: es lo que tiene que hacer hoy.
   const orden = (a: PiezaSemana, b: PiezaSemana) => {
@@ -359,102 +417,120 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [], onM
     return mia(a) - mia(b) || String(a.planned_at || "").localeCompare(String(b.planned_at || ""))
   }
 
+  const enVuelo = rows.find((r) => r.id === arrastre?.id)
+
   return (
     <div className="space-y-3">
-    <div className="flex flex-wrap items-center gap-1.5">
-      <button
-        type="button"
-        onClick={() => setFiltro(null)}
-        className={cn("rounded-full border px-3 py-1 text-xs font-bold transition",
-          filtro === null ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-muted")}
-      >
-        Todos <span className="opacity-70">{rows.length}</span>
-      </button>
-      {gente.map(([nombre, n]) => (
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
-          key={nombre}
           type="button"
-          onClick={() => setFiltro(filtro === nombre ? null : nombre)}
+          onClick={() => setFiltro(null)}
           className={cn("rounded-full border px-3 py-1 text-xs font-bold transition",
-            filtro === nombre ? "border-foreground bg-foreground text-background"
-              : n === 0 ? "border-dashed border-border text-muted-foreground/70 hover:bg-muted"
-              : "border-border text-muted-foreground hover:bg-muted",
-            nombre === editor && filtro !== nombre && "border-primary/50 text-primary")}
-          title={n === 0 ? `${nombre} no tiene piezas asignadas` : `${n} piezas de ${nombre}`}
+            filtro === null ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-muted")}
         >
-          {nombre === SIN_ASIGNAR ? "Sin asignar" : nombre}{nombre === editor ? " (vos)" : ""} <span className="opacity-70">{n}</span>
+          Todos <span className="opacity-70">{rows.length}</span>
         </button>
-      ))}
-    </div>
-    {filtro && !visibles.length && (
-      <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-        {filtro === SIN_ASIGNAR ? "No hay piezas sin asignar." : `${filtro} no tiene piezas asignadas todavía.`}
-      </p>
-    )}
-    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-      {COLUMNAS.map((col) => {
-        const piezas = visibles.filter((r) => col.estados.includes(estadoDe(r))).sort(orden)
-        const recibe = Boolean(onMover) && arrastrando !== null
-        return (
-          <section
-            key={col.id}
-            onDragOver={(e) => { if (!recibe) return; e.preventDefault(); setEncima(col.id) }}
-            onDragLeave={() => setEncima((c) => (c === col.id ? null : c))}
-            onDrop={(e) => { if (!recibe) return; e.preventDefault(); void soltar(col) }}
-            className={cn("flex min-h-[140px] flex-col rounded-xl border border-border bg-muted/30 p-2 transition",
-              recibe && "border-dashed",
-              encima === col.id && "border-primary bg-primary/10 ring-2 ring-primary/40")}
+        {gente.map(([nombre, n]) => (
+          <button
+            key={nombre}
+            type="button"
+            onClick={() => setFiltro(filtro === nombre ? null : nombre)}
+            className={cn("rounded-full border px-3 py-1 text-xs font-bold transition",
+              filtro === nombre ? "border-foreground bg-foreground text-background"
+                : n === 0 ? "border-dashed border-border text-muted-foreground/70 hover:bg-muted"
+                : "border-border text-muted-foreground hover:bg-muted",
+              nombre === editor && filtro !== nombre && "border-primary/50 text-primary")}
+            title={n === 0 ? `${nombre} no tiene piezas asignadas` : `${n} piezas de ${nombre}`}
           >
-            <header className="mb-2 flex items-center gap-1.5 px-1">
-              <span className={cn("h-2 w-2 rounded-full", col.acento)} />
-              <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">{col.label}</span>
-              <span className="ml-auto text-[11px] font-bold text-muted-foreground">{piezas.length || ""}</span>
-            </header>
-            <div className="flex flex-1 flex-col gap-1.5">
-              {piezas.map((row) => {
-                const mia = editor && claveNombre(row.assigned_to) === claveNombre(editor)
-                const guardando = Boolean(movidas[row.id])
-                const indice = COLUMNAS.findIndex((c) => c.estados.includes(estadoDe(row)))
-                return (
-                  <div
-                    key={row.id}
-                    draggable={Boolean(onMover)}
-                    onDragStart={(e) => { setArrastrando(row.id); e.dataTransfer.effectAllowed = "move" }}
-                    onDragEnd={() => { setArrastrando(null); setEncima(null) }}
-                    className={cn("group/pieza relative rounded-lg transition", mia && "ring-1 ring-primary/50",
-                      onMover && "cursor-grab active:cursor-grabbing",
-                      arrastrando === row.id && "opacity-40",
-                      guardando && "animate-pulse")}
-                  >
-                    {onMover && <GripVertical className="pointer-events-none absolute right-1 top-1 h-3.5 w-3.5 text-muted-foreground opacity-0 transition group-hover/pieza:opacity-60" />}
-                    <Pieza row={row} categoria={categoriaDe(row.angle)} onOpen={() => onOpen(row)} compacta />
-                    <div className="flex items-center gap-1 px-2 pb-1 pt-0.5">
-                      {row.assigned_to && responsableDe(row) !== SIN_ASIGNAR && (
-                        <p className={cn("min-w-0 flex-1 truncate text-[10px] font-semibold", mia ? "text-primary" : "text-muted-foreground")}>
-                          {mia ? "Tuya · " : ""}{row.assigned_to}
-                        </p>
-                      )}
-                      {/* En el celular no se puede arrastrar: estas flechas mueven de columna igual. */}
-                      {onMover && (
-                        <span className="ml-auto flex shrink-0 gap-0.5 opacity-0 transition group-hover/pieza:opacity-100">
-                          <button type="button" aria-label="Mover a la columna anterior" disabled={indice <= 0}
-                            onClick={() => { setArrastrando(row.id); void soltar(COLUMNAS[indice - 1]) }}
-                            className="rounded px-1 text-[11px] font-black text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25">‹</button>
-                          <button type="button" aria-label="Mover a la columna siguiente" disabled={indice < 0 || indice >= COLUMNAS.length - 1}
-                            onClick={() => { setArrastrando(row.id); void soltar(COLUMNAS[indice + 1]) }}
-                            className="rounded px-1 text-[11px] font-black text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25">›</button>
-                        </span>
-                      )}
+            {nombre === SIN_ASIGNAR ? "Sin asignar" : nombre}{nombre === editor ? " (vos)" : ""} <span className="opacity-70">{n}</span>
+          </button>
+        ))}
+        {onMover && <span className="ml-auto hidden text-[11px] text-muted-foreground lg:block">Arrastrá una pieza a otra columna para cambiarle el estado, o usá las flechas de la tarjeta</span>}
+      </div>
+
+      {filtro && !visibles.length && (
+        <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
+          {filtro === SIN_ASIGNAR ? "No hay piezas sin asignar." : `${filtro} no tiene piezas asignadas todavía.`}
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {COLUMNAS.map((col) => {
+          const piezas = visibles.filter((r) => col.estados.includes(estadoDe(r))).sort(orden)
+          const recibiendo = Boolean(arrastre)
+          const suya = enVuelo ? col.estados.includes(estadoDe(enVuelo)) : false
+          return (
+            <section
+              key={col.id}
+              data-columna={col.id}
+              className={cn("flex min-h-[140px] flex-col rounded-xl border border-border bg-muted/30 p-2 transition",
+                recibiendo && !suya && "border-dashed",
+                recibiendo && destino === col.id && !suya && "border-primary bg-primary/10 ring-2 ring-primary/40")}
+            >
+              <header className="mb-2 flex items-center gap-1.5 px-1">
+                <span className={cn("h-2 w-2 rounded-full", col.acento)} />
+                <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">{col.label}</span>
+                <span className="ml-auto text-[11px] font-bold text-muted-foreground">{piezas.length || ""}</span>
+              </header>
+              <div className="flex flex-1 flex-col gap-1.5">
+                {piezas.map((row) => {
+                  const mia = Boolean(editor) && claveNombre(row.assigned_to) === claveNombre(editor)
+                  const guardando = Boolean(movidas[row.id])
+                  const indice = COLUMNAS.findIndex((c) => c.estados.includes(estadoDe(row)))
+                  return (
+                    <div
+                      key={row.id}
+                      onPointerDown={(e) => empezar(e, row)}
+                      onClickCapture={(e) => { if (arrastro.current) { e.preventDefault(); e.stopPropagation() } }}
+                      className={cn("group/pieza relative rounded-lg transition", mia && "ring-1 ring-primary/50",
+                        onMover && "cursor-grab select-none active:cursor-grabbing",
+                        arrastre?.id === row.id && "opacity-30",
+                        guardando && !arrastre && "animate-pulse")}
+                    >
+                      <Pieza row={row} categoria={categoriaDe(row.angle)} onOpen={() => onOpen(row)} compacta dosLineas />
+                      <div className="flex items-center gap-1 px-2 pb-1 pt-0.5">
+                        {responsableDe(row) !== SIN_ASIGNAR && (
+                          <p className={cn("min-w-0 flex-1 truncate text-[10px] font-semibold", mia ? "text-primary" : "text-muted-foreground")}>
+                            {mia ? "Tuya · " : ""}{row.assigned_to}
+                          </p>
+                        )}
+                        {/* Las flechas hacen lo mismo que arrastrar, para quien prefiera un click. */}
+                        {onMover && (
+                          <span className="ml-auto flex shrink-0 gap-0.5 opacity-0 transition focus-within:opacity-100 group-hover/pieza:opacity-100">
+                            <button type="button" aria-label="Mover a la etapa anterior" disabled={indice <= 0}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={() => void mover(row, COLUMNAS[indice - 1])}
+                              className="rounded px-1 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25">‹</button>
+                            <button type="button" aria-label="Mover a la etapa siguiente" disabled={indice < 0 || indice >= COLUMNAS.length - 1}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={() => void mover(row, COLUMNAS[indice + 1])}
+                              className="rounded px-1 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25">›</button>
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-              {!piezas.length && <p className="px-1 py-3 text-center text-[11px] text-muted-foreground/70">{recibe ? "Soltá acá" : "Vacío"}</p>}
-            </div>
-          </section>
-        )
-      })}
-    </div>
+                  )
+                })}
+                {!piezas.length && (
+                  <p className="px-1 py-3 text-center text-[11px] text-muted-foreground/70">
+                    {recibiendo && !suya ? "Soltá acá" : "Vacío"}
+                  </p>
+                )}
+              </div>
+            </section>
+          )
+        })}
+      </div>
+
+      {/* El fantasma que sigue al dedo. No recibe eventos, así se puede saber qué columna hay debajo. */}
+      {arrastre && enVuelo && (
+        <div
+          className="pointer-events-none fixed z-50 rotate-1 rounded-lg opacity-95 shadow-2xl shadow-black/30"
+          style={{ left: arrastre.x, top: arrastre.y, width: arrastre.ancho }}
+        >
+          <Pieza row={enVuelo} categoria={categoriaDe(enVuelo.angle)} onOpen={() => undefined} compacta dosLineas />
+        </div>
+      )}
     </div>
   )
 }

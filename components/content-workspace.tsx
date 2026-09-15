@@ -431,11 +431,12 @@ export function ContentWorkspace() {
           <button onClick={() => { setWeekOffset(0); setView("grabar") }} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "grabar" ? "bg-red-500 text-white shadow shadow-red-500/25" : "text-muted-foreground hover:bg-muted")}><Play className="mr-1 inline h-3.5 w-3.5" />Grabar ya</button>
           <button onClick={() => setView("biblioteca")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "biblioteca" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60")}>Biblioteca / Calendario</button>
         </div>
+        {/* Un editor está logueado pero no crea piezas: mandarlo a iniciar sesión no tenía sentido. */}
         {view === "stories" ? null : canCreateOrDelete ? (
           <Button size="sm" onClick={() => setCreating(true)}><Plus className="mr-1.5 h-4 w-4" />Nueva pieza</Button>
-        ) : (
+        ) : !canEdit ? (
           <Button size="sm" asChild><a href="/login"><User className="mr-1.5 h-4 w-4" />Iniciar sesión para editar</a></Button>
-        )}
+        ) : null}
       </div>
 
       {!canEdit && (
