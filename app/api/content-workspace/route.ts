@@ -285,8 +285,14 @@ export async function PATCH(request: Request) {
     const hasNoAngle = /(?:^|\b)CLIP(?:\b|\s*·)|TESTIMONIO/i.test(resultingFormat)
     const isStories = priorMetadata.content_type === "stories"
     if (hasNoAngle || (isStories && !["Hand Raiser", "Caso de éxito"].includes(resultingFormat))) updates.angle = null
-    if (!isStories && "angle" in body && !/VOLUMEN/i.test(resultingFormat) && !hasNoAngle && !(SALES_ANGLES as readonly string[]).includes(String(updates.angle || ""))) {
-      return NextResponse.json({ error: "Elegí un ángulo del mapa oficial antes de guardar" }, { status: 400 })
+    // Igual que al crear: el ángulo válido es el del banco editable (crm_angulos), no la semilla
+    // del código. Si no, editar una pieza con uno de los ángulos nuevos daba error al guardar.
+    if (!isStories && "angle" in body && !/VOLUMEN/i.test(resultingFormat) && !hasNoAngle) {
+      const { data: banco } = await sb.from("crm_angulos").select("numero,titulo")
+      const validas = banco?.length ? banco.map((a) => `${a.numero} · ${a.titulo}`) : (SALES_ANGLES as readonly string[])
+      if (!validas.includes(String(updates.angle || ""))) {
+        return NextResponse.json({ error: "Elegí un ángulo del banco antes de guardar" }, { status: 400 })
+      }
     }
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 })

@@ -49,6 +49,10 @@ export const NAV_TOUR_COPY: Record<string, { title: string; description: string 
     title: "Contenido",
     description: "Qué ángulos de contenido están generando más agendas y ventas. Útil para decidir qué grabar/publicar.",
   },
+  "/youtube": {
+    title: "YouTube",
+    description: "Los videos largos del canal: lo que está por producir, las ideas, las miniaturas y lo publicado con sus vistas. Adentro de cada video se crean los clips que después edita el equipo.",
+  },
   "/rendimiento": {
     title: "Métricas",
     description: "Métricas generales del negocio, evolución diaria y reportes de llamadas analizadas.",

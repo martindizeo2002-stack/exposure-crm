@@ -248,10 +248,13 @@ export function ContentWorkspace() {
   const [libStatus, setLibStatus] = useState<string[]>([])
   const [libQuery, setLibQuery] = useState("")
   const targetContentAssetId = searchParams.get("content_asset_id")
+  // Se entra acá desde Testimonios y desde YouTube (un clip de un video largo): en los dos casos
+  // la pieza está en la biblioteca, no necesariamente en la semana que se está viendo.
   useEffect(() => {
-    if (searchParams.get("source") !== "testimonios") return
+    const origen = searchParams.get("source")
+    if (origen !== "testimonios" && origen !== "youtube") return
     setView("biblioteca")
-    setLibQuery(targetContentAssetId ? "" : "TESTIMONIO")
+    setLibQuery(targetContentAssetId ? "" : origen === "youtube" ? "CLIP" : "TESTIMONIO")
   }, [searchParams, targetContentAssetId])
   const libParams = new URLSearchParams({ managed_only: "1", content_kind: "feed", limit: "300" })
   if (targetContentAssetId) libParams.set("content_asset_id", targetContentAssetId)

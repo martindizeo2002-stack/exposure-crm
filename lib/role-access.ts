@@ -36,6 +36,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
   ["/setting-resumen", SALES_OPERATIONS],  // generador de resúmenes del setter
   ["/whatsapp", OPERATIONS],               // grupos de WhatsApp del equipo
   ["/testimonios", [...OPERATIONS, "CSM", "Editor"]],
+  ["/youtube", [...OPERATIONS, "Editor"]],   // videos largos del canal + los clips de cada uno
   ["/contenido", [...OPERATIONS, "Editor"]],
   ["/contenido-angulos", [...OPERATIONS, "Editor"]],
   ["/calidad-datos", [...OPERATIONS, "CSM"]],
@@ -67,6 +68,7 @@ const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/panel", [...OPERATIONS, "Contaduria"]],  // datos del Panel del negocio
   ["/api/formatos", [...OPERATIONS, "Editor"]],   // rendimiento por pieza de contenido
   ["/api/angulos", [...OPERATIONS, "Editor"]],    // banco de ángulos editable
+  ["/api/youtube", [...OPERATIONS, "Editor"]],   // videos de YouTube y sus clips
   ["/api/banco-formatos", [...OPERATIONS, "Editor"]],  // catálogo de formatos (escritura solo CEO, se valida en la ruta)
   ["/api/angulos-manychat", OPERATIONS],
   ["/api/setting-resumen", SALES_OPERATIONS],
