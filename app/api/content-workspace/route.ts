@@ -166,8 +166,16 @@ export async function POST(request: Request) {
       angle = volumeAssignment.angle
     }
     if (hasNoAngle) angle = null
-    if (!isStories && !hasNoAngle && !(SALES_ANGLES as readonly string[]).includes(String(angle || ""))) {
-      return NextResponse.json({ error: "Elegí un ángulo del mapa oficial antes de guardar" }, { status: 400 })
+    // El ángulo se valida contra el banco de la base (crm_angulos), no contra la semilla del código:
+    // si no, un ángulo agregado desde Contenido → Banco de ángulos sería rechazado al guardar la pieza.
+    if (!isStories && !hasNoAngle) {
+      const { data: banco } = await sb.from("crm_angulos").select("numero,titulo")
+      const validas = banco?.length
+        ? banco.map((a) => `${a.numero} · ${a.titulo}`)
+        : (SALES_ANGLES as readonly string[])
+      if (!validas.includes(String(angle || ""))) {
+        return NextResponse.json({ error: "Elegí un ángulo del banco antes de guardar" }, { status: 400 })
+      }
     }
     const scriptText = body.script_text ? String(body.script_text) : null
     const row = {
