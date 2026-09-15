@@ -80,7 +80,7 @@ export const modules: NavItem[] = [
   { label: "Leaderboard", href: "/equipo", icon: Trophy, match: ["/equipo", "/esquema-comisiones"], ramp: ramps.leaderboard, group: "Producto", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria"] },
   { label: "Clientes", href: "/clientes-hub", icon: UserRound, match: ["/clientes-hub", "/clientes", "/historia-leads"], ramp: ramps.clientes, group: "Producto", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria", "CSM"] },
   { label: "Contenido", href: "/contenido-angulos", icon: Radar, match: ["/contenido-angulos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
-  { label: "Formatos", href: "/contenido/formatos", icon: Clapperboard, match: ["/contenido/formatos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT"] },
+  { label: "Formatos", href: "/contenido/formatos", icon: Clapperboard, match: ["/contenido/formatos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Ángulos", href: "/contenido/angulos", icon: Radar, match: ["/contenido/angulos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT"] },
   { label: "YouTube", href: "/youtube", icon: Youtube, match: ["/youtube"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Testimonios", href: "/testimonios", icon: MessageSquareQuote, match: ["/testimonios"], ramp: ramps.testimonios, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "CSM", "Editor"] },

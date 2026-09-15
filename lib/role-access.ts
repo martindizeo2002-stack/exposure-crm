@@ -31,7 +31,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
   ["/gastos", ["CEO", "Contaduria"]],
   ["/payroll", ["CEO", "Contaduria"]],
   ["/reglas", ["CEO"]],
-  ["/contenido/formatos", OPERATIONS],
+  ["/contenido/formatos", [...OPERATIONS, "Editor"]],   // el editor entra al catalogo de referencias; la pestana de rendimiento no se le muestra
   ["/contenido/angulos", OPERATIONS],      // medidor de ángulos de comunicación (etiquetas de ManyChat)
   ["/setting-resumen", SALES_OPERATIONS],  // generador de resúmenes del setter
   ["/whatsapp", OPERATIONS],               // grupos de WhatsApp del equipo
@@ -66,7 +66,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
 
 const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/panel", [...OPERATIONS, "Contaduria"]],  // datos del Panel del negocio
-  ["/api/formatos", [...OPERATIONS, "Editor"]],   // rendimiento por pieza de contenido
+  ["/api/formatos", OPERATIONS],                 // rendimiento por pieza: tiene cash y cierres, no es para el editor
   ["/api/angulos", [...OPERATIONS, "Editor"]],    // banco de ángulos editable
   ["/api/youtube", [...OPERATIONS, "Editor"]],   // videos de YouTube y sus clips
   ["/api/imagen", [...OPERATIONS, "Editor"]],   // subir miniaturas y portadas desde la compu

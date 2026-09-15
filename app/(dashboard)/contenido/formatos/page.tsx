@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils"
 import { ModuleTabs } from "@/components/module-tabs"
 import { BancoFormatos } from "@/components/banco-formatos"
+import { useSession } from "@/components/session-provider"
 import { BarChart3, LayoutGrid } from "lucide-react"
 
 type Fila = { nombre: string; formato?: string; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number; ultima?: string | null }
@@ -70,13 +71,20 @@ function RendimientoFormatos() {
   </div>
 }
 
+// El editor entra para ver las referencias de cada formato. La pestaña de rendimiento no se le
+// muestra: tiene cash collected y tasas de cierre, que no son parte de su trabajo.
 export default function FormatosPage() {
+  const { rol } = useSession()
+  const esEditor = rol === "Editor"
+  const tabs = [
+    { id: "catalogo", label: "Catálogo", hint: "formatos y sus referencias", icon: <LayoutGrid className="h-4 w-4" />, content: <div className="mx-auto w-full max-w-[1800px] px-4 py-5 sm:px-6 lg:px-[1.5cm]"><BancoFormatos /></div> },
+    ...(esEditor ? [] : [{ id: "rendimiento", label: "Rendimiento", hint: "qué formato trae ventas", icon: <BarChart3 className="h-4 w-4" />, content: <RendimientoFormatos /> }]),
+  ]
   return <ModuleTabs
     title="Formatos"
-    subtitle="Qué rinde cada formato y el catálogo con la referencia de cómo se ve cada uno"
-    tabs={[
-      { id: "catalogo", label: "Catálogo", hint: "formatos y sus referencias", icon: <LayoutGrid className="h-4 w-4" />, content: <div className="mx-auto w-full max-w-[1800px] px-4 py-5 sm:px-6 lg:px-[1.5cm]"><BancoFormatos /></div> },
-      { id: "rendimiento", label: "Rendimiento", hint: "qué formato trae ventas", icon: <BarChart3 className="h-4 w-4" />, content: <RendimientoFormatos /> },
-    ]}
+    subtitle={esEditor
+      ? "El catálogo de formatos con la referencia de cómo se ve cada uno"
+      : "Qué rinde cada formato y el catálogo con la referencia de cómo se ve cada uno"}
+    tabs={tabs}
   />
 }
