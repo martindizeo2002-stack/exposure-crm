@@ -28,6 +28,16 @@ SEMANA = [
     ("viernes", 12, "VOLUMEN/TOFU", 20, "VOLUMEN",      "Paso a paso de una automatización corta",              "Una automatización corta, entera, de principio a fin.", "IG + TikTok", False),
     ("viernes", 16, "PROBLEMA",      2, "REACCIÓN",     "Respuesta a un comentario: depender de referidos",     "Fábrica de contenido: se responde un comentario real desde la misma silla.", "IG + TikTok", False),
     ("viernes", 20, "SOLUCIÓN",      8, "CARRUSEL",     "Cómo cerrar clientes con IG, paso a paso",             "Carrusel o reel educativo con el paso a paso.", "IG", True),
+
+    # Las dos de las 12 y 16 del fin de semana son de costo cero: foto real del día + una frase, sin edición.
+    # Si falta tiempo en la semana, se recorta de otro lado, no de acá.
+    ("sábado", 12, "MENTALIDAD",   17, "TALKING IMAGEN", "Dejá de procrastinar: frase sobre la foto del día",  "Costo de producción cero: foto real del día y una frase filosa encima.", "IG + TikTok", False),
+    ("sábado", 16, "VOLUMEN/TOFU", 20, "VOLUMEN",        "Re-subida del ganador, otra toma",                   "Slot fijo para re-subir el mejor de hace 20-25 días con otra toma. No tocar los reels de junio: esos se re-suben tal cual cada 60 días.", "IG + TikTok", False),
+    ("sábado", 20, "SOLUCIÓN",     10, "TALKING HEAD",   "Ingreso extra con IA, el modelo en 60 segundos",     "Educación a cámara: el modelo entero explicado en un minuto.", "IG", True),
+
+    ("domingo", 12, "PROBLEMA",    7, "TALKING HEAD",   "Prospección en frío: contra el método que todos enseñan", "Polémica de nicho contra el método que enseña todo el mundo.", "IG + TikTok", False),
+    ("domingo", 16, "MENTALIDAD", 19, "TALKING IMAGEN", "Mostrales que están equivocados",                        "Costo cero: foto real del día y una frase filosa encima.", "IG + TikTok", False),
+    ("domingo", 20, "PRODUCTO",   12, "CASO DE ÉXITO",  "Caso de éxito: Flex, con pantalla y cifra real",         "Caso distinto al del lunes, con pantalla y la cifra real de su período. Solo casos del banco, sin exagerar.", "IG", True),
 ]
 
 DIAS = {"lunes": 0, "martes": 1, "miércoles": 2, "jueves": 3, "viernes": 4, "sábado": 5, "domingo": 6}
@@ -51,8 +61,12 @@ def proxima(dia):
     delta = (DIAS[dia] - manana.weekday()) % 7
     return manana + datetime.timedelta(days=delta)
 
-cur.execute("select planned_at, title from crm_content_assets where metadata->>'import_source' = 'calendario_semana_tipo'")
-ya = {(p.date().isoformat(), p.hour) for p, _ in cur.fetchall() if p}
+# Qué franjas ya están cargadas. La comparación se hace en hora argentina y en la base: la columna
+# es timestamptz y el driver devuelve UTC, así que comparar p.hour contra la hora del calendario
+# (12/16/20) nunca coincidía y el script duplicaba todo en la segunda corrida.
+cur.execute("""select to_char(planned_at at time zone 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD"T"HH24')
+               from crm_content_assets where metadata->>'import_source' = 'calendario_semana_tipo' and planned_at is not null""")
+ya = {fila[0] for fila in cur.fetchall()}
 
 creadas, salteadas, faltantes = [], [], []
 for dia, hora, categoria, numero, formato, titulo, nota, plataforma, keyword in SEMANA:
@@ -63,9 +77,11 @@ for dia, hora, categoria, numero, formato, titulo, nota, plataforma, keyword in 
     fecha = proxima(dia)
     # -03:00 explícito: la columna es timestamptz y la franja del calendario es hora argentina.
     cuando = f"{fecha.isoformat()}T{hora:02d}:00:00-03:00"
-    if (fecha.isoformat(), hora) in ya:
+    franja = f"{fecha.isoformat()}T{hora:02d}"
+    if franja in ya:
         salteadas.append(f"{fecha} {hora}h")
         continue
+    ya.add(franja)
     fila = {
         "source_key": f"manual:exposure:{uuid.uuid4()}",
         "title": titulo,
