@@ -279,9 +279,12 @@ const COLUMNAS: Array<{ id: string; label: string; estados: string[]; acento: st
 ]
 
 const SIN_ASIGNAR = "SIN ASIGNAR"
+// "EDITOR" era el responsable genérico de la plantilla vieja: no es una persona, así que cuenta
+// como sin asignar. Vacío y null, lo mismo.
+const GENERICOS = new Set([SIN_ASIGNAR, "EDITOR", "SIN RESPONSABLE"])
 const responsableDe = (p: PiezaSemana) => {
   const r = String(p.assigned_to || "").trim()
-  return !r || r.toLocaleUpperCase("es") === SIN_ASIGNAR ? SIN_ASIGNAR : r
+  return !r || GENERICOS.has(r.toLocaleUpperCase("es")) ? SIN_ASIGNAR : r
 }
 
 export function PipelineContenido({ rows, onOpen, editor, responsables = [] }: {
