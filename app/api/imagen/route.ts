@@ -20,9 +20,11 @@ const MAX_BYTES = 8 * 1024 * 1024
 const EXT_POR_MIME: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif", "image/gif": "gif",
 }
+// Una portada subida a mano deja portada_origen en null: así el script que baja portadas de
+// Instagram sabe que esa no la tiene que pisar.
 const DESTINOS = {
-  youtube: { tabla: "crm_youtube_videos", campo: "miniatura_url" },
-  formato: { tabla: "crm_formatos", campo: "portada_url" },
+  youtube: { tabla: "crm_youtube_videos", cambios: (url: string) => ({ miniatura_url: url }) },
+  formato: { tabla: "crm_formatos", cambios: (url: string) => ({ portada_url: url, portada_origen: null }) },
 } as const
 type Destino = keyof typeof DESTINOS
 
@@ -79,8 +81,8 @@ export async function POST(request: Request) {
     const url = `/api/imagen?path=${encodeURIComponent(path)}`
     // Si vino con la fila, se deja cargada de una: es lo que espera quien sube la imagen.
     if (id) {
-      const { tabla, campo } = DESTINOS[destino]
-      const { error: e } = await sb.from(tabla).update({ [campo]: url }).eq("id", id)
+      const { tabla, cambios } = DESTINOS[destino]
+      const { error: e } = await sb.from(tabla).update(cambios(url)).eq("id", id)
       if (e) throw new Error(e.message)
     }
     return NextResponse.json({ ok: true, url })

@@ -26,13 +26,20 @@ function Referencia({ formato }: { formato: Pick<FormatoBanco, "nombre" | "porta
   const destino = primerLink(formato.referencia_url) || formato.portada_url
   const [rota, setRota] = useState(false)
   if (p.tipo === "imagen" && !rota) {
+    // Marco 9:16, que es como se ve un reel. La portada va entera, sin recortar: las verticales
+    // llenan el marco y las apaisadas (el formato HORIZONTAL, por ejemplo) quedan centradas sobre
+    // una copia difuminada de sí mismas, en vez de perder los costados.
     const imagen = (
-      /* eslint-disable-next-line @next/next/no-img-element */
-      <img src={p.src} alt={`Portada de ${formato.nombre}`} className="aspect-[9/16] w-full object-cover transition hover:scale-[1.03]" onError={() => setRota(true)} loading="lazy" />
+      <span className="relative block aspect-[9/16] w-full overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={p.src} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl saturate-150" loading="lazy" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={p.src} alt={`Portada de ${formato.nombre}`} className="relative h-full w-full object-contain transition group-hover:scale-[1.03]" onError={() => setRota(true)} loading="lazy" />
+      </span>
     )
     return destino
-      ? <a href={destino} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-border bg-muted">{imagen}</a>
-      : <div className="overflow-hidden rounded-lg border border-border bg-muted">{imagen}</div>
+      ? <a href={destino} target="_blank" rel="noreferrer" className="group block overflow-hidden rounded-lg border border-border bg-muted">{imagen}</a>
+      : <div className="group overflow-hidden rounded-lg border border-border bg-muted">{imagen}</div>
   }
   if ((p.tipo === "link" || rota) && destino) {
     return (
