@@ -88,19 +88,19 @@ export function StoriesCalendar({ canEdit }: { canEdit: boolean }) {
 
   return <div className="space-y-4">
     <div className="flex items-center justify-between rounded-2xl border border-fuchsia-400/20 bg-fuchsia-400/[.05] px-4 py-3">
-      <div><p className="text-xs font-black uppercase tracking-[.16em] text-fuchsia-300">CALENDARIO STORIES</p><p className="text-xs text-white/45">Una fila = una secuencia completa. Separado del feed.</p></div>
+      <div><p className="text-xs font-black uppercase tracking-[.16em] text-fuchsia-300">CALENDARIO STORIES</p><p className="text-xs text-muted-foreground">Una fila = una secuencia completa. Separado del feed.</p></div>
       {canEdit && <Button size="sm" onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" />Nueva secuencia</Button>}
     </div>
-    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[.035] px-4 py-2.5">
+    <div className="flex items-center justify-between rounded-2xl border border-border bg-muted/40 px-4 py-2.5">
       <Button size="icon" variant="ghost" onClick={() => setOffset(v => v - 1)}><ChevronLeft className="h-4 w-4" /></Button>
       <span className="text-sm font-bold">{shortDate(range.start)} → {shortDate(range.end)}</span>
       <Button size="icon" variant="ghost" onClick={() => setOffset(v => v + 1)}><ChevronRight className="h-4 w-4" /></Button>
     </div>
-    {isLoading ? <p className="py-10 text-center text-sm text-white/40">Cargando…</p> : (data?.rows || []).length === 0 ? <p className="rounded-2xl border border-white/10 p-8 text-center text-sm text-white/40">No hay secuencias esta semana.</p> :
-      <div className="grid gap-2 lg:grid-cols-2">{(data?.rows || []).map(row => <button key={row.id} onClick={() => setEditing(row)} className="rounded-2xl border border-white/10 bg-black/20 p-4 text-left hover:border-fuchsia-400/30">
+    {isLoading ? <p className="py-10 text-center text-sm text-muted-foreground">Cargando…</p> : (data?.rows || []).length === 0 ? <p className="rounded-2xl border border-border p-8 text-center text-sm text-muted-foreground">No hay secuencias esta semana.</p> :
+      <div className="grid gap-2 lg:grid-cols-2">{(data?.rows || []).map(row => <button key={row.id} onClick={() => setEditing(row)} className="rounded-2xl border border-border bg-muted/50 p-4 text-left hover:border-fuchsia-400/30">
         <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{row.day_of_week || shortDate(String(row.planned_at))}</Badge><Badge className="bg-fuchsia-500/15 text-fuchsia-200">{row.format}</Badge><Badge variant="outline" className="ml-auto">{statusLabel(row.status)}</Badge></div>
         <p className="mt-3 whitespace-pre-wrap text-sm font-bold">{String((Array.isArray(row.metadata?.script_blocks) ? row.metadata.script_blocks[0] : null) || row.metadata?.idea || row.title)}</p>
-        {row.metadata?.avatar ? <p className="mt-2 text-xs text-white/50">{String(row.metadata.avatar)}</p> : null}
+        {row.metadata?.avatar ? <p className="mt-2 text-xs text-muted-foreground">{String(row.metadata.avatar)}</p> : null}
         {row.angle ? <p className="mt-1 text-xs text-fuchsia-300">{row.angle}</p> : null}
       </button>)}</div>}
     {(editing || creating) && <StoryDialog row={editing} onClose={() => { setEditing(null); setCreating(false) }} onSave={(payload) => save(editing, payload)} />}
@@ -169,7 +169,7 @@ function StoryDialog({ row, onClose, onSave }: { row: StoryRow | null; onClose: 
       <div><Label>Fecha</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
       <div className="grid grid-cols-2 gap-3"><div><Label>Día</Label><Input disabled value={dayLabel} /></div><div><Label>Estado</Label><Select value={status} onValueChange={setStatus}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{STORY_STATUSES.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div></div>
       <div><Label>Link de Drive</Label><Input type="url" value={driveUrl} onChange={event => setDriveUrl(event.target.value)} placeholder="https://drive.google.com/…" />{driveUrl && <a href={driveUrl} target="_blank" rel="noreferrer" className="mt-2 flex items-start gap-1.5 break-all text-xs text-fuchsia-300 hover:underline"><ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" />{driveUrl}</a>}</div>
-      <p className="text-xs text-white/40">Cada bloque es una placa. Podés agregar, borrar y arrastrar bloques sin límite.</p>
+      <p className="text-xs text-muted-foreground">Cada bloque es una placa. Podés agregar, borrar y arrastrar bloques sin límite.</p>
     </div>
     <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancelar</Button><Button disabled={!hook || !date || (needsAvatar && (!avatar || !angle))} onClick={() => {
       const scriptChanged = !row || JSON.stringify(blocks) !== JSON.stringify(initialBlocks)

@@ -143,7 +143,7 @@ export function BancoAngulos() {
 
       <div className="space-y-2">
         {visibles.map((a) => (
-          <Card key={a.id} className={cn("border-white/10 bg-white/[.035]", !a.activo && "opacity-55")}>
+          <Card key={a.id} className={cn("border-border bg-muted/40", !a.activo && "opacity-55")}>
             <CardContent className="py-3">
               {editando === a.id ? (
                 <div className="space-y-3">

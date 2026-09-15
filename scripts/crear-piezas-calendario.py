@@ -64,7 +64,7 @@ def proxima(dia):
 # Qué franjas ya están cargadas. La comparación se hace en hora argentina y en la base: la columna
 # es timestamptz y el driver devuelve UTC, así que comparar p.hour contra la hora del calendario
 # (12/16/20) nunca coincidía y el script duplicaba todo en la segunda corrida.
-cur.execute("""select to_char(planned_at at time zone 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD"T"HH24')
+cur.execute("""select to_char(planned_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24')
                from crm_content_assets where metadata->>'import_source' = 'calendario_semana_tipo' and planned_at is not null""")
 ya = {fila[0] for fila in cur.fetchall()}
 
@@ -75,8 +75,10 @@ for dia, hora, categoria, numero, formato, titulo, nota, plataforma, keyword in 
         faltantes.append(f"{dia} {hora}h: el ángulo {numero} no está en el banco")
         continue
     fecha = proxima(dia)
-    # -03:00 explícito: la columna es timestamptz y la franja del calendario es hora argentina.
-    cuando = f"{fecha.isoformat()}T{hora:02d}:00:00-03:00"
+    # Se guarda la hora "tal cual" en UTC, sin offset: el resto del CRM lee la fecha cortando el ISO
+    # (que viene en UTC), así que poner -03:00 movía la pieza de día en algunas vistas. Con esto,
+    # 12:00 guardado es 12:00 mostrado y el día nunca se corre.
+    cuando = f"{fecha.isoformat()}T{hora:02d}:00:00Z"
     franja = f"{fecha.isoformat()}T{hora:02d}"
     if franja in ya:
         salteadas.append(f"{fecha} {hora}h")

@@ -12,37 +12,37 @@ type Paleta = {
 
 const PALETAS: Record<string, Paleta> = {
   PROBLEMA: {
-    chip: "border-red-500/35 bg-red-500/15 text-red-300",
+    chip: "border-red-500/35 bg-red-500/15 dark:bg-red-500/15 text-red-700 dark:text-red-300",
     punto: "bg-red-500", panel: "border-red-500/25 bg-red-500/[.08]",
-    titulo: "text-red-300", borde: "border-red-500/40",
+    titulo: "text-red-700 dark:text-red-300", borde: "border-red-500/40",
   },
   SOLUCION: {
-    chip: "border-emerald-500/35 bg-emerald-500/15 text-emerald-300",
+    chip: "border-emerald-500/35 bg-emerald-500/15 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
     punto: "bg-emerald-500", panel: "border-emerald-500/25 bg-emerald-500/[.08]",
-    titulo: "text-emerald-300", borde: "border-emerald-500/40",
+    titulo: "text-emerald-700 dark:text-emerald-300", borde: "border-emerald-500/40",
   },
   PRODUCTO: {
-    chip: "border-sky-500/35 bg-sky-500/15 text-sky-300",
+    chip: "border-sky-500/35 bg-sky-500/15 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300",
     punto: "bg-sky-500", panel: "border-sky-500/25 bg-sky-500/[.08]",
-    titulo: "text-sky-300", borde: "border-sky-500/40",
+    titulo: "text-sky-700 dark:text-sky-300", borde: "border-sky-500/40",
   },
   MENTALIDAD: {
-    chip: "border-amber-400/35 bg-amber-400/15 text-amber-300",
+    chip: "border-amber-400/35 bg-amber-400/15 dark:bg-amber-400/15 text-amber-700 dark:text-amber-300",
     punto: "bg-amber-400", panel: "border-amber-400/25 bg-amber-400/[.08]",
-    titulo: "text-amber-300", borde: "border-amber-400/40",
+    titulo: "text-amber-700 dark:text-amber-300", borde: "border-amber-400/40",
   },
   VOLUMEN: {
-    chip: "border-violet-500/35 bg-violet-500/15 text-violet-300",
+    chip: "border-violet-500/35 bg-violet-500/15 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300",
     punto: "bg-violet-500", panel: "border-violet-500/25 bg-violet-500/[.08]",
-    titulo: "text-violet-300", borde: "border-violet-500/40",
+    titulo: "text-violet-700 dark:text-violet-300", borde: "border-violet-500/40",
   },
 }
 
 // Sin categoría conocida: gris, para no teñir de un color que significa otra cosa.
 const NEUTRA: Paleta = {
-  chip: "border-white/15 bg-white/[.06] text-white/60",
-  punto: "bg-white/25", panel: "border-white/10 bg-white/[.04]",
-  titulo: "text-white/55", borde: "border-white/15",
+  chip: "border-border bg-muted text-muted-foreground",
+  punto: "bg-muted-foreground/40", panel: "border-border bg-muted/60",
+  titulo: "text-muted-foreground", borde: "border-border",
 }
 
 // "VOLUMEN/TOFU", "Volumen/Tofu" y "volumen" caen todos en la misma paleta; los acentos no importan.

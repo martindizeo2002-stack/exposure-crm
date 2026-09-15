@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils"
 import { useSession } from "@/components/session-provider"
 import { useAngulos } from "@/lib/use-angulos"
 import { colorAngulo } from "@/lib/colores-angulo"
+import { TableroSemana, CalendarioSemana } from "@/components/content-semana"
 import { StoriesCalendar } from "@/components/stories-calendar"
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter"
 import { RECORDING_WINDOW } from "@/lib/recording-window"
@@ -197,10 +198,12 @@ export function ContentWorkspace() {
   const canEdit = session.email !== "preview@yin-yang.local"
   const canCreateOrDelete = canEdit && session.rol !== "Editor"
   const initialRecordingView = searchParams.get("view") === "grabar"
-  const [view, setView] = useState<"semana" | "stories" | "grabar" | "biblioteca">(initialRecordingView ? "grabar" : "semana")
+  const [view, setView] = useState<"semana" | "calendario" | "stories" | "grabar" | "biblioteca">(initialRecordingView ? "grabar" : "semana")
   const [weekOffset, setWeekOffset] = useState(0)
   const [editing, setEditing] = useState<ContentRow | null>(null)
   const [creating, setCreating] = useState(false)
+  // Fecha con la que se abre el diálogo al tocar "Agregar" en un día del tablero.
+  const [fechaNueva, setFechaNueva] = useState<string>("")
   const openedContentTarget = useRef<string | null>(null)
   const { data: formatOptionsData } = useSWR<FormatOptionsResponse>(
     "/api/content-workspace?options=formats", fetcher,
@@ -216,7 +219,7 @@ export function ContentWorkspace() {
   // planificador importado), no el árbol de páginas stub de Notion.
   const weekKey = `/api/content-workspace?managed_only=1&content_kind=feed&start=${start}&end=${end}&limit=200`
   const { data: weekData, isLoading: weekLoading, mutate: mutateWeek } = useSWR<ApiResponse>(
-    view === "semana" ? weekKey : null, fetcher,
+    view === "semana" || view === "calendario" ? weekKey : null, fetcher,
   )
 
   // Ventana operativa manual: solo cambia cuando edición confirma que el próximo
@@ -381,15 +384,16 @@ export function ContentWorkspace() {
 
   return (
     <div className="min-w-0 max-w-full space-y-5 overflow-x-hidden">
-      <div className="inline-flex max-w-lg rounded-2xl border border-white/10 bg-white/[.035] p-1.5">
+      <div className="inline-flex max-w-lg rounded-2xl border border-border bg-muted/40 p-1.5">
         <span className="rounded-xl bg-fuchsia-400 px-4 py-2.5 text-xs font-black text-zinc-950">CONTENIDO EXPOSURE</span>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="grid w-full max-w-3xl grid-cols-4 gap-1.5 rounded-2xl border border-white/10 bg-white/[.035] p-1.5 sm:w-auto">
-          <button onClick={() => setView("semana")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "semana" ? "bg-white text-zinc-950 shadow dark:bg-white/[.14] dark:text-white" : "text-muted-foreground hover:bg-white/[.06]")}>Esta semana</button>
-          <button onClick={() => setView("stories")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "stories" ? "bg-fuchsia-500 text-white shadow" : "text-muted-foreground hover:bg-white/[.06]")}>Calendario Stories</button>
-          <button onClick={() => { setWeekOffset(0); setView("grabar") }} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "grabar" ? "bg-red-500 text-white shadow shadow-red-500/25" : "text-muted-foreground hover:bg-white/[.06]")}><Play className="mr-1 inline h-3.5 w-3.5" />Grabar ya</button>
-          <button onClick={() => setView("biblioteca")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "biblioteca" ? "bg-white text-zinc-950 shadow dark:bg-white/[.14] dark:text-white" : "text-muted-foreground hover:bg-white/[.06]")}>Biblioteca / Calendario</button>
+        <div className="grid w-full max-w-3xl grid-cols-2 gap-1.5 rounded-2xl border border-border bg-muted/40 p-1.5 sm:grid-cols-3 lg:w-auto lg:grid-cols-5">
+          <button onClick={() => setView("semana")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "semana" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60")}>Esta semana</button>
+          <button onClick={() => setView("calendario")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "calendario" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60")}>Calendario</button>
+          <button onClick={() => setView("stories")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "stories" ? "bg-fuchsia-500 text-white shadow" : "text-muted-foreground hover:bg-background/60")}>Calendario Stories</button>
+          <button onClick={() => { setWeekOffset(0); setView("grabar") }} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "grabar" ? "bg-red-500 text-white shadow shadow-red-500/25" : "text-muted-foreground hover:bg-muted")}><Play className="mr-1 inline h-3.5 w-3.5" />Grabar ya</button>
+          <button onClick={() => setView("biblioteca")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", view === "biblioteca" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60")}>Biblioteca / Calendario</button>
         </div>
         {view === "stories" ? null : canCreateOrDelete ? (
           <Button size="sm" onClick={() => setCreating(true)}><Plus className="mr-1.5 h-4 w-4" />Nueva pieza</Button>
@@ -405,7 +409,7 @@ export function ContentWorkspace() {
       )}
 
       {view === "semana" && (
-        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[.035] px-4 py-2.5">
+        <div className="flex items-center justify-between rounded-2xl border border-border bg-muted/40 px-4 py-2.5">
           <Button size="icon" variant="ghost" onClick={() => setWeekOffset((v) => v - 1)}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="text-sm font-bold">{formatDay(start)} → {formatDay(end)}{weekOffset === 0 && <Badge variant="outline" className="ml-2 align-middle">Semana actual</Badge>}</span>
           <Button size="icon" variant="ghost" onClick={() => setWeekOffset((v) => v + 1)}><ChevronRight className="h-4 w-4" /></Button>
@@ -415,17 +419,17 @@ export function ContentWorkspace() {
       {view === "semana" && weekSummary.length > 0 && (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           {weekSummary.map(([day, count]) => (
-            <div key={day} className="rounded-2xl border border-white/10 bg-white/[.035] p-3">
-              <p className="text-[10px] font-black uppercase tracking-wider text-white/40">{formatDay(day)}</p>
+            <div key={day} className="rounded-2xl border border-border bg-muted/40 p-3">
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">{formatDay(day)}</p>
               <p className="mt-1 text-2xl font-black">{count.total}</p>
-              <p className="text-[11px] text-white/45">{count.volumen} Volumen · {count.carrusel} Carrusel · {count.videos} videos</p>
+              <p className="text-[11px] text-muted-foreground">{count.volumen} Volumen · {count.carrusel} Carrusel · {count.videos} videos</p>
             </div>
           ))}
         </div>
       )}
 
       {view === "biblioteca" && (
-        <div className="grid gap-2 rounded-2xl border border-white/10 bg-white/[.035] p-3 sm:grid-cols-4">
+        <div className="grid gap-2 rounded-2xl border border-border bg-muted/40 p-3 sm:grid-cols-4">
           <div className="relative sm:col-span-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Buscar en título o guion…" className="pl-9" value={libQuery} onChange={(e) => setLibQuery(e.target.value)} />
@@ -441,24 +445,24 @@ export function ContentWorkspace() {
         <div className="space-y-4">
           <div className="rounded-[24px] border border-red-500/20 bg-gradient-to-br from-red-500/10 via-black/20 to-fuchsia-500/10 p-4 sm:p-5">
             <div className="mb-4 flex items-start justify-between gap-3">
-              <div><p className="text-xs font-black uppercase tracking-[.18em] text-red-400">Modo ejecución</p><h2 className="mt-1 text-2xl font-black">Grabá. Marcá. Siguiente.</h2><p className="mt-1 text-xs text-white/50">Ventana activa manual · {recordingWindow.start.split("-").reverse().join("/")} al {recordingWindow.end.split("-").reverse().join("/")}</p></div>
+              <div><p className="text-xs font-black uppercase tracking-[.18em] text-red-400">Modo ejecución</p><h2 className="mt-1 text-2xl font-black">Grabá. Marcá. Siguiente.</h2><p className="mt-1 text-xs text-muted-foreground">Ventana activa manual · {recordingWindow.start.split("-").reverse().join("/")} al {recordingWindow.end.split("-").reverse().join("/")}</p></div>
               <div className="flex flex-wrap justify-end gap-2"><Badge className="bg-red-500 text-white hover:bg-red-500">{recordingRows.length} por grabar</Badge><Badge variant="outline">{editingRows.length} en postproducción</Badge></div>
             </div>
             <div className="grid gap-2">
-              <button onClick={() => setRecordingKind("reels")} className={cn("rounded-xl border px-4 py-3 text-left transition", recordingKind === "reels" ? "border-red-400/50 bg-red-500/15" : "border-white/10 bg-black/20")}><span className="block text-xs text-white/45">Pendientes</span><span className="text-lg font-black">Reels · {recordingGroups.reels.length}</span></button>
+              <button onClick={() => setRecordingKind("reels")} className={cn("rounded-xl border px-4 py-3 text-left transition", recordingKind === "reels" ? "border-red-400/50 bg-red-500/15" : "border-border bg-muted/50")}><span className="block text-xs text-muted-foreground">Pendientes</span><span className="text-lg font-black">Reels · {recordingGroups.reels.length}</span></button>
             </div>
           </div>
 
           {recordingGroups.reels.length > 0 && (
-            <div className="min-w-0 rounded-[24px] border border-white/10 bg-white/[.035] p-4">
-              <p className="mb-3 text-xs font-black uppercase tracking-[.16em] text-white/45">Todo lo pendiente de grabar</p>
+            <div className="min-w-0 rounded-[24px] border border-border bg-muted/40 p-4">
+              <p className="mb-3 text-xs font-black uppercase tracking-[.16em] text-muted-foreground">Todo lo pendiente de grabar</p>
               <div className="grid min-w-0 gap-2 sm:grid-cols-2">
                 {recordingGroups.reels.map((row, index) => (
-                  <div key={row.id} className="flex min-w-0 items-start gap-2 rounded-xl border border-white/10 bg-black/20 p-3 hover:border-red-400/40">
+                  <div key={row.id} className="flex min-w-0 items-start gap-2 rounded-xl border border-border bg-muted/50 p-3 hover:border-red-400/40">
                     <button onClick={() => { setRecordingKind("reels"); setRecordingIndex(index); setEditing(row) }} className="min-w-0 flex-1 text-left" aria-label={`Abrir pieza completa: ${row.title}`}>
                       <div className="flex min-w-0 flex-wrap gap-1.5"><Badge variant="outline">{formatDay(String(row.planned_at || ""))}</Badge>{row.angle && <Badge variant="outline" className={cn("max-w-full truncate", colorAngulo(categoriaDeAngulo(row.angle)).chip)}>{row.angle}</Badge>}<Badge variant="outline" className="border-zinc-400/30 bg-zinc-400/10 text-zinc-300">Estado: Idea</Badge></div>
                       <p className="mt-2 break-words text-sm font-black">{row.title}</p>
-                      <p className="mt-1 line-clamp-2 break-words text-xs text-white/45">{row.format || "Formato sin definir"} · {row.script_text || row.insight_notes || "Idea de guion pendiente"}</p>
+                      <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground">{row.format || "Formato sin definir"} · {row.script_text || row.insight_notes || "Idea de guion pendiente"}</p>
                       <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-fuchsia-300">Ver pieza completa <ArrowUpRight className="h-3 w-3" /></span>
                     </button>
                     <Button size="sm" className="shrink-0 bg-emerald-500 text-zinc-950 hover:bg-emerald-400" disabled={!canEdit || markingRecordedId === row.id} onClick={() => markRecorded(row)}>{markingRecordedId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle2 className="mr-1 h-4 w-4" />Marcar grabado</>}</Button>
@@ -471,19 +475,19 @@ export function ContentWorkspace() {
           {!recordingRow ? (
             <div className="rounded-[24px] border border-emerald-400/25 bg-emerald-400/10 p-10 text-center"><CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400" /><p className="mt-3 text-xl font-black">No quedan {recordingKind} por grabar.</p></div>
           ) : (
-            <div className="min-w-0 max-w-full overflow-hidden rounded-[26px] border border-white/10 bg-white/[.035]">
-              <div className="border-b border-white/10 p-4 sm:p-6">
+            <div className="min-w-0 max-w-full overflow-hidden rounded-[26px] border border-border bg-muted/40">
+              <div className="border-b border-border p-4 sm:p-6">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{formatDay(String(recordingRow.planned_at || ""))}</Badge>
                   <Badge variant="outline" className="border-cyan-400/30 bg-cyan-400/10 text-cyan-200">{recordingFormat(recordingRow)}</Badge>
-                  <span className="ml-auto text-xs font-bold text-white/45">{Math.min(recordingIndex + 1, recordingList.length)} de {recordingList.length}</span>
+                  <span className="ml-auto text-xs font-bold text-muted-foreground">{Math.min(recordingIndex + 1, recordingList.length)} de {recordingList.length}</span>
                 </div>
                 <h3 className="mt-4 text-xl font-black leading-tight sm:text-2xl">{recordingRow.title}</h3>
               </div>
               <div className="space-y-4 p-4 sm:p-6">
                 <RecordingBrief row={recordingRow} />
               </div>
-              <div className="grid gap-2 border-t border-white/10 bg-black/20 p-4 sm:grid-cols-[auto_1fr_auto]">
+              <div className="grid gap-2 border-t border-border bg-muted/50 p-4 sm:grid-cols-[auto_1fr_auto]">
                 <Button variant="outline" disabled={recordingIndex === 0} onClick={() => setRecordingIndex((v) => Math.max(0, v - 1))}><ChevronLeft className="mr-1 h-4 w-4" />Anterior</Button>
                 <Button className="h-12 bg-emerald-500 text-base font-black text-zinc-950 hover:bg-emerald-400" disabled={!canEdit || markingRecordedId === recordingRow.id} onClick={() => markRecorded(recordingRow)}>{markingRecordedId === recordingRow.id ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}Marcar como grabado</Button>
                 <Button variant="outline" disabled={recordingIndex >= recordingList.length - 1} onClick={() => setRecordingIndex((v) => Math.min(recordingList.length - 1, v + 1))}>Siguiente<ChevronRight className="ml-1 h-4 w-4" /></Button>
@@ -496,9 +500,13 @@ export function ContentWorkspace() {
       ) : data && !data.schemaReady ? (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-100">Falta aplicar la migración canónica en Supabase preview para habilitar el workspace de contenido.</div>
       ) : rows.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-10 text-center text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-border bg-muted/30 p-10 text-center text-sm text-muted-foreground">
           {view === "semana" ? "No hay piezas calendarizadas para esta semana." : "No hay piezas que coincidan con el filtro."}
         </div>
+      ) : view === "semana" ? (
+        <TableroSemana start={start} rows={rows} onOpen={(row) => setEditing(rows.find((r) => r.id === row.id) || null)} onNueva={(fecha) => { setFechaNueva(fecha); setCreating(true) }} />
+      ) : view === "calendario" ? (
+        <CalendarioSemana start={start} rows={rows} onOpen={(row) => setEditing(rows.find((r) => r.id === row.id) || null)} />
       ) : (
         <div className="space-y-4">
           {grouped.map(([dateKey, items]) => {
@@ -507,27 +515,14 @@ export function ContentWorkspace() {
             const editingItems = items.filter((row) => KINDS_EDICION.includes(contentPieceKind(row)))
             const reels = items.filter((row) => !KINDS_EDICION.includes(contentPieceKind(row)))
             return (
-            <div key={dateKey} className="rounded-[22px] border border-white/10 bg-white/[.03] p-4">
-              <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-white/50">
+            <div key={dateKey} className="rounded-[22px] border border-border bg-muted/30 p-4">
+              <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-muted-foreground">
                 <CalendarDays className="h-3.5 w-3.5" />
                 {dateKey === "sin-fecha" ? "Sin fecha" : formatDay(dateKey)}
-                {dateKey !== "sin-fecha" && <span className="normal-case tracking-normal text-white/30">· {formatWeekLabel(dateKey)}</span>}
+                {dateKey !== "sin-fecha" && <span className="normal-case tracking-normal text-muted-foreground/70">· {formatWeekLabel(dateKey)}</span>}
               </div>
-              <div className="space-y-3">
-                <section className="rounded-2xl border border-white/10 bg-black/20">
-                  <div className="px-4 py-3 text-xs font-black uppercase tracking-wider text-white/60">
-                    EDICIÓN · {editingItems.filter((r) => contentPieceKind(r) === "VOLUMEN").length} Volumen · {editingItems.filter((r) => contentPieceKind(r) === "CARRUSEL").length} Carruseles · {editingItems.filter((r) => contentPieceKind(r) === "TESTIMONIO").length} Testimonio
-                  </div>
-                  <div className="grid gap-2.5 border-t border-white/10 p-3 md:grid-cols-2 xl:grid-cols-3">
-                    {editingItems.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} />)}
-                  </div>
-                </section>
-                <div>
-                  <p className="mb-2 px-1 text-xs font-black uppercase tracking-wider text-fuchsia-300">ALEX · {reels.length} para grabar</p>
-                  <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-                    {reels.map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} detailed />)}
-                  </div>
-                </div>
+              <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                {[...editingItems, ...reels].map((row) => <ContentCalendarCard key={row.id} row={row} onOpen={() => setEditing(row)} />)}
               </div>
             </div>
           )})}
@@ -557,7 +552,8 @@ export function ContentWorkspace() {
         <ContentEditDialog
           row={null}
           formatOptions={formatOptionsData?.formats || []}
-          onClose={() => setCreating(false)}
+          fechaInicial={fechaNueva}
+          onClose={() => { setCreating(false); setFechaNueva("") }}
           onSave={(payload) => saveRow(null, payload)}
         />
       )}
@@ -572,20 +568,20 @@ function ContentCalendarCard({ row, onOpen, detailed = false }: { row: ContentRo
   const StatusIcon = meta.icon
   const managed = isManaged(row.source_key)
   return (
-    <button onClick={onOpen} className={cn("group flex min-w-0 flex-col gap-2 rounded-2xl border bg-black/20 p-3.5 text-left transition hover:bg-black/30", contentCardBorder(row))}>
+    <button onClick={onOpen} className={cn("group flex min-w-0 flex-col gap-2 rounded-2xl border bg-muted/50 p-3.5 text-left transition hover:bg-muted/60", contentCardBorder(row))}>
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         {row.angle && !hasNoAngle(row.format) && <Badge variant="outline" className={cn("max-w-full", colorAngulo(categoriaDeAngulo(row.angle)).chip)}>{row.angle}</Badge>}
-        {row.format && <Badge variant="outline" className="text-white/55">{row.format}</Badge>}
+        {row.format && <Badge variant="outline" className="text-muted-foreground">{row.format}</Badge>}
         <Badge variant="outline" className={cn("ml-auto gap-1", meta.tone)}><StatusIcon className="h-3 w-3" />{meta.label}</Badge>
       </div>
       {contentPieceKind(row) !== "ESTRATEGIA" && <p className="line-clamp-2 text-sm font-bold leading-5">{row.title}</p>}
       {detailed && (
-        <div className="space-y-2 text-xs text-white/55">
-          <div className="whitespace-pre-line break-words rounded-xl border border-white/10 bg-white/[.03] p-2.5">{row.script_text || "Bullets pendientes"}</div>
-          <p className="break-words"><span className="font-black text-white/70">CTA:</span> {row.cta || "Recurso gratuito"}</p>
+        <div className="space-y-2 text-xs text-muted-foreground">
+          <div className="whitespace-pre-line break-words rounded-xl border border-border bg-muted/30 p-2.5">{row.script_text || "Bullets pendientes"}</div>
+          <p className="break-words"><span className="font-black text-muted-foreground">CTA:</span> {row.cta || "Recurso gratuito"}</p>
         </div>
       )}
-      <div className="mt-auto flex items-center justify-between text-[11px] text-white/40">
+      <div className="mt-auto flex items-center justify-between text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1"><User className="h-3 w-3" />{row.assigned_to || "SIN ASIGNAR"}</span>
         {!managed && <span className="italic">solo lectura</span>}
       </div>
@@ -632,18 +628,19 @@ function RecordingBrief({ row }: { row: ContentRow }) {
 
 function RecordingPieceDialog({ row, busy, canEdit, onClose, onRecorded }: { row: ContentRow; busy: boolean; canEdit: boolean; onClose: () => void; onRecorded: () => void }) {
   return <Dialog open onOpenChange={(open) => !open && onClose()}>
-    <DialogContent className="max-h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] overflow-hidden border-white/10 bg-zinc-950 p-0 text-white sm:max-w-xl">
+    <DialogContent className="max-h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] dark overflow-hidden border-border bg-zinc-950 p-0 text-white sm:max-w-xl">
       <div className="max-h-[calc(100dvh-6rem)] overflow-y-auto p-5 sm:p-7">
         <DialogHeader className="text-left"><div className="mb-2 flex flex-wrap gap-2"><Badge className="bg-gradient-to-r from-orange-400 to-fuchsia-500 text-white">LISTO PARA GRABAR</Badge><Badge variant="outline" className="border-cyan-400/30 text-cyan-200">{recordingFormat(row)}</Badge></div><DialogTitle className="text-2xl font-black leading-tight sm:text-3xl">{row.title}</DialogTitle></DialogHeader>
         <div className="mt-5 space-y-4"><RecordingBrief row={row} /></div>
       </div>
-      <div className="grid grid-cols-2 gap-2 border-t border-white/10 bg-black/30 p-4"><Button variant="outline" className="h-12 border-white/15 bg-white/5" onClick={onClose}>Cancelar</Button><Button className="h-12 bg-emerald-400 font-black text-zinc-950 hover:bg-emerald-300" disabled={!canEdit || busy} onClick={onRecorded}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}Marcar grabado</Button></div>
+      <div className="grid grid-cols-2 gap-2 border-t border-border bg-muted/60 p-4"><Button variant="outline" className="h-12 border-border bg-muted/50" onClick={onClose}>Cancelar</Button><Button className="h-12 bg-emerald-400 font-black text-zinc-950 hover:bg-emerald-300" disabled={!canEdit || busy} onClick={onRecorded}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}Marcar grabado</Button></div>
     </DialogContent>
   </Dialog>
 }
 
 function ContentEditDialog({
   row, formatOptions, onClose, onSave, onDelete, forceReadOnly = false, allowGenerator = true,
+  fechaInicial = "",
 }: {
   row: ContentRow | null
   formatOptions: string[]
@@ -652,6 +649,7 @@ function ContentEditDialog({
   onDelete?: () => void
   forceReadOnly?: boolean
   allowGenerator?: boolean
+  fechaInicial?: string
 }) {
   const readOnly = forceReadOnly || (!!row && !isManaged(row.source_key))
   // Banco de ángulos editable (Contenido → Banco de ángulos); incluye el del row aunque esté inactivo,
@@ -670,7 +668,7 @@ function ContentEditDialog({
     platform: row?.platform || "",
     assigned_to: row?.assigned_to || "SIN ASIGNAR",
     status: row?.status || "idea",
-    planned_at: row?.planned_at?.slice(0, 10) || "",
+    planned_at: row?.planned_at?.slice(0, 10) || fechaInicial || "",
     awareness_level: row?.awareness_level || "",
     script_text: row?.script_text || "",
     insight_notes: row?.insight_notes || "",
@@ -813,7 +811,7 @@ function ContentEditDialog({
                 placeholder="Tirá la idea en bruto. Ej: explicar por qué acumular matches no significa tener opciones…"
               />
               <div className="mt-2 flex items-center justify-between gap-3">
-                <p className="text-[11px] leading-4 text-white/45">{noAngle ? "Usa el formato elegido, sin forzar un ángulo." : "Usa el ángulo y formato elegidos."} Completa hook, guion, CTA y dirección de grabación; no guarda solo.</p>
+                <p className="text-[11px] leading-4 text-muted-foreground">{noAngle ? "Usa el formato elegido, sin forzar un ángulo." : "Usa el ángulo y formato elegidos."} Completa hook, guion, CTA y dirección de grabación; no guarda solo.</p>
                 <Button type="button" size="sm" onClick={generateScript} disabled={generating || generatorIdea.trim().length < 8}>
                   {generating ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
                   {generating ? "Armando…" : "Armar guion"}
