@@ -7,16 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useSession } from "@/components/session-provider"
-import { Loader2, MessageCircle, Copy, Save, Sparkles } from "lucide-react"
+import { Loader2, MessageCircle, Copy, Save, Sparkles, Download, ExternalLink, FileText } from "lucide-react"
+import { dashboardSettingHtml, nombreArchivoDashboard, porcentaje, type DiaSetting } from "@/lib/setting-dashboard"
 
-type Lead = { lead: string; usuario: string; nombre: string; origen: string | null; calificado: boolean; ciclo: string | null; gatillo: string | null; feed: string | null; fups: number | null; dolor: string | null; objetivo: string | null; sintesis_closer: string | null; caso_exito: string | null; material_enviado: string | null; agenda_id?: string | null; agenda_nombre?: string | null }
-type Dia = {
-  fecha: string; setter: string; calendarios_enviados: number | null; agendas: number | null; calificados_dia: number | null; fups: number | null
-  nuevos_seguidores: number | null; ns_contestan: number | null; ns_califican: number | null; ns_bookeados: number | null
-  historia: string | null; historia_comentaron: number | null; historia_calificaron: number | null; historia_bookeados: number | null
-  outbound_enviados: number | null; outbound_respuestas: number | null; outbound_agendas: number | null
-  leads: Lead[]; observaciones?: string[]; resumen_whatsapp?: string
-}
+// El reporte del día y su dashboard comparten la misma forma: lo que se dibuja acá es exactamente
+// lo que se descarga como HTML.
+type Dia = DiaSetting
 type Guardado = { fecha: string; setter: string; calendarios_enviados: number | null; agendas: number | null; calificados_dia: number | null; fups: number | null; leads: number; cruzados: number; origen: string; resumen_whatsapp: string | null }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -83,6 +79,33 @@ export default function SettingResumenPage() {
       setGuardado(j); void mutate("/api/setting-resumen?limite=20")
     } catch (e) { setError((e as Error).message) } finally { setEstado("idle") }
   }
+  // Trae un día ya guardado y lo vuelve a dibujar como dashboard.
+  async function verGuardado(f: string) {
+    setError(null)
+    try {
+      const r = await fetch(`/api/setting-resumen?fecha=${f}`)
+      const j = await r.json()
+      if (!r.ok) throw new Error(j.error || "No se pudo abrir ese día")
+      setDia(j.dia); setWa(j.dia.resumen_whatsapp || ""); setFecha(f); setGuardado(null)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch (e) { setError((e as Error).message) }
+  }
+
+  // El HTML del dashboard se arma en el cliente con la misma función que usa el resto del CRM.
+  const html = dia ? dashboardSettingHtml(dia) : ""
+  function descargar() {
+    if (!dia) return
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
+    const a = document.createElement("a")
+    a.href = url; a.download = nombreArchivoDashboard(dia)
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
+  function abrir() {
+    if (!dia) return
+    const v = window.open("", "_blank")
+    if (v) { v.document.write(html); v.document.close() }
+  }
   async function copiar() {
     try { await navigator.clipboard.writeText(wa); setCopiado(true); setTimeout(() => setCopiado(false), 1500) } catch { /* sin permiso de portapapeles */ }
   }
@@ -113,39 +136,31 @@ export default function SettingResumenPage() {
         {!dia && <Card className="border-dashed border-white/15 bg-transparent"><CardContent className="py-14 text-center text-sm text-muted-foreground">Acá aparece el reporte del día cuando lo generes.</CardContent></Card>}
         {dia && <>
           <Card className="border-white/10 bg-white/[.035]">
-            <CardHeader className="pb-2"><CardTitle className="text-base">Setting del {dm(dia.fecha)} · {dia.setter}</CardTitle>{dia.observaciones?.length ? <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">{dia.observaciones.map((o, i) => <li key={i}>{o}</li>)}</ul> : null}</CardHeader>
-            <CardContent className="pt-2">
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 pb-2">
+              <div>
+                <CardTitle className="text-base">Reporte del {dm(dia.fecha)} · {dia.setter}</CardTitle>
+                <p className="text-xs text-muted-foreground">El dashboard del día, igual a los que venías entregando. Esto mismo es lo que se descarga.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={descargar}><Download className="mr-2 h-4 w-4" />Descargar HTML</Button>
+                <Button size="sm" variant="outline" onClick={abrir}><ExternalLink className="mr-2 h-4 w-4" />Abrir en pestaña</Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-2">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Kpi t="Calendarios enviados" v={n(dia.calendarios_enviados)} />
-                <Kpi t="Agendas" v={n(dia.agendas)} s={pct(dia.agendas, dia.calendarios_enviados) ? `${pct(dia.agendas, dia.calendarios_enviados)} de los calendarios` : undefined} />
+                <Kpi t="Calendarios" v={n(dia.calendarios_enviados)} />
+                <Kpi t="Agendas" v={n(dia.agendas)} s={porcentaje(dia.agendas, dia.calendarios_enviados) ? `${porcentaje(dia.agendas, dia.calendarios_enviados)} de los calendarios` : undefined} />
                 <Kpi t="Calificados (día)" v={n(dia.calificados_dia)} s="negocio + dolor identificados" />
                 <Kpi t="Seguimientos" v={n(dia.fups)} />
               </div>
-              <div className="mt-3 grid gap-3 lg:grid-cols-3">
-                <Kpi t="Nuevos seguidores" v={n(dia.nuevos_seguidores)} s={`${n(dia.ns_contestan)} contestan · ${n(dia.ns_califican)} califican · ${n(dia.ns_bookeados)} bookean`} />
-                <Kpi t={dia.historia ? `Historia · ${dia.historia}` : "Historia del día"} v={n(dia.historia_comentaron)} s={`comentaron · ${n(dia.historia_calificaron)} calificaron · ${n(dia.historia_bookeados)} bookeados`} />
-                <Kpi t="Outbound" v={n(dia.outbound_enviados)} s={`enviados · ${n(dia.outbound_respuestas)} respuestas · ${n(dia.outbound_agendas)} agendas`} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/10 bg-white/[.035]">
-            <CardHeader className="pb-2"><CardTitle className="text-base">Lead por lead ({dia.leads.length})</CardTitle></CardHeader>
-            <CardContent className="pt-2">
-              <div className="overflow-x-auto"><Table>
-                <TableHeader><TableRow className="hover:bg-transparent"><TableHead>Lead</TableHead><TableHead>Origen</TableHead><TableHead>Calif.</TableHead><TableHead>Ciclo</TableHead><TableHead>Gatillo</TableHead><TableHead className="text-right">Fups</TableHead><TableHead>Dolor</TableHead><TableHead>Objetivo</TableHead><TableHead>Para el closer</TableHead></TableRow></TableHeader>
-                <TableBody>{dia.leads.map((l, i) => <TableRow key={i}>
-                  <TableCell className="font-bold whitespace-nowrap">{l.lead}{l.agenda_nombre && <span className="block text-[11px] font-normal text-emerald-300">↳ {l.agenda_nombre}</span>}</TableCell>
-                  <TableCell className="max-w-[200px] whitespace-normal text-muted-foreground">{l.origen || "—"}</TableCell>
-                  <TableCell>{l.calificado ? <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-300">Sí</span> : <span className="rounded-md bg-white/10 px-2 py-0.5 text-xs text-white/60">No</span>}</TableCell>
-                  <TableCell className="max-w-[160px] whitespace-normal text-muted-foreground">{l.ciclo || "—"}</TableCell>
-                  <TableCell className="max-w-[200px] whitespace-normal text-muted-foreground">{l.gatillo || "—"}{l.feed && <span className="block text-[11px]">{l.feed}</span>}</TableCell>
-                  <TableCell className="text-right">{n(l.fups)}</TableCell>
-                  <TableCell className="max-w-[260px] whitespace-normal">{l.dolor || "—"}</TableCell>
-                  <TableCell className="max-w-[220px] whitespace-normal">{l.objetivo || "—"}</TableCell>
-                  <TableCell className="max-w-[320px] whitespace-normal text-xs text-muted-foreground">{l.sintesis_closer || "—"}</TableCell>
-                </TableRow>)}</TableBody>
-              </Table></div>
+              {dia.avisos?.length ? <ul className="list-disc space-y-0.5 rounded-lg border border-red-500/30 bg-red-500/[.06] px-5 py-3 text-xs text-red-200">{dia.avisos.map((a, i) => <li key={i}>{a}</li>)}</ul> : null}
+              {/* El reporte se muestra tal cual se descarga: es el mismo HTML, no una vista aparte. */}
+              <iframe
+                title={`Setting del ${dia.fecha}`}
+                srcDoc={html}
+                className="h-[680px] w-full rounded-xl border border-white/10 bg-[#14110c]"
+              />
+              <p className="text-xs text-muted-foreground">{dia.leads.length} leads lead por lead · {dia.contenido_consumido?.length || 0} piezas de contenido consumidas · {(html.length / 1024).toFixed(0)} KB</p>
             </CardContent>
           </Card>
 
@@ -188,7 +203,10 @@ export default function SettingResumenPage() {
                 <TableCell className="text-right">{n(d.calendarios_enviados)}</TableCell><TableCell className="text-right font-semibold">{n(d.agendas)}</TableCell>
                 <TableCell className="text-right">{n(d.calificados_dia)}</TableCell><TableCell className="text-right">{n(d.fups)}</TableCell>
                 <TableCell className="text-right">{d.cruzados} / {d.leads}</TableCell><TableCell className="text-muted-foreground">{d.origen === "generador" ? "Generador" : "Dashboard"}</TableCell>
-                <TableCell>{d.resumen_whatsapp && <button type="button" onClick={() => { setWa(d.resumen_whatsapp || "") }} className="text-xs text-emerald-300 underline-offset-2 hover:underline">ver mensaje</button>}</TableCell>
+                <TableCell className="whitespace-nowrap">
+                  <button type="button" onClick={() => void verGuardado(d.fecha)} className="text-xs text-amber-300 underline-offset-2 hover:underline">ver reporte</button>
+                  {d.resumen_whatsapp && <button type="button" onClick={() => { setWa(d.resumen_whatsapp || "") }} className="ml-3 text-xs text-emerald-300 underline-offset-2 hover:underline">ver mensaje</button>}
+                </TableCell>
               </TableRow>)}</TableBody>
             </Table></div> : null}
           </CardContent>

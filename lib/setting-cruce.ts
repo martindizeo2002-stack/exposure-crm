@@ -10,8 +10,11 @@ export type AgendaCruce = {
 }
 export type LeadReporte = {
   lead: string; usuario?: string | null; nombre?: string | null; origen?: string | null; calificado?: boolean | null; ciclo?: string | null
-  gatillo?: string | null; feed?: string | null; fups?: number | null; dolor?: string | null; objetivo?: string | null
-  sintesis_closer?: string | null; caso_exito?: string | null; material_enviado?: string | null
+  // `feed` es la lista de piezas de contenido que consumió. Los reportes viejos lo guardaron como
+  // un texto suelto, así que se aceptan las dos formas.
+  gatillo?: string | null; feed?: string[] | string | null; fups?: number | null
+  situacion?: string | null; dolor?: string | null; objetivo?: string | null
+  sintesis_closer?: string | null; caso_exito?: string | null; material_enviado?: string | null; historial?: string | null
   agenda_id?: string | null; agenda_nombre?: string | null; cruce?: string | null
 }
 
@@ -119,7 +122,8 @@ export function cruzarLead(l: LeadReporte, fechaDia: string, agendas: AgendaCruc
 // Qué campos vacíos de la agenda completa este lead del reporte
 export function parchesDe(l: LeadReporte, a: AgendaCruce, setter: string) {
   const [fuente, recurso] = fuenteDe(l.origen, l.gatillo)
-  const gatillo = [l.gatillo, l.feed].filter(Boolean).join(" · ")
+  const feed = Array.isArray(l.feed) ? l.feed.filter(Boolean).join(" · ") : l.feed
+  const gatillo = [l.gatillo, feed].filter(Boolean).join(" · ")
   const p: Record<string, string> = {}
   if (l.dolor && !a.problema_actual) p.problema_actual = String(l.dolor).slice(0, 500)
   if (l.objetivo && !a.motivo_urgencia) p.motivo_urgencia = String(l.objetivo).slice(0, 300)
