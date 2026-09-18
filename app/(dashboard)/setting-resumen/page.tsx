@@ -193,13 +193,13 @@ export default function SettingResumenPage() {
         </>}
 
         <Card className="border-white/10 bg-white/[.035]">
-          <CardHeader className="pb-2"><CardTitle className="text-base">Días guardados</CardTitle><p className="text-xs text-muted-foreground">Lo que ya está en el CRM (por script o por este generador).</p></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Días guardados</CardTitle><p className="text-xs text-muted-foreground">Lo que ya está en el CRM. Tocá la fecha para abrir el dashboard de ese día en su propia página, con un enlace que podés guardar.</p></CardHeader>
           <CardContent className="pt-2">
             {!historial?.dias?.length && <p className="text-sm text-muted-foreground">Todavía no hay días guardados.</p>}
             {historial?.dias?.length ? <div className="overflow-x-auto"><Table>
               <TableHeader><TableRow className="hover:bg-transparent"><TableHead>Día</TableHead><TableHead>Setter</TableHead><TableHead className="text-right">Calendarios</TableHead><TableHead className="text-right">Agendas</TableHead><TableHead className="text-right">Calificados</TableHead><TableHead className="text-right">Fups</TableHead><TableHead className="text-right">Leads cruzados</TableHead><TableHead>Origen</TableHead><TableHead></TableHead></TableRow></TableHeader>
               <TableBody>{historial.dias.map((d) => <TableRow key={d.fecha}>
-                <TableCell className="font-mono text-xs">{dm(d.fecha)}</TableCell><TableCell>{d.setter}</TableCell>
+                <TableCell className="font-mono text-xs"><a href={`/setting-resumen/${d.fecha}`} className="text-amber-300 underline-offset-2 hover:underline" title="Abrir el dashboard de este día">{dm(d.fecha)}</a></TableCell><TableCell>{d.setter}</TableCell>
                 <TableCell className="text-right">{n(d.calendarios_enviados)}</TableCell><TableCell className="text-right font-semibold">{n(d.agendas)}</TableCell>
                 <TableCell className="text-right">{n(d.calificados_dia)}</TableCell><TableCell className="text-right">{n(d.fups)}</TableCell>
                 <TableCell className="text-right">{d.cruzados} / {d.leads}</TableCell><TableCell className="text-muted-foreground">{d.origen === "generador" ? "Generador" : "Dashboard"}</TableCell>

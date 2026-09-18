@@ -2,9 +2,12 @@ import { NextResponse } from "next/server"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { nombreCanonico } from "@/lib/equipo"
 import { cruzarLead, parchesDe, semanaDe, norm, type AgendaCruce, type LeadReporte } from "@/lib/setting-cruce"
+import { dashboardSettingHtml, type DiaSetting } from "@/lib/setting-dashboard"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 120
+// Vercel Pro permite hasta 300 s. Con esfuerzo bajo el reporte tarda menos de un minuto, pero un día
+// con muchos leads no puede morir por tiempo a la mitad.
+export const maxDuration = 300
 
 // Generador de resúmenes de setting. El setter pega las notas crudas del día (lo que escribe en su
 // bloc de notas) y Claude las convierte en el mismo reporte estructurado que sus dashboards
@@ -29,7 +32,7 @@ const SYSTEM = `Sos el analista de setting de EXPOSURE (programa high ticket par
 Recibís las NOTAS CRUDAS que el setter escribió al final del día y devolvés el reporte del día en JSON, con la misma estructura que sus dashboards diarios.
 
 REGLAS
-- No inventes nada. Si un número o un dato no está en las notas, va null. Nunca estimes ni completes con lo que suele pasar.
+- No inventes nada. Si un número o un dato no está en las notas, ese campo va vacío (""). Nunca estimes ni completes con lo que suele pasar. Los números van como texto: "15", o "" si no está.
 - No calcules porcentajes ni tasas: el dashboard los saca solo de los números crudos. Devolvé únicamente los conteos.
 - "Calificado" acá significa negocio + dolor identificados. NO significa capacidad de pago.
 - Los números del día suelen venir en una frase tipo: "15 leads nuevos mandaron de 113 que nos siguieron, hice 89 fups y 68 outbound, de la historia comentaron 47, 5 leads agendaron de 9 que se les mandó calendario y 11 calificados". Eso es: nuevos_seguidores 113, ns_contestan 15, fups 89, outbound_enviados 68, historia_comentaron 47, agendas 5, calendarios_enviados 9, calificados_dia 11.
@@ -43,8 +46,9 @@ Viene como bloque "Nombre de perfil: usuario (Nombre)" seguido de situación act
 - "origen": de dónde vino (ej. "Ads (nuevo seguidor)", "Inbound (Historia) — de los 47 que pusieron Yo", "Nuevo seguidor + Reel orgánico", "Outbound — el setter lo reactivó").
 - "gatillo": qué disparó la agenda ("Historia Masterclass — Yo", "Reel Solución", "Setter/DM", "Follow Me Ads").
 - "feed": ARRAY con cada pieza de contenido orgánico que consumió, una por elemento (ej. ["Historia Masterclass - Yo (9/9)", "Historias Sept (genérica)", "Reel IA Partner (2/9)"]). Array vacío si no hay.
+- Los campos de texto que no aparezcan en el bloque van "".
 - "ciclo": tiempo entre primer contacto y agenda ("≤1 día", "2–7 días", "Reactivación (1er contacto 2/5, ~3 meses)").
-- "fups": cantidad de seguimientos hasta agendar, o null.
+- "fups": cantidad de seguimientos hasta agendar, o "".
 - "dolor" y "objetivo": una línea cada uno, en las palabras del lead cuando se pueda.
 - "caso_exito": qué caso de éxito se le mandó. "material_enviado": looms, guías, automatizaciones que le pasó el setter.
 - "historial": cómo venía la conversación (cuándo fue el primer contacto, qué pasó en el medio, si se cayó una llamada anterior).
@@ -52,10 +56,10 @@ Viene como bloque "Nombre de perfil: usuario (Nombre)" seguido de situación act
 
 SECCIONES DEL DÍA
 - "contenido_consumido": ARRAY con las piezas de feed que aparecen en los bloques de los leads, agrupadas. Cada una {"pieza": nombre de la pieza, "tipo": "Historia"|"Reel"|"Carrusel"|"Ads"|null, "leads": [nombres de los leads que la consumieron]}. Si ningún lead menciona feed, array vacío.
-- "notas_embudo": aclaraciones sueltas de cada embudo, o null en cada una. Ej. nuevos_seguidores: "El único bookeado fue Densse_2000"; historia: "Matias y Juan_Erick vinieron de acá"; outbound: "Los 68 outbound salieron sobre la base de los 47 que comentaron Yo en la historia".
+- "notas_embudo": aclaraciones sueltas de cada embudo, o "" en cada una. Ej. nuevos_seguidores: "El único bookeado fue Densse_2000"; historia: "Matias y Juan_Erick vinieron de acá"; outbound: "Los 68 outbound salieron sobre la base de los 47 que comentaron Yo en la historia".
 - "avisos": cosas que faltan o que no cierran y el equipo tiene que saber (ej. "No hay CRM cargado del día", "Los calendarios enviados no coinciden con las agendas reportadas"). Array vacío si no hay.
 - "observaciones": 1 a 4 frases sobre lo que dicen los números (qué gatillo dominó, qué embudo rindió, qué falta). Sin consejos genéricos.
-- "alcance": una línea de cierre con el alcance del reporte, o null.
+- "alcance": una línea de cierre con el alcance del reporte, o "".
 
 MENSAJE DE WHATSAPP
 - "resumen_whatsapp": el mensaje que el setter le manda al equipo. Formato WhatsApp (negritas con *asteriscos*, sin markdown de otro tipo, emojis con moderación). Estructura: título "*Setting DD/MM*"; una línea con calendarios → agendas y calificados; una línea por embudo (nuevos seguidores → contestan → califican → bookean; historia del día → comentaron → calificaron → bookeados; outbound → respuestas → agendas), solo si hay datos; luego "*Agendas del día*" con una línea por lead: nombre — origen — dolor corto — objetivo corto; y al final "*Para el closer*" con lo más importante de cada lead en una línea. Máximo 2500 caracteres. Solo datos de las notas.
@@ -63,29 +67,81 @@ MENSAJE DE WHATSAPP
 SALIDA
 Solo el JSON, sin texto antes ni después, sin bloques de código.
 
-ESQUEMA
-{"fecha":"YYYY-MM-DD","calendarios_enviados":int|null,"agendas":int|null,"agendas_calificadas":int|null,"calificados_dia":int|null,"fups":int|null,"nuevos_seguidores":int|null,"ns_contestan":int|null,"ns_califican":int|null,"ns_bookeados":int|null,"historia":string|null,"historia_comentaron":int|null,"historia_calificaron":int|null,"historia_bookeados":int|null,"outbound_enviados":int|null,"outbound_respuestas":int|null,"outbound_agendas":int|null,"leads":[{"lead":str,"usuario":str,"nombre":str,"origen":str|null,"calificado":bool,"ciclo":str|null,"gatillo":str|null,"feed":[str],"fups":int|null,"situacion":str|null,"dolor":str|null,"objetivo":str|null,"sintesis_closer":str|null,"caso_exito":str|null,"material_enviado":str|null,"historial":str|null}],"contenido_consumido":[{"pieza":str,"tipo":str|null,"leads":[str]}],"notas_embudo":{"nuevos_seguidores":str|null,"historia":str|null,"outbound":str|null},"avisos":[str],"observaciones":[str],"alcance":str|null,"resumen_whatsapp":str}`
+ESQUEMA (todos los valores son texto salvo calificado, que es true/false, y las listas; "" = no está)
+{"fecha":"YYYY-MM-DD","calendarios_enviados":"n","agendas":"n","agendas_calificadas":"n","calificados_dia":"n","fups":"n","nuevos_seguidores":"n","ns_contestan":"n","ns_califican":"n","ns_bookeados":"n","historia":"texto","historia_comentaron":"n","historia_calificaron":"n","historia_bookeados":"n","outbound_enviados":"n","outbound_respuestas":"n","outbound_agendas":"n","leads":[{"lead":"","usuario":"","nombre":"","origen":"","calificado":true,"ciclo":"","gatillo":"","feed":[""],"fups":"n","situacion":"","dolor":"","objetivo":"","sintesis_closer":"","caso_exito":"","material_enviado":"","historial":""}],"contenido_consumido":[{"pieza":"","tipo":"","leads":[""]}],"notas_embudo":{"nuevos_seguidores":"","historia":"","outbound":""},"avisos":[""],"observaciones":[""],"alcance":"","resumen_whatsapp":""}`
 
-async function claude(system: string, user: string) {
+// Modelos que aceptan salida estructurada con esquema (output_config.format). Si el reporte cae al
+// modelo de respaldo, que no la soporta, se pide el JSON en texto y se parsea con tolerancia.
+const MODELOS_CON_ESQUEMA = new Set(["claude-sonnet-5", "claude-opus-5", "claude-opus-4-8", "claude-haiku-4-5"])
+
+// Esquema del reporte del día. Con esto Claude no puede devolver texto suelto, JSON a medias ni
+// claves inventadas: la API valida la salida contra el esquema antes de entregarla.
+// Sin tipos "X o null": la API acepta como mucho 16 campos con uniones y este reporte tiene más de 30.
+// Todo va como texto y el vacío ("") significa "no está en las notas"; entero() y texto() ya lo
+// traducen a null al normalizar.
+const S = { type: "string" }, SN = { type: "string" }, N = { type: "string" }, SA = { type: "array", items: { type: "string" } }
+const objeto = (properties: Record<string, unknown>) => ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false })
+const ESQUEMA_DIA = objeto({
+  fecha: S,
+  calendarios_enviados: N, agendas: N, agendas_calificadas: N, calificados_dia: N, fups: N,
+  nuevos_seguidores: N, ns_contestan: N, ns_califican: N, ns_bookeados: N,
+  historia: SN, historia_comentaron: N, historia_calificaron: N, historia_bookeados: N,
+  outbound_enviados: N, outbound_respuestas: N, outbound_agendas: N,
+  leads: { type: "array", items: objeto({
+    lead: S, usuario: S, nombre: S, origen: SN, calificado: { type: "boolean" }, ciclo: SN, gatillo: SN, feed: SA, fups: N,
+    situacion: SN, dolor: SN, objetivo: SN, sintesis_closer: SN, caso_exito: SN, material_enviado: SN, historial: SN,
+  }) },
+  contenido_consumido: { type: "array", items: objeto({ pieza: S, tipo: SN, leads: SA }) },
+  notas_embudo: objeto({ nuevos_seguidores: SN, historia: SN, outbound: SN }),
+  avisos: SA, observaciones: SA, alcance: SN, resumen_whatsapp: S,
+})
+
+type RespuestaClaude = { texto: string; stop: string; modelo: string }
+
+// Una sola llamada, sin streaming: con 16.000 tokens de salida y esfuerzo bajo el reporte más largo
+// que hubo (23.000 caracteres de notas, 6 leads) entra con margen. El razonamiento del modelo también
+// consume tokens de salida: por eso antes, con 8.000, el JSON llegaba cortado a la mitad.
+async function claude(system: string, user: string): Promise<RespuestaClaude> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error("Falta configurar ANTHROPIC_API_KEY")
   let ultimo = ""
   for (const model of MODELOS) {
+    const body: Record<string, unknown> = {
+      model, max_tokens: 16000, system,
+      messages: [{ role: "user", content: user }],
+      thinking: { type: "adaptive" },
+      output_config: MODELOS_CON_ESQUEMA.has(model)
+        ? { effort: "low", format: { type: "json_schema", schema: ESQUEMA_DIA } }
+        : { effort: "low" },
+    }
     const r = await fetch(CLAUDE_URL, {
       method: "POST", headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model, max_tokens: 8000, system, messages: [{ role: "user", content: user }] }),
+      body: JSON.stringify(body),
     })
     if (r.status === 404) { ultimo = await r.text(); continue }  // ese modelo no está disponible para la clave: probar el siguiente
     if (!r.ok) throw new Error(`Claude HTTP ${r.status}: ${(await r.text()).slice(0, 300)}`)
     const j = await r.json()
-    return (j.content || []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("\n")
+    const texto = (j.content || []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("\n")
+    return { texto, stop: String(j.stop_reason || ""), modelo: model }
   }
   throw new Error(`Ningún modelo disponible: ${ultimo.slice(0, 200)}`)
 }
+
+// Tolera cercos de código y texto alrededor. Si aun así no parsea, deja en el log qué llegó, que
+// es lo único que sirve para diagnosticar desde Vercel.
 function jsonDe(texto: string) {
-  const i = texto.indexOf("{"), f = texto.lastIndexOf("}")
-  if (i < 0 || f < i) throw new Error("Claude no devolvió JSON")
-  return JSON.parse(texto.slice(i, f + 1))
+  const limpio = texto.replace(/```(?:json)?/gi, "").trim()
+  const i = limpio.indexOf("{"), f = limpio.lastIndexOf("}")
+  if (i < 0 || f < i) {
+    console.error("setting-resumen: respuesta sin JSON:", limpio.slice(0, 300))
+    throw new Error("Claude no devolvió el reporte en el formato esperado. Volvé a generar; si sigue pasando, avisá.")
+  }
+  try {
+    return JSON.parse(limpio.slice(i, f + 1))
+  } catch (e) {
+    console.error("setting-resumen: JSON inválido:", (e as Error).message, "| final:", limpio.slice(-200))
+    throw new Error("El reporte llegó incompleto o mal formado. Volvé a generar; si sigue pasando, avisá.")
+  }
 }
 const entero = (v: unknown) => { if (v === null || v === undefined || v === "") return null; const n = Number(String(v).replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? Math.round(n) : null }
 const texto = (v: unknown, max = 600) => { const t = String(v ?? "").trim(); return t && t !== "null" ? t.slice(0, max) : null }
@@ -128,11 +184,17 @@ export async function GET(request: Request) {
   const sb = createSupabaseAdmin()
   const { searchParams } = new URL(request.url)
   // Con ?fecha= devuelve el día entero, para volver a dibujar su dashboard desde el historial.
+  // Con &html=1 devuelve directamente el dashboard como página, para abrirlo o guardarlo como enlace.
   const unaFecha = String(searchParams.get("fecha") || "")
   if (/^\d{4}-\d{2}-\d{2}$/.test(unaFecha)) {
     const { data, error } = await sb.from("crm_integration_assets").select("metadata").eq("source", "setting").eq("asset_type", "dia").eq("source_id", unaFecha).maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data) return NextResponse.json({ error: "No hay reporte guardado de ese día" }, { status: 404 })
+    if (searchParams.get("html") === "1") {
+      return new NextResponse(dashboardSettingHtml(data.metadata as DiaSetting), {
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" },
+      })
+    }
     return NextResponse.json({ dia: data.metadata })
   }
   const limite = Math.min(60, Number(searchParams.get("limite") || 20) || 20)
@@ -153,8 +215,14 @@ export async function POST(request: Request) {
       const notas = String(body.notas || "").trim()
       if (notas.length < 40) return NextResponse.json({ error: "Pegá las notas del día (al menos unas líneas)." }, { status: 400 })
       const salida = await claude(SYSTEM, `Fecha del reporte: ${fecha}. Setter: ${setter}.\n\nNOTAS CRUDAS DEL SETTER:\n"""\n${notas.slice(0, 60000)}\n"""`)
-      const dia = limpiarDia(jsonDe(salida), fecha, setter)
-      return NextResponse.json({ ok: true, dia })
+      if (salida.stop === "max_tokens") {
+        return NextResponse.json({ error: "Las notas son demasiado largas para un solo reporte: Claude se quedó sin espacio para responder. Recortá el historial de chat de cada lead o partí el día en dos." }, { status: 422 })
+      }
+      if (salida.stop === "refusal") {
+        return NextResponse.json({ error: "Claude no quiso procesar estas notas. Revisá que no tengan datos sensibles de más y probá de nuevo." }, { status: 422 })
+      }
+      const dia = limpiarDia(jsonDe(salida.texto), fecha, setter)
+      return NextResponse.json({ ok: true, dia, modelo: salida.modelo })
     }
 
     if (accion === "guardar") {
