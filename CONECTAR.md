@@ -64,6 +64,17 @@ Por eso la automatización tiene además 7 disparadores *Se aplica la etiqueta a
 Probado por API (sacar y volver a poner ASIGNADO a un contacto → llegó al CRM en segundos). **Cada mes** hay que agregar las dos
 etiquetas nuevas del mes (`Nuevo Seguidor | <Mes>` y `Leads | <Mes>`) como disparadores; pedímelo y lo hago.
 
+**Contactos nuevos cada 3 horas (desde el 19/09).** La automatización de arriba solo ve a los contactos que mandan un DM o reciben
+una de las 7 etiquetas; los que siguen o comentan sin escribir ("Visitante") no pasan por ahí. Además el cuerpo *Full Contact Data*
+llega **sin etiquetas** (el CRM ahora pide el detalle por API cuando entra un contacto, así que ya no las pierde). Para cubrir el
+resto, en la compu de Alex corre la tarea programada de Windows **"EXPOSURE - ManyChat contactos"** cada 3 horas
+(`Central Negocio\scripts\manychatctualizar-contactos.mjs`): recorre la lista de Contactos de ManyChat con un Chrome sin
+ventana (sesión guardada en `datos\manychat\.perfil`), pide el detalle de los nuevos por API, los sube a `crm_integration_assets`,
+cruza con agendas y recalcula las conversaciones por mes. Log en `datos\manychatctualizacion.log`; estado en
+`datos\manychat\estado-actualizacion.json`. Si la sesión de ManyChat vence, el log dice "SIN SESION": hay que abrir el navegador
+con ese perfil (`CLON_PERFIL=…\.perfil CLON_PUERTO=47322 node navegador.mjs abrir https://app.manychat.com`) y loguearse una vez.
+Registrar o quitar la tarea: `powershell -ExecutionPolicy Bypass -File scripts\manychat	area-programada.ps1 [-Quitar|-Ahora]`.
+
 ## 4 · Espejo CRM → Google Sheet (cómo funciona)
 
 - Va en las dos direcciones: lo que se carga o cambia en el CRM se escribe en el sheet al instante, y **los pagos que se escriben a mano en la pestaña del mes entran al CRM cada 10 minutos** (`/api/sheet-pull`; necesitan concepto, nombre y monto). Las agendas siguen entrando por iClosed.
