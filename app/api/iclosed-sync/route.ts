@@ -93,13 +93,18 @@ export async function POST(request: Request) {
   const admin = createSupabaseAdmin()
   const startedAt = Date.now()
   const requestUrl = new URL(request.url)
-  const externalId = `${new Date().toISOString().slice(0, 13)}:${requestUrl.searchParams.get("start_page") || "1"}:${requestUrl.searchParams.get("pages") || "5"}`
+  const externalId = `${new Date().toISOString().slice(0, 13)}:${requestUrl.searchParams.get("start_page") || "0"}:${requestUrl.searchParams.get("pages") || "5"}`
   const jobId = await beginIntegrationJob(admin, "iclosed", "sync_event_calls", externalId)
   try {
     const { searchParams } = new URL(request.url)
-    const startPage = Math.max(1, Number(searchParams.get("start_page") || "1") || 1)
+    // La API de iClosed pagina desde 0: la página 0 es la más nueva. Arrancar en 1 salteaba las
+    // 50 reservas más recientes (y con menos de 50 llamadas futuras, UPCOMING venía vacío).
+    const startPage = Math.max(0, Number(searchParams.get("start_page") ?? "0") || 0)
     const pageCount = Math.min(5, Math.max(1, Number(searchParams.get("pages") || "5") || 5))
     const dryRun = searchParams.get("dry_run") === "1"
+    // Ventana para dar de alta reservas que el webhook no trajo: 72 h por defecto; ?horas=336 para
+    // rellenar un bache (las repetidas se detectan por teléfono o nombre + mismo día).
+    const ventanaHoras = Math.min(24 * 60, Math.max(1, Number(searchParams.get("horas") || "72") || 72))
     const key = process.env.ICLOSED_API_KEY
     if (!key) return NextResponse.json({ ok: true, skipped: true, motivo: "Falta ICLOSED_API_KEY: el cron se saltea hasta que se cargue la clave de iClosed" })
     // iClosed no devuelve un orden estable: el subconjunto cambia según
@@ -158,7 +163,7 @@ export async function POST(request: Request) {
         const bookedAt = new Date(call.createdAt || "")
         const callAt = new Date(call.dateTimeUTC || call.dateTime || "")
         // reservas de las últimas 72 h, o llamadas todavía por venir aunque se hayan reservado antes
-        const recent = (Number.isFinite(bookedAt.getTime()) && Date.now() - bookedAt.getTime() <= 72 * 60 * 60 * 1000)
+        const recent = (Number.isFinite(bookedAt.getTime()) && Date.now() - bookedAt.getTime() <= ventanaHoras * 60 * 60 * 1000)
           || (Number.isFinite(callAt.getTime()) && callAt.getTime() >= Date.now() - 60 * 60 * 1000)
         const closer = hostName(call)
         const fechaCloser = callWallTime(call)
