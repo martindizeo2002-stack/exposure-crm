@@ -208,7 +208,7 @@ export async function POST(request: Request) {
       if (!personId) continue
       matched++
       if (!dryRun && email && !personByIdentity.has(`email:${email}`)) {
-        await attachEmailToPerson(admin, personId, email, "iclosed")
+        try { await attachEmailToPerson(admin, personId, email, "iclosed") } catch (e) { identityConflicts++; console.warn("[iclosed] email no vinculado:", String((e as any)?.message || e)) }
         await updateHammerAudience("add", { email, telefono: phone }).catch((error) => console.error("[hammer-audience] iclosed", error))
         personByIdentity.set(`email:${email}`, personId)
         emailsAttached++
