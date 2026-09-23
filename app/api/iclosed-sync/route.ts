@@ -200,7 +200,7 @@ export async function POST(request: Request) {
             agendasInserted++
             personId = inserted.person_id
             ;(agendas as any[]).push({ id: inserted.id, person_id: inserted.person_id, telefono: phone, nombre: call.inviteeName, fecha_closer: fechaCloser, fecha_agenda: argentinaWallTime(call.createdAt), ...extracted })
-            if (email) await attachEmailToPerson(admin, inserted.person_id, email, "iclosed_reconcile")
+            if (email) { try { await attachEmailToPerson(admin, inserted.person_id, email, "iclosed_reconcile") } catch (e) { identityConflicts++; console.warn("[iclosed] email no vinculado:", String((e as any)?.message || e)) } }
             await updateHammerAudience("add", { email, telefono: phone }).catch((error) => console.error("[hammer-audience] iclosed reconcile", error))
           } else agendasInserted++
         }
