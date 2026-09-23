@@ -107,22 +107,25 @@ export async function POST(request: Request) {
     // Cruzar varias ventanas y deduplicar por call ID evita perder agendas.
     // La API de iClosed de EXPOSURE pagina de forma estable y limita la tasa (429 con ráfagas):
     // una sola ventana de 50, páginas en serie y un reintento corto si devuelve 429.
-    const windows = [50]
-    const requests = ["UPCOMING", "PAST"].flatMap((eventType) => windows.flatMap((limit) =>
-      Array.from({ length: pageCount }, (_, index) => ({ eventType, limit, page: startPage + index })),
-    ))
+    const limit = 50
     const batches: any[][] = []
-    for (const { eventType, limit, page } of requests) {
-      let response = await fetch(`${API}?eventType=${eventType}&limit=${limit}&page=${page}`, { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" })
-      if (response.status === 429) {
-        await new Promise((r) => setTimeout(r, 2500))
-        response = await fetch(`${API}?eventType=${eventType}&limit=${limit}&page=${page}`, { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" })
+    // Ojo: el corte por "página corta" tiene que ser por tipo. Antes un solo `break` cortaba el
+    // recorrido entero: si UPCOMING venía vacío (ninguna llamada futura), PAST no se pedía nunca y el
+    // cron terminaba "done" con 0 reservas (pasó del 17/09 al 23/09/2026).
+    for (const eventType of ["UPCOMING", "PAST"]) {
+      for (let index = 0; index < pageCount; index++) {
+        const page = startPage + index
+        let response = await fetch(`${API}?eventType=${eventType}&limit=${limit}&page=${page}`, { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" })
+        if (response.status === 429) {
+          await new Promise((r) => setTimeout(r, 2500))
+          response = await fetch(`${API}?eventType=${eventType}&limit=${limit}&page=${page}`, { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" })
+        }
+        if (!response.ok) throw new Error(`iClosed HTTP ${response.status}`)
+        const lote = (await response.json())?.data?.eventCalls || []
+        batches.push(lote)
+        if (lote.length < limit) break  // no hay más páginas de este tipo
+        await new Promise((r) => setTimeout(r, 400))
       }
-      if (!response.ok) throw new Error(`iClosed HTTP ${response.status}`)
-      const lote = (await response.json())?.data?.eventCalls || []
-      batches.push(lote)
-      if (lote.length < limit) break  // no hay más páginas de este tipo
-      await new Promise((r) => setTimeout(r, 400))
     }
     const calls: any[] = [...new Map(
       batches.flat().map((call: any) => [String(call.id || call.callId), call]),
