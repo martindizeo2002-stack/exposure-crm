@@ -75,6 +75,16 @@ cruza con agendas y recalcula las conversaciones por mes. Log en `datos\manychat
 con ese perfil (`CLON_PERFIL=…\.perfil CLON_PUERTO=47322 node navegador.mjs abrir https://app.manychat.com`) y loguearse una vez.
 Registrar o quitar la tarea: `powershell -ExecutionPolicy Bypass -File scripts\manychat	area-programada.ps1 [-Quitar|-Ahora]`.
 
+## 3b · Avisos push del navegador (24/09)
+
+Web Push con VAPID: claves en `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` (Vercel y `.env.local`; copia en
+`exposure-crm-secrets/env.local.backup`). Tabla `crm_push_suscripciones` (un dispositivo por fila, con el email del usuario). Ruta
+`/api/push` (suscribir, probar, borrar), envío en `lib/push.ts`, service worker `public/sw.js` (eventos `push` y `notificationclick`),
+botón en `components/avisos-push.tsx`. Hoy el único disparador es el pipeline de contenido (`avisarMovimientoPieza`: grabado → en
+producción y en producción → revisar, a los CEO que activaron avisos, salvo que el que movió sea CEO). Para sumar otro aviso: llamar a
+`enviarPush(emails, { titulo, cuerpo, url, tag })` desde la ruta que corresponda. Las suscripciones vencidas (404/410) se borran solas.
+Probado el 24/09 con un Chrome controlado: suscripción guardada y aviso de prueba entregado por FCM.
+
 ## 4 · Espejo CRM → Google Sheet (cómo funciona)
 
 - Va en las dos direcciones: lo que se carga o cambia en el CRM se escribe en el sheet al instante, y **los pagos que se escriben a mano en la pestaña del mes entran al CRM cada 10 minutos** (`/api/sheet-pull`; necesitan concepto, nombre y monto). Las agendas siguen entrando por iClosed.

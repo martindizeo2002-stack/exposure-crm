@@ -23,6 +23,14 @@ Lo que no le corresponde a un rol rebota con "Tu cuenta no tiene acceso a este m
 4. **Cuotas y cobros**: *Cobros y cuotas* muestra lo que vence, lo atrasado y quién lo tiene que cobrar. Cuando entra una cuota, se carga desde el mismo "Cargar pago" eligiendo el plan existente.
 5. **Clientes**: se crean solos al cargar una venta. Ahí van onboarding, calls con CSM, estado y baja.
 
+## Avisos en el celular o la compu (24/09)
+
+En **Contenido → Semanal** hay un botón **"Activar avisos"** (lo ven CEO, Sales Manager y Manager MKT). Al tocarlo, el navegador pide permiso
+y ese dispositivo queda anotado: cada vez que un editor mueve una pieza de **Grabado → En producción** o de **En producción → Revisar**,
+llega una notificación con el nombre del editor asignado ("Nico ha movido un video a revisar.") y el título de la pieza; al tocarla se
+abre el pipeline. Se activa por dispositivo (la compu y el celular por separado) y "Probar" manda un aviso de prueba. En iPhone solo
+funciona con el CRM agregado a la pantalla de inicio (Compartir → Agregar a pantalla de inicio) y abierto desde ahí.
+
 ## Lo que pasa solo
 
 - **Google Sheet CRM CENTRAL 2026**: cada pago o agenda que se carga o cambia en el CRM se escribe en la pestaña del mes (`💰 PAGOS <MES>`, `📆 AGENDAS <MES>`) al instante. Es de ida: lo que se toca a mano en el sheet **no** vuelve al CRM.
