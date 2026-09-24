@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { avisarMovimientoPieza } from "@/lib/push"
 import { canonicalSalesAngle, SALES_ANGLES } from "@/lib/sales-angles"
 import { nextVolumeAngle } from "@/lib/content-volume-angle"
 
@@ -300,6 +301,21 @@ export async function PATCH(request: Request) {
 
     const { error } = await sb.from("crm_content_assets").update(updates).eq("id", id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    // Aviso push a dirección cuando un editor avanza una pieza (grabado → producción, producción → revisar).
+    // Nunca frena el guardado: si el envío falla, queda en el log.
+    if ("status" in updates && String(updates.status || "") !== String(existing.status || "")) {
+      try {
+        await avisarMovimientoPieza({
+          id: String(id),
+          antes: String(existing.status || ""),
+          despues: String(updates.status || ""),
+          titulo: String(("title" in updates ? updates.title : existing.title) || ""),
+          responsable: String(("assigned_to" in updates ? updates.assigned_to : existing.assigned_to) || ""),
+        })
+      } catch (e) {
+        console.warn("[push] aviso de pieza", String((e as Error)?.message || e))
+      }
+    }
     return NextResponse.json({ ok: true })
   } catch {
     return NextResponse.json({ error: "Error de servidor" }, { status: 500 })
