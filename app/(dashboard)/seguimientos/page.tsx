@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import useSWR from "swr"
 import { AlertTriangle, BellRing, CalendarClock, CheckCircle2, Download, ExternalLink, ListChecks, Loader2, Phone, Plus, RefreshCw, Search, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -210,7 +210,8 @@ function Fila({ f, hoy, manager, closers, guardando, onGuardar, onBorrar }: { f:
 // Texto que se guarda al salir del campo (solo si cambió).
 function Texto({ valor, onGuardar, placeholder, ancho, alto }: { valor: string | null; onGuardar: (v: string) => void; placeholder?: string; ancho: string; alto?: boolean }) {
   const [v, setV] = useState(valor || "")
-  useEffect(() => { setV(valor || "") }, [valor])
+  const [previo, setPrevio] = useState(valor)
+  if (valor !== previo) { setPrevio(valor); setV(valor || "") }   // el valor guardado cambió (otro dispositivo, recarga): se toma el nuevo
   const blur = () => { if (v !== (valor || "")) onGuardar(v) }
   return alto
     ? <Textarea className={cn("min-h-16 text-xs", ancho)} value={v} placeholder={placeholder} onChange={e => setV(e.target.value)} onBlur={blur} />
