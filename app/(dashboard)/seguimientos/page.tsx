@@ -120,7 +120,7 @@ export default function SeguimientosPage() {
             <th className="px-2 py-2 text-center">Audio</th>
             <th className="px-2 py-2 text-left">Tipo</th>
             <th className="px-2 py-2 text-left">Problema / dolor</th>
-            <th className="px-2 py-2 text-left">FUP 1 → 10</th>
+            <th className="min-w-[420px] px-2 py-2 text-left">FUP 1 → 10 (tocá para marcar; queda la fecha)</th>
             <th className="px-2 py-2 text-left">Próximo</th>
             <th className="px-2 py-2 text-left">Razón para la call</th>
             <th className="px-2 py-2 text-left">Fathom</th>
@@ -177,8 +177,8 @@ function Fila({ f, hoy, manager, closers, guardando, onGuardar, onBorrar }: { f:
       </Select>
     </td>
     <td className="px-2 py-2"><Texto valor={f.problema_dolor} ancho="w-52" alto onGuardar={v => onGuardar({ problema_dolor: v })} placeholder="Qué le duele / qué quiere" /></td>
-    <td className="px-2 py-2">
-      <div className="flex flex-wrap gap-1">
+    <td className="min-w-[420px] px-2 py-2">
+      <div className="flex flex-nowrap gap-1">
         {FUPS.map(n => { const h = f.fups?.[String(n)]; return <label key={n} title={h ? `FUP ${n} · ${fechaDia(h.fecha)}${h.por ? ` · ${h.por}` : ""}${h.nota ? ` · ${h.nota}` : ""}` : `Marcar FUP ${n}`} className={cn("flex h-8 w-8 cursor-pointer flex-col items-center justify-center rounded-md border text-[10px] font-bold", h ? "border-blue-500 bg-blue-500 text-white" : "text-muted-foreground hover:border-blue-400")}>
           <input type="checkbox" className="sr-only" checked={Boolean(h)} onChange={e => onGuardar({ fup: n, hecho: e.target.checked })} />
           <span>{n}</span>{h && <span className="text-[8px] leading-none opacity-90">{h.fecha.slice(8, 10)}/{h.fecha.slice(5, 7)}</span>}
@@ -227,7 +227,8 @@ function Alta({ abierto, onCerrar, closer, yo, closers, onCreado }: { abierto: b
   const [msg, setMsg] = useState<string | null>(null)
   const [form, setForm] = useState({ nombre: "", telefono: "", instagram: "", fecha_call: "", tipo_lead: "", situacion: "", closer: "", notas: "" })
   const { data, mutate } = useSWR<{ candidatas: Candidata[] }>(abierto ? `/api/seguimientos?candidatas=1&closer=${encodeURIComponent(closer)}` : null, fetcher)
-  const lista = useMemo(() => { const t = q.trim().toLowerCase(); return (data?.candidatas || []).filter(c => !t || [c.nombre, c.telefono, c.instagram].some(x => String(x || "").toLowerCase().includes(t))) }, [data, q])
+  // primero las agendas que quedaron en estado de seguimiento, después el resto por fecha de call
+  const lista = useMemo(() => { const t = q.trim().toLowerCase(); return (data?.candidatas || []).filter(c => !t || [c.nombre, c.telefono, c.instagram].some(x => String(x || "").toLowerCase().includes(t))).sort((a, b) => Number(b.en_fup) - Number(a.en_fup)) }, [data, q])
   const enFup = (data?.candidatas || []).filter(c => c.en_fup)
 
   async function crear(body: Record<string, unknown>) {
