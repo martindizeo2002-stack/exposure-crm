@@ -186,7 +186,8 @@ for fila, d, a in enlaces:
         v = fecha(d[k])
         if v and (a[k] or "")[:10] != v[:10] and not (k in SOLO_SI_VACIO and a[k]): u[k] = v; cuenta(k)
     fc = fecha(d["fecha_closer"])
-    if fc and a["fecha_closer"] and abs((datetime.datetime.fromisoformat(fc) - datetime.datetime.fromisoformat(a["fecha_closer"])).total_seconds()) > 60:
+    # la fecha de la call del sheet manda solo si cambia el dia o trae hora; una celda con la fecha sin hora (00:00) no pisa la hora del CRM
+    if fc and a["fecha_closer"] and abs((datetime.datetime.fromisoformat(fc) - datetime.datetime.fromisoformat(a["fecha_closer"])).total_seconds()) > 60 and (fc[:10] != a["fecha_closer"][:10] or fc[11:] != "00:00:00"):
         u["fecha_closer"] = fc; cuenta("fecha_closer")
         if resumen.get("fecha_closer", 0) <= 6: print(f"  fecha de call distinta · fila {fila} {d['nombre']}: sheet {fc} · CRM {a['fecha_closer']}")
     cl = closer_canon(d["closer"])
