@@ -40,6 +40,7 @@ import {
   Menu,
   X,
   Zap,
+  Filter,
 } from "lucide-react"
 
 type Item = { name: string; href: string; icon: any; roles?: string[] }
@@ -54,6 +55,7 @@ const navigation: { label: string; items: Item[] }[] = [
       { name: "Historial 2026", href: "/historia-leads", icon: History, roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria", "CSM"] },
       { name: "Agendas", href: "/centro-agendas", icon: CalendarDays, roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer"] },
       { name: "Seguimientos", href: "/seguimientos", icon: BellRing, roles: ["CEO", "Sales Manager", "Manager MKT", "Closer"] },
+      { name: "Embudos", href: "/embudos", icon: Filter, roles: ["CEO", "Sales Manager", "Manager MKT", "Contaduria"] },
       { name: "Cómo usar el CRM", href: "/sop-crm", icon: BookOpenCheck },
     ],
   },

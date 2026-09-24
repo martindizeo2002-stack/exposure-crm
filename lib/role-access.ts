@@ -42,6 +42,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
   ["/calidad-datos", [...OPERATIONS, "CSM"]],
   ["/rendimiento", [...OPERATIONS, "Contaduria"]],
   ["/metricas", [...OPERATIONS, "Contaduria"]],
+  ["/embudos", [...OPERATIONS, "Contaduria"]],     // métricas por embudo (webinar / orgánico / outbound)
   ["/evolucion-diaria", [...OPERATIONS, "Contaduria"]],
   ["/reporte-llamadas", [...OPERATIONS, "Setter", "Closer"]],
   ["/tablero-semanal", OPERATIONS],
@@ -99,6 +100,7 @@ const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/trace-review", OPERATIONS],
   ["/api/data-quality", [...OPERATIONS, "CSM"]],
   ["/api/metricas", [...OPERATIONS, "Contaduria"]],
+  ["/api/embudos", [...OPERATIONS, "Contaduria"]],
   ["/api/tablero-semanal", OPERATIONS],
   ["/api/fathom-sync", [...OPERATIONS, "Closer"]],
   ["/api/fathom-show-reconcile", ["CEO"]],

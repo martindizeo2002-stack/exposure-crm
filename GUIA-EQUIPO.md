@@ -34,6 +34,17 @@ Es la pestaña "🔂 SEGUIMIENTOS" del sheet, pero adentro del CRM y por closer 
 - Arriba se ven los vencidos (el próximo contacto ya pasó), los de hoy y cuántos leads hay en cada etapa de FUP.
 - Cuando el lead cierra, se carga el pago como siempre y el seguimiento se pasa a Cerrado; si se enfría, a Descartado. Borrar solo puede dirección.
 
+## Embudos (25/09)
+
+Ventas → Embudos: la misma tabla de métricas para Webinar, Orgánico y Outbound, mes por mes. Ads no es un embudo aparte: es el orgánico potenciado con Meta Ads, y se ve en "Orgánico por origen". Criterio:
+
+- **Cierre** = cliente que entró al programa (pago Venta Nueva o Adentro en Seguimiento en el mes). Un fee no es cierre; los fees tienen su fila.
+- **AOV Trato Cerrado** = lo que pagó cada cliente el día que entró (sumando los pagos de ese día). Sano: 33 a 50 % del ticket.
+- **AOV Día 1** = lo recibido el día del cierre sobre todos los compromisos (los que entraron + los que dejaron fee). Mínimo: 10 % del ticket.
+- **Cash collected** sale de la tabla de pagos y se atribuye al embudo de la agenda del cliente (por persona, teléfono o nombre). Las cuotas de clientes viejos cuentan en el embudo por el que entraron.
+- El show up se calcula sobre las calls con resultado; "sin resultado cargado" muestra cuántas calls pasadas nadie marcó. Si ese número es alto, el show up no es confiable.
+- Outbound tiene su trazabilidad lead por lead (setter que prospectó, closer, calificación, show, estado, pagos).
+
 ## Sheet CRM CENTRAL 2026 y el CRM (25/09)
 
 El CRM escribe solo en el sheet (cada 5 minutos) los pagos y las agendas; **lo que se carga a mano en el sheet no vuelve al CRM solo**. La carga de show, cerró, estado y motivo va en el CRM (pipeline o Vista de agendas). Si igual alguien actualiza la pestaña de agendas del sheet, se trae al CRM con `python scripts/importar-agendas-sheet.py --aplicar` (primero sin `--aplicar` muestra qué cambiaría). El espejo verifica el teléfono antes de escribir en una fila del sheet: si el equipo borró o corrió filas, no pisa a otra persona.

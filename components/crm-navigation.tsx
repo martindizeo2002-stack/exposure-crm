@@ -19,6 +19,7 @@ import {
   Eye, LogOut, Menu, Monitor, Moon, Palette, Radar, RotateCcw, Search, Settings2, Sparkles, Sun, Trophy, Type, UserRound,
   UsersRound, Volume2, WalletCards, ShieldCheck, MessageSquareQuote,
   Wallet, Target, Kanban, CalendarRange, Compass, Coins, Mic, Layers, NotebookPen, MessageCircle, Youtube,
+  Filter,
 } from "lucide-react"
 
 export type GroupName = "General" | "Panel del negocio" | "Ventas" | "Producto" | "Marketing" | "Operaciones" | "Sistema IA · maqueta"
@@ -73,6 +74,7 @@ export const modules: NavItem[] = [
   { label: "Generador de carruseles", href: "/panel/carrusel", icon: Layers, match: ["/panel/carrusel"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
   { label: "Agendas", href: "/ventas", icon: UsersRound, match: ["/ventas", "/pipeline", "/centro-agendas"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria"] },
   { label: "Seguimientos", href: "/seguimientos", icon: BellRing, match: ["/seguimientos"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer"] },
+  { label: "Embudos", href: "/embudos", icon: Filter, match: ["/embudos"], ramp: ramps.metricas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Contaduria"] },
   { label: "Resumen de setting", href: "/setting-resumen", icon: NotebookPen, match: ["/setting-resumen"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter"] },
   { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle, match: ["/whatsapp"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager"] },
   { label: "Pagos", href: "/pagos", icon: CircleDollarSign, match: ["/pagos", "/carga-pagos", "/todos-pagos"], ramp: ramps.pagos, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria", "CSM"] },
