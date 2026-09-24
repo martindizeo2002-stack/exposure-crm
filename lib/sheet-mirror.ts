@@ -239,6 +239,8 @@ export async function sincronizarSheet(opts: { limite?: number; registro?: { tab
       const mapaPor = new Map<string, Mapa>((mapas || []).map(m => [m.source_id as string, m.metadata as Mapa]))
 
       for (const r of registros) {
+        // el cursor avanza con cada registro leído (también los sin cambios), así no se relee lo mismo en cada corrida
+        if (r.updated_at > (hasta || "") || (r.updated_at === hasta && (!hastaId || r.id > hastaId))) { hasta = r.updated_at; hastaId = r.id }
         try {
           const bloques = kind === "pagos" ? filaPago(r) : filaAgenda(r)
           const hash = hashDe(bloques)
@@ -292,7 +294,6 @@ export async function sincronizarSheet(opts: { limite?: number; registro?: { tab
         } catch (e) {
           resultado.errores.push(`${kind} ${r.id}: ${(e as Error).message}`)
         }
-        if (r.updated_at > (hasta || "") || (r.updated_at === hasta && (!hastaId || r.id > hastaId))) { hasta = r.updated_at; hastaId = r.id }
       }
     }
 
