@@ -13,9 +13,9 @@ import { cn } from "@/lib/utils"
 
 const fetcher = (url: string) => fetch(url, { cache: "no-store" }).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error || "Error"); return b })
 const EMBUDOS = ["Webinar", "Orgánico", "Outbound", "Sin fuente", "Total"] as const
-type Detalle = { cierres: Array<{ cliente: string; dia: string; cobrado: number; fuente: string | null; via: string; ticket: number | null }>; fees: Array<{ cliente: string; dia: string; monto: number; fuente: string | null }>; fees_sin_pago: Array<{ nombre: string; closer: string | null; fecha: string | null }> }
-type Bloque = { agendas: number; presentadas: number; no_show: number; sin_resultado: number; futuras: number; show_up: number | null; calificadas: number; calif_presentadas: number; show_up_calif: number | null; cierres: number; tc_calif_presentadas: number | null; tc_presentadas: number | null; fees: number; fees_usd: number; fees_sin_pago: number; ticket_promedio: number | null; aov_trato_cerrado: number | null; aov_dia_1: number | null; aov_tc_sobre_ticket: number | null; aov_dia1_sobre_ticket: number | null; cash_total: number; cash_leads_mes: number; cuotas: number; back_end: number; detalle: Detalle }
-type Respuesta = { mes: string; corte: string; embudos: Record<string, Bloque>; origenes: Array<{ origen: string; embudo: string; agendas: number; presentadas: number; calificadas: number; cierres: number; fees: number; cash_leads_mes: number }>; outbound: { leads: Array<{ id: string; nombre: string; fecha: string | null; origen: string | null; setter: string | null; closer: string | null; calificacion: string | null; show: boolean | null; estado: string | null; motivo: string | null; recurso: string | null; pagos: string; cash: number }>; por_setter: Array<{ setter: string; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number }> }; pagos_sin_fuente: Array<{ cliente: string; via: string; pagos: string; cash: number }>; pagos_del_mes: number; cash_del_mes: number }
+type Detalle = { cierres: Array<{ cliente: string; dia: string; cobrado: number; pagos_del_dia: string; fuente: string | null; via: string }>; fees: Array<{ cliente: string; dia: string; monto: number; pagos_del_dia: string; fuente: string | null }>; fees_sin_pago: Array<{ nombre: string; closer: string | null; fecha: string | null }> }
+type Bloque = { agendas: number; presentadas: number; no_show: number; sin_resultado: number; futuras: number; show_up: number | null; calificadas: number; calif_presentadas: number; show_up_calif: number | null; cierres: number; tc_calif_presentadas: number | null; tc_presentadas: number | null; fees: number; fees_usd: number; fees_sin_pago: number; aov_trato_cerrado: number | null; aov_dia_1: number | null; cash_total: number; cash_leads_mes: number; cuotas: number; back_end: number; detalle: Detalle }
+type Respuesta = { mes: string; corte: string; embudos: Record<string, Bloque>; origenes: Array<{ origen: string; embudo: string; agendas: number; presentadas: number; calificadas: number; cierres: number; fees: number; cash_leads_mes: number }>; outbound: { leads: Array<{ id: string; nombre: string; fecha: string | null; origen: string | null; setter: string | null; closer: string | null; calificacion: string | null; show: boolean | null; estado: string | null; motivo: string | null; recurso: string | null; pagos: string; cash: number }>; por_setter: Array<{ setter: string; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number }> }; pagos_sin_fuente: Array<{ cliente: string; via: string; pagos: string; cash: number }>; ventas_internas: { pagos: Array<{ cliente: string; fecha: string; tipo: string | null; monto: number }>; total: number }; pagos_del_mes: number; cash_del_mes: number; cash_front_end: number }
 
 const usd = (n: number | null | undefined) => (n === null || n === undefined ? "—" : n.toLocaleString("es-AR", { maximumFractionDigits: 0 }))
 const pc = (n: number | null | undefined) => (n === null || n === undefined ? "—" : `${n.toLocaleString("es-AR", { maximumFractionDigits: 1 })} %`)
@@ -38,15 +38,11 @@ const FILAS: Fila[] = [
   { label: "Tasa de cierre s/ presentadas", get: (b) => pc(b.tc_presentadas) },
   { label: "Fees cobrados (personas · USD)", get: (b) => `${b.fees} · ${usd(b.fees_usd)}`, detalle: "fees" },
   { label: "Fees marcados en la agenda sin pago cargado", get: (b) => String(b.fees_sin_pago), sub: true, detalle: "fees_sin_pago" },
-  { label: "Ticket promedio del trato", get: (b) => usd(b.ticket_promedio), nota: "valor total del plan de pagos de los que entraron" },
-  { label: "AOV Trato Cerrado", get: (b) => usd(b.aov_trato_cerrado), bold: true, nota: "lo que pagó cada cliente el día que entró · sano: 33 a 50 % del ticket" },
-  { label: "AOV Trato Cerrado sobre el ticket", get: (b) => pc(b.aov_tc_sobre_ticket), sub: true },
-  { label: "AOV Día 1", get: (b) => usd(b.aov_dia_1), bold: true, nota: "lo recibido el día del cierre sobre todos los compromisos (ventas + fees) · mínimo: 10 % del ticket" },
-  { label: "AOV Día 1 sobre el ticket", get: (b) => pc(b.aov_dia1_sobre_ticket), sub: true },
-  { label: "Cash collected total", get: (b) => usd(b.cash_total), bold: true, nota: "todo lo cobrado en el mes a clientes de este embudo" },
+  { label: "AOV Trato Cerrado", get: (b) => usd(b.aov_trato_cerrado), bold: true, detalle: "cierres", nota: "promedio de lo que pagó cada cliente el día que entró (los pagos de ese día; nunca el plan de pagos) · sano: 33 a 50 % del ticket" },
+  { label: "AOV Día 1", get: (b) => usd(b.aov_dia_1), bold: true, nota: "lo recibido el día del cierre, promediado sobre todos los compromisos: los que entraron + los que dejaron fee · mínimo: 10 % del ticket" },
+  { label: "Cash collected total (front end)", get: (b) => usd(b.cash_total), bold: true, nota: "todo lo cobrado en el mes a clientes de este embudo; las ventas internas no entran" },
   { label: "De leads con call en el mes", get: (b) => usd(b.cash_leads_mes), sub: true },
   { label: "Cuotas de clientes anteriores", get: (b) => usd(b.cuotas), sub: true },
-  { label: "Ventas internas / back end", get: (b) => usd(b.back_end), sub: true },
 ]
 
 export default function EmbudosPage() {
@@ -92,8 +88,8 @@ export default function EmbudosPage() {
       <h2 className="font-black">{detalle.emb} · {detalle.key === "cierres" ? "cierres" : detalle.key === "fees" ? "fees cobrados" : "fees marcados sin pago cargado"} ({detalle.items.length})</h2>
       <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
         {detalle.items.map((it, i) => {
-          if (detalle.key === "cierres") { const x = it as Detalle["cierres"][number]; return <li key={i} className="rounded-lg border px-3 py-1.5"><strong>{x.cliente}</strong> · {fecha(x.dia)} · pagó al entrar USD {usd(x.cobrado)}{x.ticket ? ` de ${usd(x.ticket)}` : ""}<span className="block text-xs text-muted-foreground">{x.fuente || "sin fuente"} · enlazado por {x.via}</span></li> }
-          if (detalle.key === "fees") { const x = it as Detalle["fees"][number]; return <li key={i} className="rounded-lg border px-3 py-1.5"><strong>{x.cliente}</strong> · {fecha(x.dia)} · USD {usd(x.monto)}<span className="block text-xs text-muted-foreground">{x.fuente || "sin fuente"}</span></li> }
+          if (detalle.key === "cierres") { const x = it as Detalle["cierres"][number]; return <li key={i} className="rounded-lg border px-3 py-1.5"><strong>{x.cliente}</strong> · {fecha(x.dia)} · pagó al entrar USD {usd(x.cobrado)}<span className="block text-xs text-muted-foreground">{x.pagos_del_dia} · {x.fuente || "sin fuente"} · enlazado por {x.via}</span></li> }
+          if (detalle.key === "fees") { const x = it as Detalle["fees"][number]; return <li key={i} className="rounded-lg border px-3 py-1.5"><strong>{x.cliente}</strong> · {fecha(x.dia)} · USD {usd(x.monto)}<span className="block text-xs text-muted-foreground">{x.pagos_del_dia} · {x.fuente || "sin fuente"}</span></li> }
           const x = it as Detalle["fees_sin_pago"][number]; return <li key={i} className="rounded-lg border px-3 py-1.5"><strong>{x.nombre}</strong> · call {fecha(x.fecha)} · {x.closer || "sin closer"}<span className="block text-xs text-muted-foreground">estado Fee en la agenda, sin pago en Cargar pago</span></li>
         })}
       </ul>
@@ -127,6 +123,11 @@ export default function EmbudosPage() {
       <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2 lg:grid-cols-3">{data.pagos_sin_fuente.map((p, i) => <li key={i} className="rounded-lg border px-3 py-1.5"><strong>{p.cliente}</strong> · {p.pagos} · USD {usd(p.cash)}</li>)}</ul>
     </section>}
 
-    {data && <p className="text-xs text-muted-foreground">Corte {data.corte} · {data.pagos_del_mes} pagos activos en el mes por USD {usd(data.cash_del_mes)} (tabla pagos). Las agendas cuentan por la fecha de la call; los pagos por su fecha, atribuidos al embudo de la agenda del cliente aunque la call haya sido en otro mes.</p>}
+    {data && data.ventas_internas.pagos.length > 0 && <section className="rounded-2xl border bg-card p-4 shadow-sm">
+      <h2 className="font-black">Ventas internas / back end · USD {usd(data.ventas_internas.total)} (fuera de los embudos)</h2>
+      <p className="text-xs text-muted-foreground">Cobros a clientes que ya estaban adentro. No entran en ningún embudo ni en los AOV.</p>
+      <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2 lg:grid-cols-3">{data.ventas_internas.pagos.map((p, i) => <li key={i} className="rounded-lg border px-3 py-1.5"><strong>{p.cliente}</strong> · {fecha(p.fecha)} · {p.tipo} · USD {usd(p.monto)}</li>)}</ul>
+    </section>}
+    {data && <p className="text-xs text-muted-foreground">Corte {data.corte} · {data.pagos_del_mes} pagos activos en el mes por USD {usd(data.cash_del_mes)}, de los cuales USD {usd(data.cash_front_end)} son front end (tabla pagos, nunca el plan de pagos). Las agendas cuentan por la fecha de la call; los pagos por su fecha, atribuidos al embudo de la agenda del cliente aunque la call haya sido en otro mes.</p>}
   </div>
 }
