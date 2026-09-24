@@ -75,7 +75,8 @@ export async function GET(request: Request) {
     const [agMes, agTodas, pagosMes] = await Promise.all([
       sb.from("agendas").select("id,person_id,nombre,telefono,fuente,setter,closer,calificacion,show,cerro,estado,motivo_no_cierre,fecha_closer,recurso")
         .gte("fecha_closer", desde).lt("fecha_closer", hasta).or("estado.is.null,estado.neq.Archivada manualmente").order("fecha_closer").limit(3000),
-      sb.from("agendas").select("id,person_id,nombre,telefono,fuente,fecha_closer").gte("fecha_closer", new Date(Date.now() - 400 * 86400000).toISOString().slice(0, 10)).limit(8000),
+      // todas las agendas de los últimos 13 meses (por fecha de alta: también las que no tienen fecha de call) para enlazar pagos
+      sb.from("agendas").select("id,person_id,nombre,telefono,fuente,fecha_closer").gte("created_at", new Date(Date.now() - 400 * 86400000).toISOString()).limit(8000),
       sb.from("pagos").select("id,fecha,cliente,telefono,tipo,monto,fuente,person_id,closer").eq("record_status", "active").gte("fecha", desde).lt("fecha", hasta).order("fecha").limit(3000),
     ])
     for (const r of [agMes, agTodas, pagosMes]) if (r.error) return NextResponse.json({ error: r.error.message }, { status: 500 })
@@ -100,14 +101,25 @@ export async function GET(request: Request) {
       const t = tel9(a.telefono); if (t && !porTel.has(t)) porTel.set(t, a)
       const tk = tokens(a.nombre); if (tk.length >= 2) porNombre.push({ t: tk, a })
     }
-    const mismoNombre = (x: string[], y: string[]) => x.length >= 2 && y.length >= 2 && x[0] === y[0] && x.slice(1).some((s) => s.length > 2 && y.slice(1).includes(s))
+    // misma persona si comparten nombre de pila y un apellido, o dos palabras de más de 2 letras ("Tiago Agustin Alegre" = "Agustín Alegre")
+    const mismoNombre = (x: string[], y: string[]) => {
+      if (x.length < 2 || y.length < 2) return false
+      if (x[0] === y[0] && x.slice(1).some((s) => s.length > 2 && y.slice(1).includes(s))) return true
+      const largas = x.filter((s) => s.length > 2 && y.includes(s))
+      return largas.length >= 2
+    }
     function agendaDe(pg: Pago) {
       if (pg.person_id && porPersona.has(pg.person_id)) return { a: porPersona.get(pg.person_id)!, via: "persona" }
       const t = tel9(pg.telefono); if (t && porTel.has(t)) return { a: porTel.get(t)!, via: "teléfono" }
       const tk = tokens(pg.cliente)
       // preferimos la agenda más cercana a la fecha del pago entre las que coinciden por nombre
-      const cand = porNombre.filter((x) => mismoNombre(tk, x.t)).map((x) => x.a)
-        .sort((a, b) => Math.abs(Date.parse(a.fecha_closer || "") - Date.parse(pg.fecha)) - Math.abs(Date.parse(b.fecha_closer || "") - Date.parse(pg.fecha)))
+      let cand = porNombre.filter((x) => mismoNombre(tk, x.t)).map((x) => x.a)
+      // nombre con una sola palabra útil ("Jeyson R"): se acepta solo si hay una única agenda con ese nombre de pila
+      if (!cand.length && tk.length && tk.filter((s) => s.length > 2).length === 1 && tk[0].length > 3) {
+        const unicos = porNombre.filter((x) => x.t[0] === tk[0]).map((x) => x.a)
+        if (unicos.length === 1) cand = unicos
+      }
+      cand = cand.sort((a, b) => Math.abs(Date.parse(a.fecha_closer || "") - Date.parse(pg.fecha)) - Math.abs(Date.parse(b.fecha_closer || "") - Date.parse(pg.fecha)))
       if (cand.length) return { a: cand[0], via: "nombre" }
       return null
     }
