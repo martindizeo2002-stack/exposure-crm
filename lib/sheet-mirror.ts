@@ -150,7 +150,9 @@ function hashDe(bloques: Array<{ desde: number; valores: unknown[] }>): string {
   return createHash("sha1").update(JSON.stringify(bloques)).digest("hex")
 }
 
-type Cursor = { desde: string | null; ultimo: string | null; lock?: string | null }
+// ultimo + ultimoId: cursor por (updated_at, id). Con solo la fecha, una importación masiva (todas las filas con la
+// misma marca de tiempo) dejaba sin espejar lo que no entraba en el primer lote.
+type Cursor = { desde: string | null; ultimo: string | null; ultimoId?: string | null; lock?: string | null }
 
 const CURSOR = { source: "gsheet", asset_type: "config", source_id: "cursor" }
 
@@ -200,6 +202,8 @@ export async function sincronizarSheet(opts: { limite?: number; registro?: { tab
     const tabs = await listTabs()
     // cursor estricto: el webhook de la base manda tabla + id, y ese registro se incluye siempre
     const desdeConsulta = cursor.ultimo || cursor.desde
+    const desdeId = cursor.ultimo ? cursor.ultimoId || null : null
+    let hastaId: string | null = desdeId
     const escrituras: Array<{ range: string; values: unknown[][] }> = []
     const mapasNuevos: Array<Record<string, unknown>> = []
     const siguienteFila = new Map<string, number>()
@@ -218,7 +222,11 @@ export async function sincronizarSheet(opts: { limite?: number; registro?: { tab
     let hasta = cursor.ultimo || cursor.desde
 
     for (const kind of ["pagos", "agendas"] as Kind[]) {
-      const { data: filas, error } = await admin.from(kind).select("*").gt("updated_at", desdeConsulta).order("updated_at", { ascending: true }).limit(limite)
+      let consulta = admin.from(kind).select("*")
+      consulta = desdeId
+        ? consulta.or(`updated_at.gt.${desdeConsulta.replace(/\+00:00$/, "Z")},and(updated_at.eq.${desdeConsulta.replace(/\+00:00$/, "Z")},id.gt.${desdeId})`)
+        : consulta.gt("updated_at", desdeConsulta)
+      const { data: filas, error } = await consulta.order("updated_at", { ascending: true }).order("id", { ascending: true }).limit(limite)
       if (error) throw error
       const registros = (filas || []) as Registro[]
       if (opts.registro && opts.registro.table === kind && opts.registro.id && !registros.some(r => r.id === opts.registro!.id)) {
@@ -284,7 +292,7 @@ export async function sincronizarSheet(opts: { limite?: number; registro?: { tab
         } catch (e) {
           resultado.errores.push(`${kind} ${r.id}: ${(e as Error).message}`)
         }
-        if (r.updated_at > (hasta || "")) hasta = r.updated_at
+        if (r.updated_at > (hasta || "") || (r.updated_at === hasta && (!hastaId || r.id > hastaId))) { hasta = r.updated_at; hastaId = r.id }
       }
     }
 
@@ -294,6 +302,7 @@ export async function sincronizarSheet(opts: { limite?: number; registro?: { tab
       if (error) throw error
     }
     cursor.ultimo = hasta || ahoraIso
+    cursor.ultimoId = hasta ? hastaId : null
     resultado.hasta = cursor.ultimo
     return resultado
   } catch (e) {
