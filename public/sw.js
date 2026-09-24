@@ -9,7 +9,9 @@ const OFFLINE_URL = "/offline.html"
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.add(OFFLINE_URL)).then(() => self.skipWaiting())
+    // Si la página offline no se puede cachear (sin sesión, sin red), el worker igual se instala:
+    // los avisos push no dependen del shell offline.
+    caches.open(CACHE_NAME).then((cache) => cache.add(OFFLINE_URL)).catch(() => {}).then(() => self.skipWaiting())
   )
 })
 

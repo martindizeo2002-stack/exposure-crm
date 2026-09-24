@@ -20,6 +20,19 @@ function claveAUint8(base64: string) {
 
 const cabeceras = { "Content-Type": "application/json" }
 
+// Registro del service worker con tope de espera: si `ready` no resuelve (instalación trabada),
+// el botón igual aparece y el error real se muestra al intentar activar.
+async function workerListo(ms = 6000): Promise<ServiceWorkerRegistration | null> {
+  try {
+    const reg = await navigator.serviceWorker.register("/sw.js")
+    const listo = navigator.serviceWorker.ready
+    const tope = new Promise<null>((r) => setTimeout(() => r(null), ms))
+    return (await Promise.race([listo, tope])) || reg
+  } catch {
+    return null
+  }
+}
+
 export function AvisosPush() {
   const session = useSession()
   const [estado, setEstado] = useState<Estado>("cargando")
@@ -37,8 +50,8 @@ export function AvisosPush() {
     }
     if (Notification.permission === "denied") { setEstado("bloqueado"); return }
     try {
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.getSubscription()
+      const reg = await workerListo()
+      const sub = reg ? await reg.pushManager.getSubscription() : null
       if (!sub) { setEstado("inactivo"); return }
       const r = await fetch(`/api/push?endpoint=${encodeURIComponent(sub.endpoint)}`).then((x) => x.json()).catch(() => null)
       if (r?.activo) { setEstado("activo"); return }
@@ -59,7 +72,8 @@ export function AvisosPush() {
       if (permiso !== "granted") { setEstado(permiso === "denied" ? "bloqueado" : "inactivo"); return }
       const { publicKey } = await fetch("/api/push").then((x) => x.json())
       if (!publicKey) { setMsg("Faltan las claves de avisos en el servidor."); return }
-      const reg = await navigator.serviceWorker.ready
+      const reg = await workerListo()
+      if (!reg) throw new Error("No se pudo registrar el service worker en este navegador.")
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: claveAUint8(publicKey) })
       const r = await fetch("/api/push", { method: "POST", headers: cabeceras, body: JSON.stringify({ subscription: sub.toJSON(), userAgent: navigator.userAgent }) })
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || "No se pudo guardar la suscripción")
@@ -74,8 +88,8 @@ export function AvisosPush() {
   async function desactivar() {
     setOcupado(true); setMsg("")
     try {
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.getSubscription()
+      const reg = await workerListo()
+      const sub = reg ? await reg.pushManager.getSubscription() : null
       if (sub) {
         await fetch("/api/push", { method: "DELETE", headers: cabeceras, body: JSON.stringify({ endpoint: sub.endpoint }) })
         await sub.unsubscribe()
