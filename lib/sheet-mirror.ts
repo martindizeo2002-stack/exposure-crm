@@ -25,13 +25,33 @@ export type ResultadoEspejo = {
   actualizados: number
   sinCambios: number
   historicosSinMapa: number
+  reubicadas: number      // la fila mapeada tenía otra persona y se encontró la correcta más arriba o más abajo
+  quitadas: number        // la persona ya no está en la pestaña: se marca y no se vuelve a escribir
   pestanasCreadas: string[]
   errores: string[]
   hasta?: string
 }
 
 type Registro = Record<string, unknown> & { id: string; created_at: string; updated_at: string }
-type Mapa = { tab: string; row: number; hash?: string; ym?: string }
+// quitada: la fila se borró a mano del sheet; el espejo no la vuelve a escribir ni la agrega al final.
+type Mapa = { tab: string; row: number; hash?: string; ym?: string; quitada?: boolean }
+
+// Antes de escribir en una fila mapeada se verifica que siga siendo la misma persona (el equipo borra y
+// corre filas a mano en el sheet). Agendas: teléfono (col B) o nombre (col A); pagos: cliente (col I) y teléfono (col J).
+const digitos = (v: unknown) => String(v ?? "").replace(/\D/g, "").slice(-9)
+const normTexto = (v: unknown) => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim()
+function mismaFila(kind: Kind, r: Registro, fila: unknown[]): boolean {
+  if (kind === "agendas") {
+    const tel = digitos(r.telefono), telSheet = digitos(fila[1])
+    if (tel && telSheet) return tel === telSheet
+    const nombre = normTexto(r.nombre)
+    return nombre !== "" && nombre === normTexto(fila[0])
+  }
+  const cliente = normTexto(r.cliente)
+  if (!cliente || cliente !== normTexto(fila[8])) return false
+  const tel = digitos(r.telefono), telSheet = digitos(fila[9])
+  return !tel || !telSheet || tel === telSheet
+}
 
 function normTitulo(t: string): string {
   return t.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9 ]/g, " ").replace(/\s+/g, " ").trim().toUpperCase()
@@ -164,7 +184,7 @@ async function guardarCursor(admin: ReturnType<typeof createSupabaseAdmin>, curs
 }
 
 export async function sincronizarSheet(opts: { limite?: number; registro?: { table: string; id: string } | null } = {}): Promise<ResultadoEspejo> {
-  const vacio: ResultadoEspejo = { ok: true, agregados: 0, actualizados: 0, sinCambios: 0, historicosSinMapa: 0, pestanasCreadas: [], errores: [] }
+  const vacio: ResultadoEspejo = { ok: true, agregados: 0, actualizados: 0, sinCambios: 0, historicosSinMapa: 0, reubicadas: 0, quitadas: 0, pestanasCreadas: [], errores: [] }
   if (!sheetsConfigured()) return { ...vacio, ok: false, motivo: "Faltan GOOGLE_SERVICE_ACCOUNT_JSON / GOOGLE_SHEET_ID" }
   const admin = createSupabaseAdmin()
   const tomado = await tomarCursor(admin)
@@ -183,6 +203,18 @@ export async function sincronizarSheet(opts: { limite?: number; registro?: { tab
     const escrituras: Array<{ range: string; values: unknown[][] }> = []
     const mapasNuevos: Array<Record<string, unknown>> = []
     const siguienteFila = new Map<string, number>()
+    // columnas A..J de cada pestaña desde la primera fila de datos, para verificar filas y buscar personas
+    const identidades = new Map<string, unknown[][]>()
+    const identidadesDe = async (kind: Kind, titulo: string) => {
+      if (!identidades.has(titulo)) {
+        const filas = await getValues(a1(titulo, `A${PRIMERA_FILA_DATOS}:J`))
+        identidades.set(titulo, filas)
+        let ultima = 0
+        filas.forEach((fila, i) => { const v = fila[COL_OCUPADA[kind]]; if (v !== undefined && v !== null && String(v).trim() !== "") ultima = i + 1 })
+        siguienteFila.set(titulo, PRIMERA_FILA_DATOS + ultima)
+      }
+      return identidades.get(titulo)!
+    }
     let hasta = cursor.ultimo || cursor.desde
 
     for (const kind of ["pagos", "agendas"] as Kind[]) {
@@ -205,26 +237,41 @@ export async function sincronizarSheet(opts: { limite?: number; registro?: { tab
           const mapa = mapaPor.get(r.id)
           let tab: SheetTab | undefined
           let row: number
+          if (mapa?.quitada) { resultado.sinCambios++; continue }
           if (mapa && tabs.some(t => t.title === mapa.tab)) {
             if (mapa.hash === hash) { resultado.sinCambios++; continue }
             tab = tabs.find(t => t.title === mapa.tab)!
             row = mapa.row
+            const filas = await identidadesDe(kind, tab.title)
+            if (!mismaFila(kind, r, filas[row - PRIMERA_FILA_DATOS] || [])) {
+              const idx = filas.findIndex(f => mismaFila(kind, r, f))
+              if (idx < 0) {
+                // la fila se borró a mano: se respeta y no se vuelve a escribir
+                mapasNuevos.push({ source: "gsheet", asset_type: ASSET[kind], source_id: r.id, name: String(r.cliente || r.nombre || r.id), metadata: { ...mapa, quitada: true } satisfies Mapa, last_seen_at: ahoraIso })
+                resultado.quitadas++
+                continue
+              }
+              row = idx + PRIMERA_FILA_DATOS
+              resultado.reubicadas++
+            }
             resultado.actualizados++
           } else {
             if (Date.parse(r.created_at) < Date.parse(cursor.desde) && !mapa) { resultado.historicosSinMapa++; continue }
             const ym = kind === "pagos" ? mesDe(r.fecha, r.created_at) : mesDe(r.fecha_agenda || r.fecha_closer, r.created_at)
             tab = pestanaDelMes(tabs, kind, ym, hoy) || undefined
             if (!tab) { tab = await crearPestana(tabs, kind, ym, hoy); resultado.pestanasCreadas.push(tab.title) }
-            if (!siguienteFila.has(tab.title)) {
-              const col = columnLetter(COL_OCUPADA[kind])
-              const ocupadas = await getValues(a1(tab.title, `${col}${PRIMERA_FILA_DATOS}:${col}`))
-              let ultima = 0
-              ocupadas.forEach((fila, i) => { if (fila[0] !== undefined && fila[0] !== null && String(fila[0]).trim() !== "") ultima = i + 1 })
-              siguienteFila.set(tab.title, PRIMERA_FILA_DATOS + ultima)
+            const filas = await identidadesDe(kind, tab.title)
+            // si el equipo ya cargó a esa persona a mano en la pestaña, se escribe sobre su fila y no se duplica
+            const idx = filas.findIndex(f => mismaFila(kind, r, f))
+            if (idx >= 0) {
+              row = idx + PRIMERA_FILA_DATOS
+              resultado.reubicadas++
+            } else {
+              row = siguienteFila.get(tab.title)!
+              siguienteFila.set(tab.title, row + 1)
+              identidades.get(tab.title)!.push(kind === "agendas" ? [r.nombre, r.telefono] : [, , , , , , , , r.cliente, r.telefono])
+              resultado.agregados++
             }
-            row = siguienteFila.get(tab.title)!
-            siguienteFila.set(tab.title, row + 1)
-            resultado.agregados++
           }
           for (const b of bloques) {
             escrituras.push({ range: a1(tab.title, `${columnLetter(b.desde)}${row}:${columnLetter(b.desde + b.valores.length - 1)}${row}`), values: [b.valores] })

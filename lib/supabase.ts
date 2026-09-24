@@ -64,6 +64,36 @@ export type Agenda = {
   calificacion_crm_original: string | null
 }
 
+// Seguimiento de un lead (tabla seguimientos): réplica de la pestaña 🔂 SEGUIMIENTOS del sheet, un lead por fila.
+export type FupHecho = { hecho: true; fecha: string; por?: string; nota?: string }
+export type Seguimiento = {
+  id: string
+  agenda_id: string | null
+  person_id: string | null
+  mes: string | null
+  nombre: string
+  telefono: string | null
+  instagram: string | null
+  fecha_call: string | null
+  closer: string | null
+  tuvo_call: boolean | null
+  situacion: string | null
+  enviado_audio: boolean
+  tipo_lead: string | null
+  problema_dolor: string | null
+  fups: Record<string, FupHecho>
+  etapa: number
+  proximo_fup: string | null
+  razon_call: string | null
+  transcripcion_fathom: string | null
+  notas: string | null
+  estado: "Activo" | "Reagendó" | "Cerrado" | "Descartado"
+  creado_por: string | null
+  actualizado_por: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type Pago = {
   id?: number
   fecha: string | null

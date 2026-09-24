@@ -23,6 +23,21 @@ Lo que no le corresponde a un rol rebota con "Tu cuenta no tiene acceso a este m
 4. **Cuotas y cobros**: *Cobros y cuotas* muestra lo que vence, lo atrasado y quién lo tiene que cobrar. Cuando entra una cuota, se carga desde el mismo "Cargar pago" eligiendo el plan existente.
 5. **Clientes**: se crean solos al cargar una venta. Ahí van onboarding, calls con CSM, estado y baja.
 
+## Seguimientos (25/09)
+
+Es la pestaña "🔂 SEGUIMIENTOS" del sheet, pero adentro del CRM y por closer (menú Ventas → Seguimientos).
+
+- **Cada closer ve solo sus leads**; dirección y setters ven todos y pueden filtrar por closer.
+- Una fila por lead: tuvo call, situación, audio enviado, tipo de lead, problema/dolor, **los 10 FUP como casilleros** (al marcar uno queda la fecha y quién lo hizo), próximo contacto, razón para la call, link de Fathom, notas y estado (Activo · Reagendó · Cerrado · Descartado).
+- **Todo se guarda solo**: los desplegables y casilleros al tocarlos, los textos al salir del campo.
+- Los leads entran desde "Agregar lead": se eligen agendas de los últimos 90 días, o con un clic se traen todas las que quedaron en estado *Hacer Seguimiento, Seguimiento por wpp, Adentro en FUP, Agendó 2da call* o *Fee*. También se puede cargar uno a mano.
+- Arriba se ven los vencidos (el próximo contacto ya pasó), los de hoy y cuántos leads hay en cada etapa de FUP.
+- Cuando el lead cierra, se carga el pago como siempre y el seguimiento se pasa a Cerrado; si se enfría, a Descartado. Borrar solo puede dirección.
+
+## Sheet CRM CENTRAL 2026 y el CRM (25/09)
+
+El CRM escribe solo en el sheet (cada 5 minutos) los pagos y las agendas; **lo que se carga a mano en el sheet no vuelve al CRM solo**. La carga de show, cerró, estado y motivo va en el CRM (pipeline o Vista de agendas). Si igual alguien actualiza la pestaña de agendas del sheet, se trae al CRM con `python scripts/importar-agendas-sheet.py --aplicar` (primero sin `--aplicar` muestra qué cambiaría). El espejo verifica el teléfono antes de escribir en una fila del sheet: si el equipo borró o corrió filas, no pisa a otra persona.
+
 ## Avisos en el celular o la compu (24/09)
 
 En **Contenido → Semanal** hay un botón **"Activar avisos"** (lo ven CEO, Sales Manager y Manager MKT). Al tocarlo, el navegador pide permiso
