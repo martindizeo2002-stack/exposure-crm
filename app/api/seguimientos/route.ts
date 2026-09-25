@@ -130,14 +130,24 @@ export async function POST(request: Request) {
   }
 }
 
-// PATCH: { id, ...campos } edita; { id, fup: 3, hecho: true|false, nota? } marca o desmarca un FUP (guarda fecha y quién).
+// PATCH: { id, ...campos } edita la fila.
+// { id, fup: 3, hecho?, fecha?, nota?, mensaje?, link?, adjuntos? } crea o edita el FUP 3: hecho = true es un seguimiento
+// realizado (la fecha puede ser anterior a hoy, para dejar registro), hecho = false es un seguimiento preparado para esa
+// fecha (texto, link y capturas listos para usar). Los campos que no vienen se conservan. { id, fup: 3, borrar: true } lo quita.
+// Si queda un FUP preparado a futuro, el próximo contacto se corre a esa fecha cuando estaba vacío o era posterior.
+const FECHA = /^\d{4}-\d{2}-\d{2}$/
+const limpiarLink = (v: unknown) => { const t = texto(v, 500); return t && /^https?:\/\//i.test(t) ? t : null }
+const limpiarAdjuntos = (v: unknown) => Array.isArray(v)
+  ? v.slice(0, 10).map(a => ({ url: String(a?.url || ""), nombre: texto(a?.nombre, 120) || "adjunto", tipo: texto(a?.tipo, 60) || "" }))
+      .filter(a => a.url.startsWith("/api/seguimientos/adjunto?path=") || /^https?:\/\//i.test(a.url))
+  : []
 export async function PATCH(request: Request) {
   try {
     const ctx = await contexto()
     if (!ctx) return NextResponse.json({ error: "No autenticado" }, { status: 401 })
-    const { id, fup, hecho, nota, ...resto } = await request.json()
+    const { id, fup, hecho, nota, mensaje, link, adjuntos, fecha, borrar, ...resto } = await request.json()
     if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 })
-    const { data: fila, error: e0 } = await db().from("seguimientos").select("id,closer,fups").eq("id", id).maybeSingle()
+    const { data: fila, error: e0 } = await db().from("seguimientos").select("id,closer,fups,proximo_fup").eq("id", id).maybeSingle()
     if (e0) return NextResponse.json({ error: e0.message }, { status: 500 })
     if (!fila) return NextResponse.json({ error: "No existe el seguimiento" }, { status: 404 })
     if (ctx.soloPropios && fila.closer && !mismoCloser(fila.closer, ctx.primerNombre)) return NextResponse.json({ error: "Este lead es de otro closer" }, { status: 403 })
@@ -156,11 +166,33 @@ export async function PATCH(request: Request) {
     if (fup !== undefined) {
       const n = Number(fup)
       if (!Number.isInteger(n) || n < 1 || n > 10) return NextResponse.json({ error: "FUP inválido (1 a 10)" }, { status: 400 })
-      const fups = { ...((fila.fups as Record<string, unknown>) || {}) }
-      if (hecho) fups[String(n)] = { hecho: true, fecha: hoyAR(), por: ctx.primerNombre || ctx.email, nota: texto(nota, 500) || undefined }
-      else delete fups[String(n)]
+      type Entrada = { hecho: boolean; fecha: string; por?: string; nota?: string; mensaje?: string; link?: string; adjuntos?: { url: string; nombre: string; tipo: string }[] }
+      const fups = { ...((fila.fups as Record<string, Entrada>) || {}) }
+      const k = String(n)
+      const previo = fups[k] || null
+      if (borrar) delete fups[k]
+      else {
+        const f = fecha !== undefined && fecha !== null && fecha !== "" ? String(fecha) : (previo?.fecha || hoyAR())
+        if (!FECHA.test(f)) return NextResponse.json({ error: "Fecha inválida (AAAA-MM-DD)" }, { status: 400 })
+        const estaHecho = hecho !== undefined && hecho !== null ? Boolean(hecho) : (previo ? Boolean(previo.hecho) : true)
+        const entrada: Entrada = {
+          hecho: estaHecho, fecha: f,
+          por: previo?.por || ctx.primerNombre || ctx.email,
+          nota: nota !== undefined ? (texto(nota, 500) || undefined) : previo?.nota,
+          mensaje: mensaje !== undefined ? (texto(mensaje, 4000) || undefined) : previo?.mensaje,
+          link: link !== undefined ? (limpiarLink(link) || undefined) : previo?.link,
+          adjuntos: adjuntos !== undefined ? limpiarAdjuntos(adjuntos) : previo?.adjuntos,
+        }
+        if (estaHecho && !previo?.hecho) entrada.por = ctx.primerNombre || ctx.email   // quien lo dio por hecho
+        if (!entrada.adjuntos?.length) delete entrada.adjuntos
+        for (const c of ["nota", "mensaje", "link"] as const) if (!entrada[c]) delete entrada[c]
+        fups[k] = entrada
+      }
       updates.fups = fups
-      updates.etapa = Math.max(0, ...Object.keys(fups).map(Number))
+      updates.etapa = Math.max(0, ...Object.entries(fups).filter(([, e]) => e?.hecho).map(([kk]) => Number(kk)))
+      const hoy = hoyAR()
+      const programado = Object.values(fups).filter(e => e && !e.hecho && e.fecha >= hoy).map(e => e.fecha).sort()[0]
+      if (programado && (!fila.proximo_fup || String(fila.proximo_fup) > programado) && updates.proximo_fup === undefined) updates.proximo_fup = programado
     }
     if (Object.keys(updates).length === 1) return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 })
     const { data, error } = await db().from("seguimientos").update(updates).eq("id", id).select("*").maybeSingle()

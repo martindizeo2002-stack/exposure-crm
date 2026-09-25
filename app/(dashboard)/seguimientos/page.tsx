@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import useSWR from "swr"
-import { AlertTriangle, BellRing, CalendarClock, CheckCircle2, Download, ExternalLink, ListChecks, Loader2, Phone, Plus, RefreshCw, Search, Trash2, X } from "lucide-react"
+import { AlertTriangle, BellRing, CalendarClock, CheckCircle2, Clock, Download, ExternalLink, FileText, ImagePlus, Link2, ListChecks, Loader2, MessageSquareText, Paperclip, Phone, Plus, RefreshCw, Search, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,11 +12,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CrmEmpty, CrmPageIntro, CrmStat } from "@/components/crm-ui"
 import { cn } from "@/lib/utils"
-import type { Seguimiento } from "@/lib/supabase"
+import type { FupAdjunto, FupHecho, Seguimiento } from "@/lib/supabase"
 
 // Pantalla de seguimientos: la pestaña 🔂 SEGUIMIENTOS del sheet, pero por closer. Una fila por lead con
-// los 10 FUP como casilleros (cada uno guarda fecha y quién), situación, tipo de lead, dolor, razón para
-// la call, Fathom, notas y próximo contacto. Todo se guarda solo al cambiar (los textos, al salir del campo).
+// los 10 FUP como casilleros. Cada casillero abre un editor: fecha (pasada, hoy o futura), hecho o preparado,
+// nota, mensaje enviado, link (Loom, etc.) y capturas. Lo demás se guarda solo al cambiar.
 
 const fetcher = (url: string) => fetch(url, { cache: "no-store" }).then(async r => { const b = await r.json(); if (!r.ok) throw new Error(b.error || "Error"); return b })
 const SITUACIONES = ["Lo tenía que pensar", "No tenia dinero para fee", "No llegaba a la Cuota 1", "No llegaba al PIF", "Le parecía caro", "Desconfianza", "Miedo", "Metodo de pago", "No tenia urgencia", "Los padres no lo dejaron", "Consultar con pareja/socio", "No respondió", "Reagendó", "Pagó fee", "Problemas de Luz"]
@@ -27,6 +27,7 @@ const NADA = "-"
 
 type Respuesta = { yo: { nombre: string; rol: string; primerNombre: string; manager: boolean; soloPropios: boolean }; closers: string[]; hoy: string; filas: Seguimiento[] }
 type Candidata = { id: string; nombre: string; telefono: string | null; instagram: string | null; fecha_closer: string | null; closer: string | null; calificacion: string | null; estado: string | null; motivo_no_cierre: string | null; en_fup: boolean }
+type Patch = Record<string, unknown>
 
 const fechaCorta = (v: string | null | undefined) => {
   if (!v) return "—"
@@ -37,6 +38,8 @@ const fechaCorta = (v: string | null | undefined) => {
 const fechaDia = (v: string | null | undefined) => v ? new Date(`${v.slice(0, 10)}T12:00:00`).toLocaleDateString("es-AR", { day: "2-digit", month: "short" }) : ""
 const meses = () => { const out: string[] = []; const d = new Date(); for (let i = 0; i < 8; i++) { out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); d.setMonth(d.getMonth() - 1) } return out }
 const nombreMes = (ym: string) => new Date(`${ym}-15T12:00:00`).toLocaleDateString("es-AR", { month: "long", year: "numeric" })
+// Estado visual de un FUP: hecho · preparado para una fecha futura · preparado con fecha pasada (no se envió) · vacío
+const estadoFup = (h: FupHecho | undefined, hoy: string) => !h ? "vacio" : h.hecho ? "hecho" : h.fecha < hoy ? "vencido" : "preparado"
 
 export default function SeguimientosPage() {
   const [closer, setCloser] = useState("todos")
@@ -59,16 +62,18 @@ export default function SeguimientosPage() {
   const vencidos = activos.filter(f => f.proximo_fup && f.proximo_fup < hoy)
   const paraHoy = activos.filter(f => f.proximo_fup === hoy)
   const sinFup = activos.filter(f => !f.etapa)
+  const preparados = activos.reduce((s, f) => s + Object.values(f.fups || {}).filter(h => h && !h.hecho && h.fecha >= hoy).length, 0)
   const porEtapa = FUPS.map(n => activos.filter(f => f.etapa === n).length)
 
-  async function guardar(id: string, patch: Record<string, unknown>) {
+  async function guardar(id: string, patch: Patch): Promise<Seguimiento | null> {
     setGuardando(id); setError(null)
     try {
       const r = await fetch("/api/seguimientos", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...patch }) })
       const b = await r.json()
       if (!r.ok) throw new Error(b.error || "No se pudo guardar")
       await mutate(d => d ? { ...d, filas: d.filas.map(f => f.id === id ? b.fila : f) } : d, { revalidate: false })
-    } catch (e) { setError((e as Error).message) } finally { setGuardando(null) }
+      return b.fila as Seguimiento
+    } catch (e) { setError((e as Error).message); return null } finally { setGuardando(null) }
   }
   async function borrar(f: Seguimiento) {
     if (!confirm(`¿Borrar el seguimiento de ${f.nombre}? Si solo terminó, pasalo a Descartado o Cerrado.`)) return
@@ -78,14 +83,14 @@ export default function SeguimientosPage() {
 
   return <div className="mx-auto max-w-[1700px] space-y-5 p-4 md:p-7">
     <CrmPageIntro eyebrow="Ventas · Seguimientos" title={yo?.soloPropios ? `Mis seguimientos` : "Seguimientos"} tone="blue" icon={<BellRing className="h-5 w-5" />}
-      description={yo?.soloPropios ? "Tus leads después de la call: marcá cada FUP a medida que lo hacés, poné el próximo contacto y anotá qué pasó. Todo se guarda solo." : "Los leads en seguimiento de cada closer, con sus FUP, situación y próximo contacto. Filtrá por closer para ver la cartera de cada uno."}
+      description={yo?.soloPropios ? "Tus leads después de la call: tocá cada FUP para registrarlo (con fecha, mensaje y captura) o dejarlo preparado para más adelante. Todo se guarda solo." : "Los leads en seguimiento de cada closer, con sus FUP, situación y próximo contacto. Filtrá por closer para ver la cartera de cada uno."}
       actions={<>
         <Button variant="outline" size="sm" onClick={() => mutate()}><RefreshCw className={cn("mr-1 h-4 w-4", isLoading && "animate-spin")} />Actualizar</Button>
         <Button size="sm" onClick={() => setAbrirAlta(true)}><Plus className="mr-1 h-4 w-4" />Agregar lead</Button>
       </>} />
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <CrmStat label="En seguimiento" value={activos.length} detail={`${sinFup.length} todavía sin ningún FUP`} icon={<ListChecks className="h-5 w-5" />} tone="blue" />
+      <CrmStat label="En seguimiento" value={activos.length} detail={`${sinFup.length} todavía sin ningún FUP · ${preparados} FUP preparados a futuro`} icon={<ListChecks className="h-5 w-5" />} tone="blue" />
       <CrmStat label="Para hoy" value={paraHoy.length} detail="con próximo contacto hoy" icon={<CalendarClock className="h-5 w-5" />} tone="amber" />
       <CrmStat label="Vencidos" value={vencidos.length} detail="el próximo contacto ya pasó" icon={<AlertTriangle className="h-5 w-5" />} tone={vencidos.length ? "red" : "neutral"} />
       <div className="crm-stat">
@@ -120,7 +125,7 @@ export default function SeguimientosPage() {
             <th className="px-2 py-2 text-center">Audio</th>
             <th className="px-2 py-2 text-left">Tipo</th>
             <th className="px-2 py-2 text-left">Problema / dolor</th>
-            <th className="min-w-[420px] px-2 py-2 text-left">FUP 1 → 10 (tocá para marcar; queda la fecha)</th>
+            <th className="min-w-[420px] px-2 py-2 text-left">FUP 1 → 10 (tocá uno: fecha, mensaje, captura · amarillo = preparado)</th>
             <th className="px-2 py-2 text-left">Próximo</th>
             <th className="px-2 py-2 text-left">Razón para la call</th>
             <th className="px-2 py-2 text-left">Fathom</th>
@@ -139,7 +144,8 @@ export default function SeguimientosPage() {
   </div>
 }
 
-function Fila({ f, hoy, manager, closers, guardando, onGuardar, onBorrar }: { f: Seguimiento; hoy: string; manager: boolean; closers: string[]; guardando: boolean; onGuardar: (patch: Record<string, unknown>) => void; onBorrar: () => void }) {
+function Fila({ f, hoy, manager, closers, guardando, onGuardar, onBorrar }: { f: Seguimiento; hoy: string; manager: boolean; closers: string[]; guardando: boolean; onGuardar: (patch: Patch) => Promise<Seguimiento | null>; onBorrar: () => void }) {
+  const [fupAbierto, setFupAbierto] = useState<number | null>(null)
   const activo = f.estado === "Activo" || f.estado === "Reagendó"
   const vencido = activo && Boolean(f.proximo_fup && f.proximo_fup < hoy)
   const esHoy = activo && f.proximo_fup === hoy
@@ -179,11 +185,24 @@ function Fila({ f, hoy, manager, closers, guardando, onGuardar, onBorrar }: { f:
     <td className="px-2 py-2"><Texto valor={f.problema_dolor} ancho="w-52" alto onGuardar={v => onGuardar({ problema_dolor: v })} placeholder="Qué le duele / qué quiere" /></td>
     <td className="min-w-[420px] px-2 py-2">
       <div className="flex flex-nowrap gap-1">
-        {FUPS.map(n => { const h = f.fups?.[String(n)]; return <label key={n} title={h ? `FUP ${n} · ${fechaDia(h.fecha)}${h.por ? ` · ${h.por}` : ""}${h.nota ? ` · ${h.nota}` : ""}` : `Marcar FUP ${n}`} className={cn("flex h-8 w-8 cursor-pointer flex-col items-center justify-center rounded-md border text-[10px] font-bold", h ? "border-blue-500 bg-blue-500 text-white" : "text-muted-foreground hover:border-blue-400")}>
-          <input type="checkbox" className="sr-only" checked={Boolean(h)} onChange={e => onGuardar({ fup: n, hecho: e.target.checked })} />
-          <span>{n}</span>{h && <span className="text-[8px] leading-none opacity-90">{h.fecha.slice(8, 10)}/{h.fecha.slice(5, 7)}</span>}
-        </label> })}
+        {FUPS.map(n => {
+          const h = f.fups?.[String(n)]
+          const st = estadoFup(h, hoy)
+          const extras = h ? [h.mensaje ? "mensaje" : "", h.link ? "link" : "", h.adjuntos?.length ? `${h.adjuntos.length} adjunto${h.adjuntos.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ") : ""
+          const title = h ? `FUP ${n} · ${st === "hecho" ? "hecho" : st === "preparado" ? "preparado para" : "preparado, no enviado"} ${fechaDia(h.fecha)}${h.por ? ` · ${h.por}` : ""}${h.nota ? ` · ${h.nota}` : ""}${extras ? ` · ${extras}` : ""}` : `FUP ${n}: registrar o dejar preparado`
+          return <button key={n} type="button" title={title} onClick={() => setFupAbierto(n)}
+            className={cn("relative flex h-8 w-8 flex-col items-center justify-center rounded-md border text-[10px] font-bold",
+              st === "hecho" && "border-blue-500 bg-blue-500 text-white",
+              st === "preparado" && "border-dashed border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+              st === "vencido" && "border-dashed border-red-500 bg-red-500/10 text-red-600",
+              st === "vacio" && "text-muted-foreground hover:border-blue-400")}>
+            <span>{n}</span>
+            {h && <span className="text-[8px] leading-none opacity-90">{h.fecha.slice(8, 10)}/{h.fecha.slice(5, 7)}</span>}
+            {h && (h.adjuntos?.length || h.mensaje || h.link) ? <span className={cn("absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-card", st === "hecho" ? "bg-white" : "bg-current")} /> : null}
+          </button>
+        })}
       </div>
+      {fupAbierto !== null && <FupEditor f={f} n={fupAbierto} hoy={hoy} onGuardar={onGuardar} onCerrar={() => setFupAbierto(null)} />}
     </td>
     <td className="px-2 py-2">
       <Input type="date" className={cn("h-8 w-36 text-xs", vencido && "border-red-500 text-red-600", esHoy && "border-amber-500")} value={f.proximo_fup || ""} onChange={e => onGuardar({ proximo_fup: e.target.value || null })} />
@@ -205,6 +224,111 @@ function Fila({ f, hoy, manager, closers, guardando, onGuardar, onBorrar }: { f:
     </td>
     {manager && <td className="px-2 py-2"><button className="mt-1 text-muted-foreground hover:text-red-500" title="Borrar" onClick={onBorrar}><Trash2 className="h-4 w-4" /></button></td>}
   </tr>
+}
+
+// Editor de un FUP: fecha (pasada para dejar registro, futura para dejarlo preparado), hecho o preparado, nota,
+// mensaje enviado o a enviar, link y capturas. Las capturas se suben y guardan al instante; el resto con "Guardar".
+function FupEditor({ f, n, hoy, onGuardar, onCerrar }: { f: Seguimiento; n: number; hoy: string; onGuardar: (patch: Patch) => Promise<Seguimiento | null>; onCerrar: () => void }) {
+  const h = f.fups?.[String(n)]
+  const [fecha, setFecha] = useState(h?.fecha || hoy)
+  const [hecho, setHecho] = useState<boolean>(h ? h.hecho : true)
+  const [nota, setNota] = useState(h?.nota || "")
+  const [mensaje, setMensaje] = useState(h?.mensaje || "")
+  const [link, setLink] = useState(h?.link || "")
+  const [adjuntos, setAdjuntos] = useState<FupAdjunto[]>(h?.adjuntos || [])
+  const [subiendo, setSubiendo] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const archivoRef = useRef<HTMLInputElement>(null)
+  const futura = fecha > hoy
+  const base = () => ({ fup: n, hecho, fecha, nota, mensaje, link })
+
+  async function guardar(extra: Patch = {}) {
+    setGuardando(true); setMsg(null)
+    const ok = await onGuardar({ ...base(), adjuntos, ...extra })
+    setGuardando(false)
+    if (ok) onCerrar()
+  }
+  async function subir(files: FileList | File[]) {
+    const lista = Array.from(files).filter(a => a.size)
+    if (!lista.length) return
+    setSubiendo(true); setMsg(null)
+    const nuevos: FupAdjunto[] = []
+    for (const a of lista) {
+      const form = new FormData(); form.append("file", a); form.append("id", f.id); form.append("fup", String(n))
+      try {
+        const r = await fetch("/api/seguimientos/adjunto", { method: "POST", body: form })
+        const b = await r.json()
+        if (!r.ok) throw new Error(b.error || "No se pudo subir")
+        nuevos.push({ url: b.url, nombre: b.nombre, tipo: b.tipo })
+      } catch (e) { setMsg((e as Error).message) }
+    }
+    if (nuevos.length) {
+      const lista2 = [...adjuntos, ...nuevos]
+      setAdjuntos(lista2)
+      const ok = await onGuardar({ ...base(), adjuntos: lista2 })   // la captura queda guardada aunque después no toque "Guardar"
+      if (ok) setMsg(`${nuevos.length} archivo${nuevos.length === 1 ? "" : "s"} guardado${nuevos.length === 1 ? "" : "s"}`)
+    }
+    setSubiendo(false)
+  }
+  async function quitarAdjunto(url: string) {
+    const lista2 = adjuntos.filter(a => a.url !== url)
+    setAdjuntos(lista2)
+    await onGuardar({ ...base(), adjuntos: lista2 })
+  }
+
+  return <Dialog open onOpenChange={o => { if (!o) onCerrar() }}>
+    <DialogContent className="max-w-xl" onPaste={e => { const fs = Array.from(e.clipboardData?.files || []).filter(a => /^image\//.test(a.type)); if (fs.length) { e.preventDefault(); subir(fs) } }}>
+      <DialogHeader><DialogTitle>FUP {n} · {f.nombre}</DialogTitle></DialogHeader>
+      <div className="grid gap-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1 text-xs font-semibold text-muted-foreground">Fecha del seguimiento
+            <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
+            <span className="font-normal">{futura ? "Es a futuro: quedará preparado y se toma como próximo contacto." : fecha < hoy ? "Es anterior a hoy: queda como registro de ese día." : "Hoy."}</span>
+          </label>
+          <div className="grid gap-1 text-xs font-semibold text-muted-foreground">Estado
+            <div className="grid gap-1">
+              <label className={cn("flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium", hecho && "border-blue-500 bg-blue-500/10")}><input type="radio" name={`fup-${n}`} checked={hecho} onChange={() => setHecho(true)} /><CheckCircle2 className="h-4 w-4 text-blue-500" />Hecho (ya se envió)</label>
+              <label className={cn("flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium", !hecho && "border-amber-500 bg-amber-500/10")}><input type="radio" name={`fup-${n}`} checked={!hecho} onChange={() => setHecho(false)} /><Clock className="h-4 w-4 text-amber-500" />Preparado para esa fecha</label>
+            </div>
+          </div>
+        </div>
+        <label className="grid gap-1 text-xs font-semibold text-muted-foreground">Nota corta
+          <Input value={nota} onChange={e => setNota(e.target.value)} placeholder="Ej: le mandé el caso de Toto, quedó en contestar el lunes" maxLength={500} />
+        </label>
+        <label className="grid gap-1 text-xs font-semibold text-muted-foreground"><span className="flex items-center gap-1"><MessageSquareText className="h-3.5 w-3.5" />Mensaje enviado o preparado (pegalo acá)</span>
+          <Textarea className="min-h-24 text-sm" value={mensaje} onChange={e => setMensaje(e.target.value)} placeholder="El texto del DM, WhatsApp o audio transcripto" maxLength={4000} />
+        </label>
+        <label className="grid gap-1 text-xs font-semibold text-muted-foreground"><span className="flex items-center gap-1"><Link2 className="h-3.5 w-3.5" />Link (Loom, Drive, video)</span>
+          <Input value={link} onChange={e => setLink(e.target.value)} placeholder="https://www.loom.com/share/…" />
+        </label>
+        <div className="grid gap-2 text-xs font-semibold text-muted-foreground">
+          <span className="flex items-center gap-1"><Paperclip className="h-3.5 w-3.5" />Capturas y archivos (JPG, PNG, WEBP, GIF o PDF, hasta 8 MB; también podés pegar una captura con Ctrl+V)</span>
+          {adjuntos.length > 0 && <div className="flex flex-wrap gap-2">
+            {adjuntos.map(a => <div key={a.url} className="group relative">
+              {/^image\//.test(a.tipo)
+                ? <a href={a.url} target="_blank" rel="noreferrer"><img src={a.url} alt={a.nombre} className="h-20 w-20 rounded-md border object-cover" /></a>
+                : <a href={a.url} target="_blank" rel="noreferrer" className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-md border p-1 text-center text-[10px] font-normal"><FileText className="h-6 w-6" /><span className="line-clamp-2 break-all">{a.nombre}</span></a>}
+              <button type="button" title="Quitar" onClick={() => quitarAdjunto(a.url)} className="absolute -right-1.5 -top-1.5 rounded-full border bg-card p-0.5 text-muted-foreground shadow hover:text-red-500"><X className="h-3 w-3" /></button>
+            </div>)}
+          </div>}
+          <div>
+            <input ref={archivoRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={e => { if (e.target.files) subir(e.target.files); e.target.value = "" }} />
+            <Button type="button" size="sm" variant="outline" disabled={subiendo} onClick={() => archivoRef.current?.click()}>{subiendo ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-1 h-4 w-4" />}Subir captura</Button>
+          </div>
+        </div>
+        {h?.por && <p className="text-xs text-muted-foreground">Cargado por {h.por}.</p>}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+          <p className="text-xs text-muted-foreground">{msg}</p>
+          <div className="flex flex-wrap gap-2">
+            {h && <Button type="button" variant="ghost" size="sm" className="text-red-500" disabled={guardando} onClick={() => guardar({ borrar: true })}><Trash2 className="mr-1 h-4 w-4" />Quitar FUP</Button>}
+            {!h && <Button type="button" variant="outline" size="sm" disabled={guardando} onClick={() => { setHecho(true); setFecha(hoy); guardar({ hecho: true, fecha: hoy }) }}>Marcar hecho hoy</Button>}
+            <Button type="button" size="sm" disabled={guardando || subiendo} onClick={() => guardar()}>{guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}</Button>
+          </div>
+        </div>
+      </div>
+    </DialogContent>
+  </Dialog>
 }
 
 // Texto que se guarda al salir del campo (solo si cambió).

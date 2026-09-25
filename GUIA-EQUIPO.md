@@ -28,8 +28,15 @@ Lo que no le corresponde a un rol rebota con "Tu cuenta no tiene acceso a este m
 Es la pestaña "🔂 SEGUIMIENTOS" del sheet, pero adentro del CRM y por closer (menú Ventas → Seguimientos).
 
 - **Cada closer ve solo sus leads**; dirección y setters ven todos y pueden filtrar por closer.
-- Una fila por lead: tuvo call, situación, audio enviado, tipo de lead, problema/dolor, **los 10 FUP como casilleros** (al marcar uno queda la fecha y quién lo hizo), próximo contacto, razón para la call, link de Fathom, notas y estado (Activo · Reagendó · Cerrado · Descartado).
-- **Todo se guarda solo**: los desplegables y casilleros al tocarlos, los textos al salir del campo.
+- Una fila por lead: tuvo call, situación, audio enviado, tipo de lead, problema/dolor, **los 10 FUP como casilleros**, próximo contacto, razón para la call, link de Fathom, notas y estado (Activo · Reagendó · Cerrado · Descartado).
+- **Cada FUP se abre tocándolo** (26/09) y tiene su propia ficha:
+  - **Fecha**: se puede poner una anterior a hoy para dejar registro de un seguimiento que ya se hizo, o una futura para dejarlo preparado.
+  - **Hecho** (ya se envió) o **Preparado para esa fecha** (texto, link o captura listos para usar cuando toque).
+  - **Nota corta**, **mensaje enviado o preparado** (se pega el DM, WhatsApp o audio transcripto), **link** (Loom, Drive, video) y **capturas** (JPG, PNG, WEBP, GIF o PDF hasta 8 MB; también se pega la captura con Ctrl+V dentro de la ficha). Las capturas quedan guardadas al instante; lo demás con "Guardar".
+  - "Marcar hecho hoy" lo cierra en un toque; "Quitar FUP" lo borra.
+  - Colores del casillero: **azul** = hecho (muestra el día), **amarillo punteado** = preparado para más adelante, **rojo punteado** = preparado con fecha que ya pasó y no se envió. Un puntito arriba avisa que tiene mensaje, link o captura.
+  - La etapa del lead cuenta solo los FUP hechos. Si se deja un FUP preparado a futuro, el **próximo contacto** se corre solo a esa fecha (salvo que ya hubiera uno más cercano).
+- **Todo se guarda solo**: los desplegables al tocarlos, los textos al salir del campo.
 - Los leads entran desde "Agregar lead": se eligen agendas de los últimos 90 días, o con un clic se traen todas las que quedaron en estado *Hacer Seguimiento, Seguimiento por wpp, Adentro en FUP, Agendó 2da call* o *Fee*. También se puede cargar uno a mano.
 - Arriba se ven los vencidos (el próximo contacto ya pasó), los de hoy y cuántos leads hay en cada etapa de FUP.
 - Cuando el lead cierra, se carga el pago como siempre y el seguimiento se pasa a Cerrado; si se enfría, a Descartado. Borrar solo puede dirección.
