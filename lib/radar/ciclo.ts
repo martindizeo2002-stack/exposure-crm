@@ -28,7 +28,9 @@ function salteaElCron(paso: Paso, turno: string | undefined) {
   if (planRadar() === "completo") return null
   const dia = local(new Date()).dow
   if (paso === "piezas" && !["Mon", "Thu"].includes(dia)) return "plan gratis: las piezas se leen lunes y jueves"
-  if (paso === "historias" && turno === "2") return "plan gratis: las historias se leen una vez por día"
+  // El plan gratuito de Apify no deja usar los actores de historias (devuelven una muestra y cobran igual):
+  // las historias las captura la tarea de Windows "EXPOSURE - Radar capturas" (scripts/radar-capturas.py).
+  if (paso === "historias") return "plan gratis: las historias las captura la tarea de la compu a las 18 y a las 22"
   if (paso === "comentarios") return "plan gratis: los comentarios se bajan a mano desde Sincronizar"
   return null
 }

@@ -54,6 +54,7 @@ Marketing → Radar. Sigue cuentas de Instagram (las nuestras, la competencia y 
 - **Semillas**: las cuentas seguidas. Se agregan pegando el @usuario o el link (varias a la vez), se pausan y se les prende o apaga la captura de historias. Abajo está qué está conectado y las últimas corridas con su costo.
 - **Comentarios**: dolores, objeciones, preguntas y jerga de la audiencia, sacados de los comentarios de las piezas más comentadas.
 - **Sincronizar** (arriba): adelanta cualquier lectura sin esperar al horario.
+- **Capturas de historias (29/09):** la tarea de Windows "EXPOSURE - Radar capturas" abre Instagram en la compu de Alex a las **18:00** y saca una captura de cada historia activa de las cuentas con "historias" prendido; a las **22:00** vuelve a mirar y suma solo las nuevas. Aparecen en la pestaña Historias y Claude les lee el texto y el tipo. Copia local en `Central Negocio/datos/radar-capturas/`. Necesita la compu prendida (si estaba apagada, corre al prenderla) y una sesión de Instagram iniciada una vez con `scripts/radar-capturas-tarea.ps1 -Login`.
 - Ven el Radar dirección, marketing y editores. Agregar cuentas, sincronizar, analizar y recrear: solo dirección y marketing.
 
 De dónde sale cada cosa: las piezas, perfiles, historias y comentarios los lee **Apify**; las historias propias con sus métricas, la **Graph API de Instagram**; la transcripción, **Whisper (Groq)**; el análisis, **Claude**. Variables: `APIFY_TOKEN`, `GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `IG_INSIGHTS_TOKEN`, `RADAR_PLAN` (`gratis` o `completo`), `RADAR_MODELO`.
