@@ -888,7 +888,7 @@ function renderSemillas(){
     <td class="r">${x.piezas_semana?num(x.bangers):'—'}</td><td class="r">${num(x.med_views)}</td><td class="r" title="piezas históricas usadas para la mediana (mín 5)">${num(x.n_baseline)}</td>
     <td>${x.historias?'<span class="tag ok">sí</span>':'<span class="tag">no</span>'}${g?`<button class="lk" data-a="historias" data-v="${x.historias?0:1}">${x.historias?'apagar':'prender'}</button>`:''}</td>
     <td class="muted">${esc(x.nota||'')}</td>
-    <td style="white-space:nowrap">${g?`<button class="lk ${x.activa?'peligro':''}" data-a="activa" data-v="${x.activa?0:1}">${x.activa?'pausar':'reactivar'}</button>`:''}</td></tr>`).join('') || `<tr><td colspan="11"><div class="empty">Sin cuentas. Agregá la primera arriba.</div></td></tr>`;
+    <td style="white-space:nowrap">${g?`<button class="lk" data-e="1">editar</button><button class="lk ${x.activa?'peligro':''}" data-a="activa" data-v="${x.activa?0:1}">${x.activa?'pausar':'reactivar'}</button>`:''}</td></tr>`).join('') || `<tr><td colspan="11"><div class="empty">Sin cuentas. Agregá la primera arriba.</div></td></tr>`;
 }
 async function trasSemillas(j){ const d = await api('/api/radar/datos'); D = d; PROPIAS = propias(); PROPIA = [...PROPIAS][0] || ''; renderSemillas(); fillCuentas(); return j; }
 $('#a-b').onclick = async () => {
@@ -906,10 +906,54 @@ $('#a-h').onkeydown = e => { if(e.key === 'Enter') $('#a-b').click(); };
 $('#t-semillas').addEventListener('click', async e => {
   const b = e.target.closest('button.lk'); if(!b) return;
   const h = b.closest('tr').dataset.h;
+  if(b.dataset.e){ editarCuenta(h); return; }
   b.disabled = true;
   try{ await trasSemillas(await api('/api/radar/semillas', { method:'PATCH', headers:{'content-type':'application/json'}, body: JSON.stringify({ handle: h, [b.dataset.a]: b.dataset.v === '1' }) })); flash('Guardado ✓'); }
   catch(err){ flash(err.message, true); b.disabled = false; }
 });
+
+// ═══ EDITAR CUENTA ═══
+const TAGS_RADAR = ['propia', 'competencia', 'referente', 'nicho'];
+function editarCuenta(h){
+  const x = (D.semillas || []).find(s => s.handle === h); if(!x) return;
+  ABIERTA = '';
+  const d = $('#drawer');
+  d.innerHTML = `<div class="dhead"><span class="chip">@${esc(h)}</span><button class="x" onclick="cerrar()">cerrar ✕</button></div>
+    <h2>Editar cuenta</h2>
+    <p class="muted">${x.nombre ? esc(x.nombre) + ' · ' : ''}${num(x.seguidores)} seguidores</p>
+    <h3>Tags</h3>
+    <div class="alta">${TAGS_RADAR.map(t => `<label class="chip" style="cursor:pointer"><input type="checkbox" class="e-tag" value="${t}" ${(x.tags||[]).includes(t)?'checked':''}> ${t}</label>`).join('')}</div>
+    <h3>Nota</h3>
+    <div class="alta"><input class="h" id="e-nota" value="${esc(x.nota||'')}" placeholder="para qué la seguimos"></div>
+    <h3>Qué se lee</h3>
+    <div class="alta">
+      <label class="chip" style="cursor:pointer"><input type="checkbox" id="e-act" ${x.activa?'checked':''}> activa (se leen sus piezas)</label>
+      <label class="chip" style="cursor:pointer"><input type="checkbox" id="e-his" ${x.historias?'checked':''}> capturar historias</label>
+    </div>
+    <div class="acts"><button class="btn" id="e-ok">Guardar</button></div>
+    <h3>Quitar del radar</h3>
+    <p class="muted">Saca la cuenta y todo lo que el radar guardó de ella: piezas, análisis, historias y comentarios. No se puede deshacer. Si solo querés dejar de leerla, destildá "activa".</p>
+    <div class="acts"><button class="btn sec" id="e-del" style="color:var(--red)">Quitar @${esc(h)}</button></div>`;
+  d.classList.add('open'); d.setAttribute('aria-hidden','false');
+  const guardar = async body => api('/api/radar/semillas', { method:'PATCH', headers:{'content-type':'application/json'}, body: JSON.stringify({ handle: h, ...body }) });
+  $('#e-ok').onclick = async () => {
+    const b = $('#e-ok'); b.disabled = true;
+    try{
+      await trasSemillas(await guardar({ tags: [...d.querySelectorAll('.e-tag:checked')].map(i => i.value), nota: $('#e-nota').value, activa: $('#e-act').checked, historias: $('#e-his').checked }));
+      cerrar(); flash('Cuenta guardada ✓');
+    }catch(err){ flash(err.message, true); b.disabled = false; }
+  };
+  $('#e-del').onclick = async () => {
+    if(!confirm(`¿Quitar @${h} del radar? Se borran sus piezas, historias y comentarios guardados.`)) return;
+    const b = $('#e-del'); b.disabled = true; b.textContent = 'Quitando…';
+    try{
+      const j = await guardar({ quitar: true });
+      DET.clear(); await trasSemillas(j);
+      syncFiltros(); renderKpis(); renderTendencias(); renderTabla(); renderGrid(); loadCuentas(); loadGuion(); loadHistorias();
+      cerrar(); flash(`@${h} quitada · ${j.piezas} piezas y ${j.historias} historias borradas`);
+    }catch(err){ flash(err.message, true); b.disabled = false; b.textContent = 'Reintentar'; }
+  };
+}
 
 // ═══ ESTADO Y SINCRONIZACIÓN ═══
 const PASOS = [

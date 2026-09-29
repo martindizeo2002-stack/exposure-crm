@@ -17,14 +17,8 @@ for (const linea of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
 
 const SEMILLAS: Array<{ handle: string; tags: string[]; historias: boolean; nota: string }> = [
   { handle: "alexmcarrera", tags: ["propia"], historias: true, nota: "cuenta propia: baseline, no se recrea" },
-  { handle: "frannguess", tags: ["competencia"], historias: true, nota: "informe de competencia del 11/09" },
-  { handle: "santiago.molinaaaaa", tags: ["competencia"], historias: true, nota: "informe de competencia del 18/09: vende por historias" },
-  { handle: "marcosrpascual", tags: ["competencia"], historias: true, nota: "informe de competencia del 24/09" },
-  { handle: "ramiro.cubria", tags: ["referente"], historias: true, nota: "Rama · método de historias SYK" },
-  { handle: "kallawaymarketing", tags: ["referente"], historias: false, nota: "referencia del estilo motion de carruseles" },
-  { handle: "aiagently", tags: ["referente"], historias: false, nota: "referencia del estilo portada de carruseles" },
-  { handle: "relentlessrisee_", tags: ["referente"], historias: false, nota: "referencia de clips de podcast" },
-  { handle: "brezadvice", tags: ["referente"], historias: false, nota: "referencia del estilo lifestyle" },
+  ...["ramiro.cubria", "ramiro.contenido", "nahue.urso", "itsmaurito", "elsensei", "victorherasemprendedor", "herasmedia", "agustinbadt", "bryan.jabalera", "aiagently", "relentlessrisee_", "brezadvice"]
+    .map((handle) => ({ handle, tags: ["referente"], historias: true, nota: "" })),
 ]
 
 async function main() {
