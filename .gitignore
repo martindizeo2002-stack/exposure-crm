@@ -27,3 +27,7 @@ supabase/.temp/
 
 .vercel
 .env*
+
+# Radar: la página de referencia es de un tercero y no entra al repo
+scripts/radar-referencia.html
+scripts/out/

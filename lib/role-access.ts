@@ -37,6 +37,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
   ["/whatsapp", OPERATIONS],               // grupos de WhatsApp del equipo
   ["/testimonios", [...OPERATIONS, "CSM", "Editor"]],
   ["/youtube", [...OPERATIONS, "Editor"]],   // videos largos del canal + los clips de cada uno
+  ["/radar", [...OPERATIONS, "Editor"]],     // radar de contenido: cuentas seguidas, piezas, historias (página y su index.html)
   ["/contenido", [...OPERATIONS, "Editor"]],
   ["/contenido-angulos", [...OPERATIONS, "Editor"]],
   ["/calidad-datos", [...OPERATIONS, "CSM"]],
@@ -70,6 +71,7 @@ const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/formatos", OPERATIONS],                 // rendimiento por pieza: tiene cash y cierres, no es para el editor
   ["/api/angulos", [...OPERATIONS, "Editor"]],    // banco de ángulos editable
   ["/api/youtube", [...OPERATIONS, "Editor"]],   // videos de YouTube y sus clips
+  ["/api/radar", [...OPERATIONS, "Editor"]],     // lectura del radar; las acciones validan dirección/marketing adentro
   ["/api/imagen", [...OPERATIONS, "Editor"]],   // subir miniaturas y portadas desde la compu
   ["/api/banco-formatos", [...OPERATIONS, "Editor"]],  // catálogo de formatos (escritura solo CEO, se valida en la ruta)
   ["/api/angulos-manychat", OPERATIONS],

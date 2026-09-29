@@ -41,6 +41,23 @@ Es la pestaña "🔂 SEGUIMIENTOS" del sheet, pero adentro del CRM y por closer 
 - Arriba se ven los vencidos (el próximo contacto ya pasó), los de hoy y cuántos leads hay en cada etapa de FUP.
 - Cuando el lead cierra, se carga el pago como siempre y el seguimiento se pasa a Cerrado; si se enfría, a Descartado. Borrar solo puede dirección.
 
+## Radar de contenido (29/09)
+
+Marketing → Radar. Sigue cuentas de Instagram (las nuestras, la competencia y los referentes) y muestra qué publican, cómo les rinde y cómo se haría esa pieza en EXPOSURE.
+
+- **Semana** y **Grilla**: las piezas del período (esta semana, 7 o 30 días) con comentarios, views, tasa, outlier y score. *Outlier* = views de la pieza sobre la mediana de su cuenta; 3x o más es un banger. *Score* = ranking de 0 a 100 (50 % comentarios, 30 % outlier, 20 % tasa). Tocando una pieza se abre el panel con el caption, lo que se dice, las slides leídas y el análisis.
+- **Análisis** (lo hace Claude): formato, etapa de consciencia, hook textual y su patrón, estructura, CTA, keyword, recurso prometido, por qué pegó, ángulo del banco que le corresponde y si es recreable.
+- **Generar recreación**: escribe la versión de EXPOSURE (reel, carrusel, historias y hooks alternativos) con las reglas de la casa. Marca en "revisar antes de publicar" lo que roza una regla. **Reel → Contenido** y **Carrusel → Contenido** la mandan al pipeline como pieza con guion listo.
+- **Cuentas**: una cuenta a fondo (keywords que farmean, patrones de hook, formatos, hora y día de publicación) y el dossier "qué hace y qué le robamos", que se genera a pedido.
+- **Guion**: anatomía del guion de los reels con voz (hook, apertura, estructura, evidencia, emoción, CTA) cruzada con el rendimiento. Pide 15 reels etiquetados por cuenta.
+- **Historias**: las historias capturadas antes de que venzan, con el texto en pantalla, lo hablado, los stickers y el tipo (hand raiser, CTA, why now, encuesta, prueba social). **Las métricas de historias ajenas no son públicas**: alcance, respuestas y salidas solo existen para la cuenta propia.
+- **Semillas**: las cuentas seguidas. Se agregan pegando el @usuario o el link (varias a la vez), se pausan y se les prende o apaga la captura de historias. Abajo está qué está conectado y las últimas corridas con su costo.
+- **Comentarios**: dolores, objeciones, preguntas y jerga de la audiencia, sacados de los comentarios de las piezas más comentadas.
+- **Sincronizar** (arriba): adelanta cualquier lectura sin esperar al horario.
+- Ven el Radar dirección, marketing y editores. Agregar cuentas, sincronizar, analizar y recrear: solo dirección y marketing.
+
+De dónde sale cada cosa: las piezas, perfiles, historias y comentarios los lee **Apify**; las historias propias con sus métricas, la **Graph API de Instagram**; la transcripción, **Whisper (Groq)**; el análisis, **Claude**. Variables: `APIFY_TOKEN`, `GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `IG_INSIGHTS_TOKEN`, `RADAR_PLAN` (`gratis` o `completo`), `RADAR_MODELO`.
+
 ## Embudos (25/09)
 
 Ventas → Embudos: la misma tabla de métricas para Webinar, Orgánico y Outbound, mes por mes. Ads no es un embudo aparte: es el orgánico potenciado con Meta Ads, y se ve en "Orgánico por origen". Criterio:

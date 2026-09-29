@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch"
 import { LogoExposure } from "@/components/logo-exposure"
 import {
   BarChart3, Bell, BellRing, Calendar, ChartSpline, ChevronDown, CircleDollarSign, Clapperboard, FileText, Gauge, GraduationCap, LayoutGrid, ListChecks, Network, PhoneCall, Users, Wrench,
-  Eye, LogOut, Menu, Monitor, Moon, Palette, Radar, RotateCcw, Search, Settings2, Sparkles, Sun, Trophy, Type, UserRound,
+  Eye, LogOut, Menu, Monitor, Moon, Palette, Radar, RotateCcw, Telescope, Search, Settings2, Sparkles, Sun, Trophy, Type, UserRound,
   UsersRound, Volume2, WalletCards, ShieldCheck, MessageSquareQuote,
   Wallet, Target, Kanban, CalendarRange, Compass, Coins, Mic, Layers, NotebookPen, MessageCircle, Youtube,
   Filter,
@@ -85,6 +85,7 @@ export const modules: NavItem[] = [
   { label: "Formatos", href: "/contenido/formatos", icon: Clapperboard, match: ["/contenido/formatos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Ángulos", href: "/contenido/angulos", icon: Radar, match: ["/contenido/angulos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT"] },
   { label: "YouTube", href: "/youtube", icon: Youtube, match: ["/youtube"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
+  { label: "Radar", href: "/radar", icon: Telescope, match: ["/radar"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Testimonios", href: "/testimonios", icon: MessageSquareQuote, match: ["/testimonios"], ramp: ramps.testimonios, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "CSM", "Editor"] },
   { label: "Métricas", href: "/rendimiento", icon: BarChart3, match: ["/rendimiento", "/metricas", "/evolucion-diaria"], ramp: ramps.metricas, group: "Operaciones", roles: ["CEO", "Sales Manager", "Manager MKT", "Contaduria"] },
   { label: "Calidad", href: "/calidad-datos", icon: ShieldCheck, match: ["/calidad-datos"], ramp: ramps.metricas, group: "Operaciones", roles: ["CEO", "Sales Manager", "Manager MKT", "CSM"] },
