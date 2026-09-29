@@ -1,17 +1,12 @@
 /** @type {import('next').NextConfig} */
 // upgrade-insecure-requests solo cuando la app corre en https: en localhost
 // (http) el navegador intentaba subir a https y fallaba un recurso por página.
-// sharp (reduce las imágenes del Radar) es un módulo nativo: con pnpm sus binarios de Linux quedan en
-// node_modules/.pnpm y el empaquetado de las funciones no los encuentra solo. Se los incluye a mano en las
-// dos rutas que bajan imágenes.
-const SHARP_LINUX = ["./node_modules/.pnpm/@img+sharp-linux*/**/*", "./node_modules/.pnpm/@img+sharp-libvips-linux*/**/*", "./node_modules/.pnpm/sharp@*/**/*"]
-
+// Nota sobre sharp (reduce las imágenes del Radar): es un módulo nativo y con pnpm sus binarios de Linux
+// quedan detrás de enlaces simbólicos que el empaquetado de Vercel no acepta (probado el 29/09: incluirlos
+// con outputFileTracingIncludes rompe el deploy). En producción el Radar guarda las imágenes sin reducir;
+// lib/radar/medios.ts carga sharp solo si está disponible.
 const nextConfig = {
   poweredByHeader: false,
-  outputFileTracingIncludes: {
-    "/api/radar-sync": SHARP_LINUX,
-    "/api/radar/accion": SHARP_LINUX,
-  },
   images: {
     unoptimized: true,
   },
