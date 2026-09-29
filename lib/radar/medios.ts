@@ -3,32 +3,45 @@
 // con presupuesto de tiempo: lo que no entra en una pasada queda para la siguiente.
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import sharp from "sharp"
 
 type DB = SupabaseClient
 const BUCKET = "radar"
 const ANCHO = 540
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
-async function bajar(url: string, ancho = ANCHO) {
-  const r = await fetch(url, { headers: { "User-Agent": UA, Accept: "image/avif,image/webp,image/*,*/*;q=0.8" }, signal: AbortSignal.timeout(15000) })
+// sharp se carga recién cuando hace falta y una sola vez. Si el servidor no lo tiene disponible, las
+// imágenes se guardan como llegan (pesan más, pero el Radar sigue andando en vez de caerse entero).
+type Reductor = (typeof import("sharp"))["default"]
+let reductor: Promise<Reductor | null> | null = null
+const cargarReductor = () => (reductor ||= import("sharp").then((m) => m.default).catch((e) => { console.error("radar: sharp no disponible, las imágenes se guardan sin reducir ·", (e as Error).message.slice(0, 200)); return null }))
+export const hayReductor = async () => Boolean(await cargarReductor())
+
+type Imagen = { datos: Buffer; tipo: string }
+
+async function bajar(url: string, ancho = ANCHO): Promise<Imagen> {
+  const r = await fetch(url, { headers: { "User-Agent": UA, Accept: "image/jpeg,image/png,image/*;q=0.8" }, signal: AbortSignal.timeout(15000) })
   if (!r.ok) throw new Error(`http ${r.status}`)
   const crudo = Buffer.from(await r.arrayBuffer())
   if (crudo.length < 500) throw new Error("imagen vacía")
-  return sharp(crudo).rotate().resize({ width: ancho, withoutEnlargement: true }).jpeg({ quality: 72, mozjpeg: true }).toBuffer()
+  const sharp = await cargarReductor()
+  if (sharp) return { datos: await sharp(crudo).rotate().resize({ width: ancho, withoutEnlargement: true }).jpeg({ quality: 72, mozjpeg: true }).toBuffer(), tipo: "image/jpeg" }
+  const tipo = (r.headers.get("content-type") || "image/jpeg").split(";")[0].trim()
+  if (!["image/jpeg", "image/png", "image/webp"].includes(tipo)) throw new Error(`unsupported image ${tipo}`)
+  if (crudo.length > 2 * 1024 * 1024) throw new Error("imagen de más de 2 MB y sin reductor")
+  return { datos: crudo, tipo }
 }
 
-async function subir(db: DB, path: string, datos: Buffer) {
-  const { error } = await db.storage.from(BUCKET).upload(path, datos, { contentType: "image/jpeg", cacheControl: "31536000", upsert: true })
+async function subir(db: DB, path: string, imagen: Imagen) {
+  const { error } = await db.storage.from(BUCKET).upload(path, imagen.datos, { contentType: imagen.tipo, cacheControl: "31536000", upsert: true })
   if (error) throw new Error(error.message)
   return path
 }
 
 // Una url vencida o bloqueada no se reintenta: se borra para que la próxima corrida traiga una nueva.
-const definitivo = (e: unknown) => /http (403|404|410)|imagen vacía|unsupported image|Input buffer/i.test((e as Error).message || "")
+const definitivo = (e: unknown) => /http (403|404|410)|imagen vacía|unsupported image|Input buffer|sin reductor/i.test((e as Error).message || "")
 
 export async function descargarMedios(db: DB, hasta: number) {
-  const out = { miniaturas: 0, slides: 0, frames: 0, perfiles: 0, fallidas: 0 }
+  const out = { miniaturas: 0, slides: 0, frames: 0, perfiles: 0, fallidas: 0, reducidas: await hayReductor() }
   const queda = () => Date.now() < hasta
 
   const { data: piezas } = await db.from("radar_piezas").select("id,thumb_remota").is("thumb_path", null).not("thumb_remota", "is", null).order("fecha", { ascending: false }).limit(80)
