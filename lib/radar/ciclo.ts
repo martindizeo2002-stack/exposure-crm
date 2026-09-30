@@ -24,13 +24,17 @@ const SIN_APIFY = { ok: false, motivo: "falta APIFY_TOKEN: conectá Apify para q
 const LECTURAS: Paso[] = ["piezas", "perfiles", "historias", "comentarios"]
 
 // Lo que el cron saltea según el plan. Lo que se pide a mano desde la página corre siempre.
-function salteaElCron(paso: Paso, turno: string | undefined) {
-  if (planRadar() === "completo") return null
+function salteaElCron(paso: Paso) {
+  const plan = planRadar()
+  if (plan === "completo") return null
   const dia = local(new Date()).dow
+  if (plan === "estandar") {
+    if (paso === "piezas" && !["Mon", "Wed", "Fri"].includes(dia)) return "plan estándar: las piezas se leen lunes, miércoles y viernes"
+    return null
+  }
   if (paso === "piezas" && !["Mon", "Thu"].includes(dia)) return "plan gratis: las piezas se leen lunes y jueves"
-  // El plan gratuito de Apify no deja usar los actores de historias (devuelven una muestra y cobran igual):
-  // las historias las captura la tarea de Windows "EXPOSURE - Radar capturas" (scripts/radar-capturas.py).
-  if (paso === "historias") return "plan gratis: las historias las captura la tarea de la compu a las 18 y a las 22"
+  // El plan gratuito de Apify no deja usar los actores de historias (devuelven una muestra y cobran igual).
+  if (paso === "historias") return "plan gratis: Apify no permite leer historias"
   if (paso === "comentarios") return "plan gratis: los comentarios se bajan a mano desde Sincronizar"
   return null
 }
@@ -39,7 +43,7 @@ export async function correrPaso(db: SupabaseClient, paso: Paso, o: { pedidaPor?
   const hasta = Date.now() + (o.segundos || 240) * 1000
   const pedidaPor = o.pedidaPor || "cron"
   if (LECTURAS.includes(paso) && apifyListo()) {
-    const salteo = pedidaPor === "cron" ? salteaElCron(paso, o.turno) : null
+    const salteo = pedidaPor === "cron" ? salteaElCron(paso) : null
     if (salteo) return { ok: false, motivo: salteo }
     const p = await presupuesto()
     if (p?.agotado) return { ok: false, motivo: `Apify llegó al tope del mes (US$ ${p.usado} de ${p.tope}). Se renueva el ${p.renueva?.slice(0, 10) || "próximo ciclo"}.`, presupuesto: p }
@@ -48,7 +52,7 @@ export async function correrPaso(db: SupabaseClient, paso: Paso, o: { pedidaPor?
     case "piezas": return apifyListo() ? lanzarPiezas(db, { pedidaPor, cuentas: o.cuentas, dias: o.dias }) : SIN_APIFY
     case "perfiles": return apifyListo() ? lanzarPerfiles(db, { pedidaPor }) : SIN_APIFY
     // Sin token de Instagram, las historias propias también se piden por Apify (sin métricas, pero quedan guardadas).
-    case "historias": return apifyListo() ? lanzarHistorias(db, { pedidaPor, incluirPropias: !graphListo() }) : SIN_APIFY
+    case "historias": return apifyListo() ? lanzarHistorias(db, { pedidaPor: pedidaPor === "cron" ? (o.turno === "2" ? "cron 22 h (rechequeo)" : "cron 18 h") : pedidaPor, incluirPropias: !graphListo() }) : SIN_APIFY
     case "comentarios": return apifyListo() ? lanzarComentarios(db, { pedidaPor }) : SIN_APIFY
     case "propias": return sincronizarPropias(db)
     case "minar": return minarSemana(db)

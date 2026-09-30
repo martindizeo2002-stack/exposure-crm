@@ -36,7 +36,14 @@ export async function transcribirUrl(videoUrl: string) {
 
 const vencida = (e: unknown) => /video http (403|404|410)/.test((e as Error).message || "")
 // Un texto muy corto suele ser música o ruido que Whisper "completa": se guarda vacío para no analizar basura.
-const limpio = (t: string) => (t.replace(/\s+/g, " ").trim().length < 12 ? "" : t.replace(/\s+/g, " ").trim())
+// También se descarta lo que no está en alfabeto latino: suele ser la letra de una canción mal reconocida.
+const limpio = (t: string) => {
+  const x = t.replace(/\s+/g, " ").trim()
+  if (x.length < 12) return ""
+  const letras = x.replace(/[^\p{L}]/gu, "")
+  const latinas = letras.replace(/[^\p{Script=Latin}]/gu, "")
+  return letras.length && latinas.length / letras.length < 0.8 ? "" : x
+}
 
 export async function transcribirPendientes(db: DB, hasta: number, tope = Number(process.env.RADAR_TRANSCRIPCIONES_POR_PASADA || 4)) {
   const out = { reels: 0, historias: 0, fallidas: 0, motor: motorTranscripcion()?.nombre || null }
@@ -65,6 +72,8 @@ export async function transcribirPendientes(db: DB, hasta: number, tope = Number
     .order("fecha", { ascending: false }).limit(tope)
   for (const h of historias || []) {
     if (Date.now() > hasta) return out
+    // Historia con canción de fondo: lo que se escucha es la música, no alguien hablando.
+    if ((h.stickers as { musica?: boolean } | null)?.musica) { await db.from("radar_historias").update({ tx: "", tx_error: "música de fondo" }).eq("id", h.id); continue }
     try {
       const texto = limpio(await transcribirUrl(String(h.video_url)))
       await db.from("radar_historias").update({ tx: texto, tx_error: texto ? null : "sin voz" }).eq("id", h.id)

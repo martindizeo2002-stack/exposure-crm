@@ -98,11 +98,11 @@ export async function lanzarHistorias(db: DB, o: { pedidaPor?: string; incluirPr
 export async function lanzarComentarios(db: DB, o: { pedidaPor?: string; piezas?: number; porPieza?: number; dias?: number } = {}) {
   if (await enCurso(db, "comentarios")) return { ok: false, motivo: "ya hay una corrida de comentarios en curso" }
   const desde = new Date(Date.now() - (o.dias || 7) * 864e5).toISOString()
-  const { data, error } = await db.from("radar_piezas").select("id,url,comentarios").gte("fecha", desde).gt("comentarios", 5).order("comentarios", { ascending: false }).limit(o.piezas || Number(process.env.RADAR_PIEZAS_COMENTARIOS || 25))
+  const { data, error } = await db.from("radar_piezas").select("id,url,comentarios").gte("fecha", desde).gt("comentarios", 5).order("comentarios", { ascending: false }).limit(o.piezas || Number(process.env.RADAR_PIEZAS_COMENTARIOS || 15))
   if (error) throw new Error(error.message)
   if (!data?.length) return { ok: false, motivo: "no hay piezas con comentarios en el período" }
   const actor = ACTORES.comentarios()
-  const run = await lanzarActor(actor, { directUrls: data.map((p) => p.url), resultsLimit: o.porPieza || Number(process.env.RADAR_COMENTARIOS_POR_PIEZA || 40) }, { segundos: 1500 })
+  const run = await lanzarActor(actor, { directUrls: data.map((p) => p.url), resultsLimit: o.porPieza || Number(process.env.RADAR_COMENTARIOS_POR_PIEZA || 30) }, { segundos: 1500 })
   const corrida = await registrar(db, { tipo: "comentarios", actor, apify_run_id: run.id, apify_dataset_id: run.defaultDatasetId, cuentas: [], pedida_por: o.pedidaPor || "cron", detalle: { piezas: data.map((p) => p.id) } })
   return { ok: true, corrida: corrida.id, piezas: data.length }
 }
@@ -205,7 +205,7 @@ export function historiaDesdeApify(i: Item) {
   if (menciones.length) stickers.menciones = [...new Set(menciones)]
   if (encuestas.length) stickers.encuestas = encuestas
   if (preguntas.length) stickers.preguntas = preguntas
-  if (i.story_music_stickers || i.music_metadata || i.has_audio === false && esVideo || i.music) stickers.musica = true
+  if ((Array.isArray(i.story_music_stickers) && i.story_music_stickers.length) || i.music_metadata || i.is_story_image_with_music === true || i.is_music_collection_story === true || i.music) stickers.musica = true
   const caption = i.caption && typeof i.caption === "object" ? txt((i.caption as Item).text) : txt(primero(i.caption, i.text, i.accessibility_caption))
   return {
     id: String(id),
@@ -305,7 +305,10 @@ async function procesar(db: DB, corrida: Corrida, items: Item[]) {
     const ya = await existentes(db, "radar_historias", filas.map((f) => f.id))
     const nuevas = filas.filter((f) => !ya.has(f.id))
     await guardar(db, "radar_historias", nuevas, "id")   // una historia no cambia: las que ya estaban se dejan como están
-    return { items: filas.length, nuevos: nuevas.length, sin_leer: items.length - filas.length, muestra: items.length && !filas.length ? Object.keys(items[0]).slice(0, 40) : undefined }
+    // Qué cuentas publicaron algo desde la corrida anterior (lo que responde el rechequeo de las 22).
+    const por_cuenta: Record<string, { activas: number; nuevas: number }> = {}
+    for (const f of filas) { const c = (por_cuenta[f.cuenta] ||= { activas: 0, nuevas: 0 }); c.activas += 1; if (!ya.has(f.id)) c.nuevas += 1 }
+    return { items: filas.length, nuevos: nuevas.length, por_cuenta, sin_leer: items.length - filas.length, muestra: items.length && !filas.length ? Object.keys(items[0]).slice(0, 40) : undefined }
   }
   if (corrida.tipo === "comentarios") {
     const ids = ((corrida.detalle?.piezas as string[]) || [])

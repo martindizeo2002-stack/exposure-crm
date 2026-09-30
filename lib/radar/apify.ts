@@ -86,8 +86,14 @@ export async function presupuesto() {
   }
 }
 
-// "gratis" (default) cuida el tope de US$ 5 del plan gratuito de Apify: piezas dos veces por semana,
-// historias una vez por día y comentarios solo a mano. "completo" lee todo con la frecuencia plena.
-export const planRadar = () => (String(process.env.RADAR_PLAN || "gratis").toLowerCase() === "completo" ? "completo" : "gratis")
+// Cuánto lee el cron (lo que se pide a mano desde la página corre siempre):
+//   "estandar" (default, pensado para el plan Starter de US$ 19/mes): historias a las 18 y a las 22,
+//              piezas lunes, miércoles y viernes, comentarios una vez por semana. Unos US$ 16 por mes.
+//   "completo" todo a diario.   "gratis" piezas lunes y jueves, sin historias (el plan gratuito no las permite).
+export type PlanRadar = "gratis" | "estandar" | "completo"
+export const planRadar = (): PlanRadar => {
+  const p = String(process.env.RADAR_PLAN || "estandar").toLowerCase()
+  return p === "completo" || p === "gratis" ? p : "estandar"
+}
 
 export const TERMINADA_MAL = new Set(["FAILED", "TIMED-OUT", "ABORTED"])
