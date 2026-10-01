@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
+import { inversionAds } from "@/lib/ads-embudos"
 
 export const dynamic = "force-dynamic"
 
@@ -203,8 +204,10 @@ export async function GET(request: Request) {
 
     const ventasInternas = [...clientes.values()].flatMap((c) => c.pagos.filter((x) => BE.has(x.tipo || "")).map((x) => ({ cliente: c.nombre, fecha: x.fecha.slice(0, 10), tipo: x.tipo, monto: r0(Number(x.monto || 0)) })))
     const sinFuente = [...clientes.values()].filter((c) => c.embudo === "Sin fuente" && c.pagos.some((x) => !BE.has(x.tipo || ""))).map((c) => ({ cliente: c.nombre, via: c.via, pagos: c.pagos.filter((x) => !BE.has(x.tipo || "")).map((x) => `${x.tipo} ${r0(Number(x.monto || 0))}`).join(" · "), cash: r0(c.pagos.filter((x) => !BE.has(x.tipo || "")).reduce((s, x) => s + Number(x.monto || 0), 0)) }))
+    // inversión en Meta Ads del mes, separada por embudo (lib/ads-embudos.ts); si Meta falla, la página sigue sin ads
+    const ads = await inversionAds(sb, [mes]).then((x) => x[mes]).catch((e) => ({ mes, total: 0, por_embudo: {}, campanas: [], actualizado: null, fuente: "meta", error: (e as Error).message }))
     return NextResponse.json({
-      mes, corte: hoy,
+      mes, corte: hoy, ads,
       embudos: Object.fromEntries([...EMBUDOS, "Total"].map((e) => [e, resumen(B[e])])),
       origenes: [...origenes.values()].sort((a, b) => b.agendas - a.agendas),
       outbound: { leads: outbound, por_setter: [...porSetter.values()] },

@@ -85,6 +85,8 @@ export type EntradaPanel = {
   cuotas: CuotaPanel[]
   clientes: ClientePanel[]
   metricas: MetricaPanel[]
+  // inversión en Meta Ads por mes ('AAAA-MM' → USD), de lib/ads-embudos.ts
+  ads?: Record<string, number>
   // reportes diarios del setter (crm_integration_assets source=setting), tal como los cargó scripts/setting
   setting?: SettingDiaPanel[]
   hoy?: Date
@@ -229,6 +231,7 @@ export function armarDatosPanel(e: EntradaPanel): DatosPanel {
 
   // ── meses ──
   const filas = meses.map((mes) => ({ mes, facturado: 0, cobrado: 0, leads: 0, agendas: 0, presentadas: 0, calificadas: 0, cierres: 0, ads: 0, alumnos: 0, vencidas: 0, pendientes: 0, noShow: 0, sinDato: 0 }))
+  for (const f of filas) f.ads = Math.round(e.ads?.[f.mes] || 0)
   const fechaLlamada = (a: AgendaPanel) => fecha(a.fecha_closer) || fecha(a.fecha_agenda)
   const pagosPorMes = new Map<string, PagoPanel[]>()
   for (const p of e.pagos) {

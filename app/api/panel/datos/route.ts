@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { armarDatosPanel } from "@/lib/panel-negocio"
+import { inversionAds } from "@/lib/ads-embudos"
 
 export const dynamic = "force-dynamic"
 
@@ -82,9 +83,13 @@ export async function GET() {
 
     if (!agendas.length && !pagos.length) return js(await demo(), { "X-Panel-Datos": "demo" })
 
+    // inversión en Meta Ads de los 12 meses (guardada en el CRM; solo se le pregunta a Meta lo que falta o está abierto)
+    const mesesAds = Array.from({ length: 12 }, (_, i) => { const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` })
+    const ads = await inversionAds(sb, mesesAds).then((x) => Object.fromEntries(Object.values(x).map((m) => [m.mes, m.total]))).catch(() => ({} as Record<string, number>))
+
     const datos = armarDatosPanel({
       agendas: agendas as never, pagos: pagos as never, cuotas: cuotas as never,
-      clientes: clientes as never, metricas: metricas as never, hoy,
+      clientes: clientes as never, metricas: metricas as never, hoy, ads,
       setting: settingDias.map((r) => r.metadata as never),
       metaMensual: Number(process.env.PANEL_META_MENSUAL || 50000) || 50000,
       precioBase: Number(process.env.PANEL_PRECIO_BASE || 1500) || 1500, // IA Partner PIF desde sept. 2026

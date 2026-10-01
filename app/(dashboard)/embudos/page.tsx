@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import useSWR from "swr"
-import { Filter, Info, Loader2, RefreshCw } from "lucide-react"
+import { Filter, Info, Loader2, Megaphone, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CrmPageIntro } from "@/components/crm-ui"
 import { cn } from "@/lib/utils"
@@ -15,11 +15,16 @@ const fetcher = (url: string) => fetch(url, { cache: "no-store" }).then(async (r
 const EMBUDOS = ["Webinar", "Orgánico", "Outbound", "Sin fuente", "Total"] as const
 type Detalle = { cierres: Array<{ cliente: string; dia: string; cobrado: number; pagos_del_dia: string; fuente: string | null; via: string }>; fees: Array<{ cliente: string; dia: string; monto: number; pagos_del_dia: string; fuente: string | null }>; fees_sin_pago: Array<{ nombre: string; closer: string | null; fecha: string | null }> }
 type Bloque = { agendas: number; presentadas: number; no_show: number; sin_resultado: number; futuras: number; show_up: number | null; calificadas: number; calif_presentadas: number; show_up_calif: number | null; cierres: number; tc_calif_presentadas: number | null; tc_presentadas: number | null; fees: number; fees_usd: number; fees_sin_pago: number; aov_trato_cerrado: number | null; aov_dia_1: number | null; cash_total: number; cash_leads_mes: number; cuotas: number; back_end: number; detalle: Detalle }
-type Respuesta = { mes: string; corte: string; embudos: Record<string, Bloque>; origenes: Array<{ origen: string; embudo: string; agendas: number; presentadas: number; calificadas: number; cierres: number; fees: number; cash_leads_mes: number }>; outbound: { leads: Array<{ id: string; nombre: string; fecha: string | null; origen: string | null; setter: string | null; closer: string | null; calificacion: string | null; show: boolean | null; estado: string | null; motivo: string | null; recurso: string | null; pagos: string; cash: number }>; por_setter: Array<{ setter: string; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number }> }; pagos_sin_fuente: Array<{ cliente: string; via: string; pagos: string; cash: number }>; ventas_internas: { pagos: Array<{ cliente: string; fecha: string; tipo: string | null; monto: number }>; total: number }; pagos_del_mes: number; cash_del_mes: number; cash_front_end: number }
+type Campana = { campaign_id: string; campaign_name: string | null; objetivo: string | null; embudo: string; embudo_manual: boolean; spend: number; impresiones: number | null; clics: number | null }
+type Ads = { total: number; por_embudo: Record<string, number>; campanas: Campana[]; actualizado: string | null; error?: string }
+type Respuesta = { mes: string; corte: string; ads?: Ads; embudos: Record<string, Bloque>; origenes: Array<{ origen: string; embudo: string; agendas: number; presentadas: number; calificadas: number; cierres: number; fees: number; cash_leads_mes: number }>; outbound: { leads: Array<{ id: string; nombre: string; fecha: string | null; origen: string | null; setter: string | null; closer: string | null; calificacion: string | null; show: boolean | null; estado: string | null; motivo: string | null; recurso: string | null; pagos: string; cash: number }>; por_setter: Array<{ setter: string; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number }> }; pagos_sin_fuente: Array<{ cliente: string; via: string; pagos: string; cash: number }>; ventas_internas: { pagos: Array<{ cliente: string; fecha: string; tipo: string | null; monto: number }>; total: number }; pagos_del_mes: number; cash_del_mes: number; cash_front_end: number }
 
 const usd = (n: number | null | undefined) => (n === null || n === undefined ? "—" : n.toLocaleString("es-AR", { maximumFractionDigits: 0 }))
 const pc = (n: number | null | undefined) => (n === null || n === undefined ? "—" : `${n.toLocaleString("es-AR", { maximumFractionDigits: 1 })} %`)
 const fecha = (v: string | null | undefined) => (v ? new Date(v.includes("T") ? v : v.replace(" ", "T") + "Z").toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit" }) : "—")
+const usd2 = (n: number) => n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const OBJETIVOS: Record<string, string> = { OUTCOME_SALES: "Ventas", OUTCOME_LEADS: "Clientes potenciales", OUTCOME_AWARENESS: "Reconocimiento", OUTCOME_TRAFFIC: "Tráfico", LINK_CLICKS: "Tráfico", OUTCOME_ENGAGEMENT: "Interacción", VIDEO_VIEWS: "Reproducciones" }
+const EMBUDOS_ADS = ["Webinar", "Orgánico", "Outbound"]
 const meses = () => { const out: Array<{ v: string; l: string }> = []; const d = new Date(); for (let i = 0; i < 8; i++) { const v = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; out.push({ v, l: d.toLocaleDateString("es-AR", { month: "long", year: "numeric" }) }); d.setMonth(d.getMonth() - 1) } return out }
 
 type Fila = { label: string; get: (b: Bloque) => string; bold?: boolean; sub?: boolean; detalle?: keyof Detalle; nota?: string }
@@ -45,16 +50,44 @@ const FILAS: Fila[] = [
   { label: "Cuotas de clientes anteriores", get: (b) => usd(b.cuotas), sub: true },
 ]
 
+// filas de Meta Ads: se calculan con la inversión del embudo y los números del mismo bloque
+type FilaAds = { label: string; get: (b: Bloque, inv: number | null) => string; bold?: boolean; nota?: string }
+const costo = (inv: number | null, n: number) => (inv && n > 0 ? usd(inv / n) : "—")
+const FILAS_ADS: FilaAds[] = [
+  { label: "Inversión en Meta Ads", get: (_b, inv) => (inv ? usd(inv) : "—"), bold: true, nota: "lo gastado en Meta en el mes, campaña por campaña, imputado al embudo de cada campaña (abajo se puede cambiar)" },
+  { label: "Costo por agenda", get: (b, inv) => costo(inv, b.agendas) },
+  { label: "Costo por presentada", get: (b, inv) => costo(inv, b.presentadas) },
+  { label: "Costo por cierre (CAC)", get: (b, inv) => costo(inv, b.cierres), bold: true, nota: "inversión del embudo dividida por los clientes que entraron por ese embudo en el mes" },
+  { label: "Retorno (cash ÷ inversión)", get: (b, inv) => (inv ? `${(b.cash_total / inv).toLocaleString("es-AR", { maximumFractionDigits: 1 })}x` : "—"), bold: true, nota: "cash collected front end del embudo dividido por lo invertido en Meta para ese embudo" },
+]
+
 export default function EmbudosPage() {
   const [mes, setMes] = useState(meses()[0].v)
   const [abierto, setAbierto] = useState<string | null>(null)
   const { data, error, isLoading, mutate } = useSWR<Respuesta>(`/api/embudos?mes=${mes}`, fetcher)
   const E = data?.embudos
+  const ads = data?.ads
+  const invDe = (e: string) => (!ads ? null : e === "Total" ? ads.total : e === "Sin fuente" ? null : ads.por_embudo[e] || null)
+  const [trayendo, setTrayendo] = useState(false)
+  const [errAds, setErrAds] = useState<string | null>(null)
+  const traerMeta = async () => {
+    setTrayendo(true); setErrAds(null)
+    const r = await fetch("/api/embudos/ads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mes }) })
+    const b = await r.json().catch(() => ({}))
+    if (!r.ok) setErrAds(b.error || "No se pudo leer Meta")
+    await mutate(); setTrayendo(false)
+  }
+  const cambiarEmbudo = async (c: Campana, embudo: string) => {
+    setErrAds(null)
+    const r = await fetch("/api/embudos/ads", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ campaign_id: c.campaign_id, embudo }) })
+    if (!r.ok) setErrAds((await r.json().catch(() => ({}))).error || "No se pudo cambiar")
+    await mutate()
+  }
   const detalle = abierto && E ? (() => { const [emb, key] = abierto.split("|") as [string, keyof Detalle]; return { emb, key, items: E[emb]?.detalle?.[key] || [] } })() : null
 
   return <div className="mx-auto max-w-[1500px] space-y-5 p-4 md:p-7">
     <CrmPageIntro eyebrow="Ventas · Métricas por embudo" title="Embudos" tone="violet" icon={<Filter className="h-5 w-5" />}
-      description="Webinar, orgánico (incluye Ads: es el mismo embudo potenciado con Meta Ads) y outbound, con el mismo criterio: cierre = cliente que entró, fees aparte, AOV desde los pagos. Tocá un número de cierres o fees para ver quiénes son."
+      description="Webinar, orgánico (incluye Ads: es el mismo embudo potenciado con Meta Ads) y outbound, con el mismo criterio: cierre = cliente que entró, fees aparte, AOV desde los pagos. Abajo de la tabla, lo invertido en Meta Ads separado por embudo. Tocá un número de cierres o fees para ver quiénes son."
       actions={<Button variant="outline" size="sm" onClick={() => mutate()}><RefreshCw className={cn("mr-1 h-4 w-4", isLoading && "animate-spin")} />Actualizar</Button>} />
 
     <div className="flex flex-wrap gap-1">{meses().map((m) => <Button key={m.v} size="sm" variant={mes === m.v ? "default" : "outline"} onClick={() => { setMes(m.v); setAbierto(null) }} className="capitalize">{m.l}</Button>)}</div>
@@ -80,9 +113,40 @@ export default function EmbudosPage() {
               </td>
             })}
           </tr>)}
+          <tr className="border-t-2"><td colSpan={EMBUDOS.length + 1} className="bg-muted/70 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Meta Ads{ads?.error ? ` · no se pudo leer Meta: ${ads.error}` : ""}</td></tr>
+          {FILAS_ADS.map((f) => <tr key={f.label} className={cn("border-t", f.bold && "bg-muted/30")}>
+            <td className={cn("px-3 py-1.5 font-medium", f.bold && "font-bold")}>{f.label}{f.nota && <span title={f.nota} className="ml-1 inline-flex align-middle text-muted-foreground"><Info className="h-3 w-3" /></span>}</td>
+            {EMBUDOS.map((e) => <td key={e} className={cn("px-3 py-1.5 text-right tabular-nums", f.bold && "font-bold", e === "Total" && "border-l")}>{f.get(E[e], invDe(e))}</td>)}
+          </tr>)}
         </tbody>
       </table>
     </div>}
+
+    {ads && <section className="rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="flex items-center gap-2 font-black"><Megaphone className="h-4 w-4" />Inversión en Meta Ads · USD {usd2(ads.total)}</h2>
+          <p className="text-xs text-muted-foreground">{EMBUDOS_ADS.map((e) => `${e} USD ${usd2(ads.por_embudo[e] || 0)}`).join(" · ")}. Las campañas «exp-…» son del webinar; el resto potencia el orgánico. Si una está mal imputada, cambiale el embudo: queda fijo para esa campaña.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={traerMeta} disabled={trayendo}><RefreshCw className={cn("mr-1 h-4 w-4", trayendo && "animate-spin")} />Traer de Meta</Button>
+      </div>
+      {errAds && <p className="mt-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-sm text-red-500">{errAds}</p>}
+      {!ads.campanas.length && <p className="mt-3 text-sm text-muted-foreground">No hubo gasto en Meta Ads en este mes.</p>}
+      {ads.campanas.length > 0 && <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[760px] text-sm">
+        <thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1 text-left">Campaña</th><th className="text-left">Objetivo</th><th className="text-left">Embudo</th><th className="text-right">Invertido USD</th><th className="text-right">% del mes</th><th className="text-right">Impresiones</th><th className="text-right">Clics</th><th className="text-right">Costo por clic</th></tr></thead>
+        <tbody>{ads.campanas.map((c) => <tr key={c.campaign_id} className="border-t">
+          <td className="py-1.5 font-medium">{c.campaign_name || c.campaign_id}</td>
+          <td className="text-muted-foreground">{OBJETIVOS[c.objetivo || ""] || c.objetivo || "—"}</td>
+          <td><select aria-label={`Embudo de ${c.campaign_name || c.campaign_id}`} value={c.embudo} onChange={(ev) => cambiarEmbudo(c, ev.target.value)} className="rounded-md border bg-background px-2 py-0.5 text-sm">{EMBUDOS_ADS.map((e) => <option key={e} value={e}>{e}</option>)}</select>{c.embudo_manual && <span className="ml-1 text-[10px] text-muted-foreground">a mano</span>}</td>
+          <td className="text-right font-bold tabular-nums">{usd2(c.spend)}</td>
+          <td className="text-right tabular-nums">{ads.total ? `${Math.round((c.spend / ads.total) * 100)} %` : "—"}</td>
+          <td className="text-right tabular-nums">{c.impresiones?.toLocaleString("es-AR") ?? "—"}</td>
+          <td className="text-right tabular-nums">{c.clics?.toLocaleString("es-AR") ?? "—"}</td>
+          <td className="text-right tabular-nums">{c.clics ? usd2(c.spend / c.clics) : "—"}</td>
+        </tr>)}</tbody>
+      </table></div>}
+      {ads.actualizado && <p className="mt-2 text-[11px] text-muted-foreground">Leído de Meta el {new Date(ads.actualizado).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}. El mes en curso se vuelve a leer cada 3 horas; los meses cerrados quedan guardados.</p>}
+    </section>}
 
     {detalle && <section className="rounded-2xl border bg-card p-4 shadow-sm">
       <h2 className="font-black">{detalle.emb} · {detalle.key === "cierres" ? "cierres" : detalle.key === "fees" ? "fees cobrados" : "fees marcados sin pago cargado"} ({detalle.items.length})</h2>
