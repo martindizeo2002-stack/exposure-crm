@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-import { armarEnlazador, cargarAgendasEnlace, embudoDe, esEmbudo } from "@/lib/embudo-atribucion"
+import { armarEnlazador, cargarAgendasEnlace, embudoDe, leerEmbudos } from "@/lib/embudo-atribucion"
 import { BECCPP_TYPES, BECCU_TYPES, FECCPP_TYPES, FECCU_TYPES } from "@/lib/commission-scheme"
 import { ALL_SALE_TYPES, BACK_END_SALE_TYPES, CLOSED_IN_CALL_TYPES } from "@/lib/revenue"
 import { FEE_TIPOS, FRONT_END_FEE_TIPOS } from "@/lib/cash-collected"
@@ -116,11 +116,11 @@ export async function GET(request: Request) {
     const { start, end } = getDateRange(mes, weekIdx)
     const sb = getSupabase()
     // ?embudo=: mismo recorte que /api/metricas (agendas por fuente, pagos por la agenda del cliente)
-    const embudoParam = searchParams.get("embudo")
-    const embudo = esEmbudo(embudoParam) ? embudoParam : null
-    const deEmbudo = (r: { fuente?: string | null }) => !embudo || embudoDe(r.fuente) === embudo
-    const enlace = embudo ? armarEnlazador(await cargarAgendasEnlace(sb)) : null
-    const pagoDeEmbudo = (r: { fecha?: string | null; cliente?: string | null; telefono?: string | null; person_id?: string | null; fuente?: string | null }) => !enlace || enlace.embudoDePago(r) === embudo
+    // Uno o varios embudos separados por coma: se suman (Alex, 01/10/2026).
+    const embudos = leerEmbudos(searchParams.get("embudo"))
+    const deEmbudo = (r: { fuente?: string | null }) => !embudos || embudos.includes(embudoDe(r.fuente))
+    const enlace = embudos ? armarEnlazador(await cargarAgendasEnlace(sb)) : null
+    const pagoDeEmbudo = (r: { fecha?: string | null; cliente?: string | null; telefono?: string | null; person_id?: string | null; fuente?: string | null }) => !enlace || !embudos || embudos.includes(enlace.embudoDePago(r))
 
     if (key === "agendas") {
       const { data, error } = await sb

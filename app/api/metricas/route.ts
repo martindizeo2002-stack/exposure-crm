@@ -5,7 +5,7 @@ import { BECCPP_TYPES, BECCU_TYPES, FECCPP_TYPES, FECCU_TYPES, frontendCohort, w
 import { ALL_SALE_TYPES, BACK_END_SALE_TYPES, CLOSED_IN_CALL_TYPES, FRONT_END_SALE_TYPES } from "@/lib/revenue"
 import { FEE_TIPOS, FRONT_END_FEE_TIPOS } from "@/lib/cash-collected"
 import { nombreCanonico } from "@/lib/equipo"
-import { armarEnlazador, cargarAgendasEnlace, embudoDe, esEmbudo } from "@/lib/embudo-atribucion"
+import { armarEnlazador, cargarAgendasEnlace, embudoDe, EMBUDOS, leerEmbudos, nombreEmbudos, type Embudo } from "@/lib/embudo-atribucion"
 import { gastoAdsPorEmbudo } from "@/lib/ads-embudos"
 
 function getSupabase() {
@@ -117,10 +117,12 @@ export async function GET(request: Request) {
     const endParam = searchParams.get("end")
     const { start, end } = (startParam && endParam) ? { start: startParam, end: endParam } : getDateRange(mes, weekIdx)
     const sb = getSupabase()
-    // ?embudo=Webinar|Orgánico|Outbound|Sin fuente: todo se recorta a ese embudo (misma regla que Ventas → Embudos).
-    // Agendas por su fuente; pagos y planes por la agenda del cliente. Sin el parámetro, todos los embudos juntos.
-    const embudoParam = searchParams.get("embudo")
-    const embudo = esEmbudo(embudoParam) ? embudoParam : null
+    // ?embudo=Webinar|Orgánico|Outbound|Sin fuente, uno o varios separados por coma: todo se recorta a esos embudos
+    // (misma regla que Ventas → Embudos). Agendas por su fuente; pagos y planes por la agenda del cliente. Con varios
+    // (Alex, 01/10/2026: "orgánico y outbound juntos"), se suman y las tasas salen de los totales. Sin el parámetro, todos.
+    const embudos = leerEmbudos(searchParams.get("embudo"))
+    const embudo = nombreEmbudos(embudos)
+    const enEmb = (e: Embudo) => !embudos || embudos.includes(e)
 
     const [
       { data: pagos, error: pErr },
@@ -159,13 +161,16 @@ export async function GET(request: Request) {
     if (asErr) return NextResponse.json({ error: asErr.message }, { status: 500 })
 
     // EXPOSURE opera una sola cuenta (@alexmcarrera): se toman todos los pagos (o los del embudo elegido).
-    const enlace = embudo ? armarEnlazador(await cargarAgendasEnlace(sb)) : null
-    const p = (pagos || []).filter((x) => !enlace || enlace.embudoDePago(x) === embudo)
-    // inversión en Meta del embudo elegido (campaña por campaña, lib/ads-embudos.ts); sin embudo, la de toda la cuenta
-    if (embudo) {
-      const g = await gastoAdsPorEmbudo(sb, start, end).catch(() => null)
-      if (g) Object.assign(metaSpend, { spend: g[embudo] || 0, available: true, source: "meta", estimated: false })
-    }
+    // El enlace pago → embudo se arma siempre: ROAS y CAC se calculan embudo por embudo y nunca se mezclan.
+    const enlace = armarEnlazador(await cargarAgendasEnlace(sb))
+    const p = (pagos || []).filter((x) => enEmb(enlace.embudoDePago(x)))
+    // Inversión en Meta separada por embudo, campaña por campaña (lib/ads-embudos.ts): las campañas de la masterclass
+    // (exp-…, "masterclass", "webinar") → Webinar; FM ADS → Orgánico. Con embudo elegido, la inversión es la de ese
+    // embudo; sin embudo, la de toda la cuenta (solo como total: el ROAS y el CAC van por embudo en `por_embudo`).
+    const gastoEmbudos = await gastoAdsPorEmbudo(sb, start, end).catch(() => null)
+    if (embudos) Object.assign(metaSpend, gastoEmbudos
+      ? { spend: r2(embudos.reduce((s, e) => s + (gastoEmbudos[e] || 0), 0)), available: true, source: "meta", estimated: false }
+      : { spend: 0, available: false, source: "unavailable", estimated: false })
 
     // La ventana del setter se cuenta desde el primer pago frontend histórico
     // de cada cliente, aunque el período visible empiece después.
@@ -189,7 +194,7 @@ export async function GET(request: Request) {
       if (!firstFrontendPayment.has(key) && payment.fecha) firstFrontendPayment.set(key, payment.fecha)
     }
     // Sin dedup: la data viene limpia del Sheets (1 fila = 1 agenda real)
-    const a = (agendasRaw || []).filter((x) => !embudo || embudoDe(x.fuente) === embudo)
+    const a = (agendasRaw || []).filter((x) => enEmb(embudoDe(x.fuente)))
     const setterAgendaSeen = new Set<string>()
     // primero se sacan los repetidos (mismo setter + misma persona) y después se recorta al embudo: así los embudos suman el total
     const aBySetterFecha = (agendasSetterRaw || []).filter((agenda: any) => {
@@ -200,8 +205,8 @@ export async function GET(request: Request) {
       if (setterAgendaSeen.has(key)) return false
       setterAgendaSeen.add(key)
       return true
-    }).filter((agenda: any) => !embudo || embudoDe(agenda.fuente) === embudo)
-    const planes = (planesRaw || []).filter((plan: any) => !enlace || enlace.embudoDePago({ person_id: plan.person_id, telefono: plan.telefono, fecha: plan.fecha_alta || plan.created_at }) === embudo)
+    }).filter((agenda: any) => enEmb(embudoDe(agenda.fuente)))
+    const planes = (planesRaw || []).filter((plan: any) => enEmb(enlace.embudoDePago({ person_id: plan.person_id, telefono: plan.telefono, fecha: plan.fecha_alta || plan.created_at })))
     const revenue = r2(planes.reduce((total, plan: any) =>
       total + (plan.plan_pago_items || []).reduce(
         (subtotal: number, item: any) => subtotal + Number(item.monto || 0),
@@ -272,11 +277,26 @@ export async function GET(request: Request) {
     const calificaron_si_realmente = presentadasArr.filter(x => x.calificaba_realmente === "Si").length
 
     // CASH
-    const feccu = r2(p.filter(x => !isBackendContext(x) && FECCU_TIPOS.has(x.tipo)).reduce((s, x) => s + (x.monto || 0), 0))
+    const feccuDe = (lista: typeof p) => r2(lista.filter(x => !isBackendContext(x) && FECCU_TIPOS.has(x.tipo)).reduce((s, x) => s + (x.monto || 0), 0))
+    const feccu = feccuDe(p)
     // Definición vigente confirmada por Alex (08/08/2026): ROAS usa solo
     // FECCU efectivamente cobrado en el período. No entran cuotas/FECCP,
     // ventas internas/backend ni revenue contractual pendiente.
-    const roas = metaSpend.available && metaSpend.spend > 0 ? r2(feccu / metaSpend.spend) : null
+    // Alex (01/10/2026): el ROAS y el CAC no se mezclan entre embudos. Sin embudo elegido no hay un ROAS "de todo":
+    // cada embudo tiene el suyo en `por_embudo` (su FECCU sobre lo invertido en sus campañas). Con varios embudos
+    // elegidos a propósito, el ROAS es el de esa combinación: su FECCU sobre lo invertido en sus campañas.
+    const roas = embudo && metaSpend.available && metaSpend.spend > 0 ? r2(feccu / metaSpend.spend) : null
+    const por_embudo = Object.fromEntries(EMBUDOS.map((e) => {
+      const pe = (pagos || []).filter((x) => enlace.embudoDePago(x) === e)
+      const inversion = gastoEmbudos ? r2(gastoEmbudos[e] || 0) : null
+      const feccuE = feccuDe(pe)
+      const cierresE = pe.filter(x => FRONT_END_SALE_TYPES.has(x.tipo)).length
+      return [e, {
+        inversion, feccu: feccuE, cierres_fe: cierresE,
+        roas: inversion ? r2(feccuE / inversion) : null,
+        cac: inversion && cierresE > 0 ? r2(inversion / cierresE) : null,
+      }]
+    })) as Record<string, { inversion: number | null; feccu: number; cierres_fe: number; roas: number | null; cac: number | null }>
     const feccp = r2(p.filter(x => !isBackendContext(x) && FECCP_TIPOS.has(x.tipo)).reduce((s, x) => s + (x.monto || 0), 0))
     const beccu = r2(p.filter(isBeccu).reduce((s, x) => s + (x.monto || 0), 0))
     const beccpp = r2(p.filter(isBeccpp).reduce((s, x) => s + (x.monto || 0), 0))
@@ -473,7 +493,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      mes, weekIdx, weekCount, volumen, embudo,
+      mes, weekIdx, weekCount, volumen, embudo, embudos,
       funnel: {
         total_agendas, calls_evaluables: callsOccurred.length, calificadas, presentadas, calif_presentadas,
         cierres, cierres_fe, cierres_be, cierres_llamada, cierres_seguimiento,

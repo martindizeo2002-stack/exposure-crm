@@ -25,6 +25,15 @@ export function esEmbudo(v: unknown): v is Embudo {
   return (EMBUDOS as readonly string[]).includes(String(v))
 }
 
+// ?embudo= acepta uno o varios separados por coma ("Orgánico,Outbound"): se miden juntos, como si fueran un solo
+// embudo (las tasas salen de los conteos sumados, así que quedan promediadas por volumen). null = todos.
+export function leerEmbudos(param: string | null): Embudo[] | null {
+  const pedidos = String(param ?? "").split(",").map((s) => s.trim()).filter(esEmbudo)
+  const lista = EMBUDOS.filter((e) => pedidos.includes(e))
+  return lista.length === 0 || lista.length === EMBUDOS.length ? null : lista
+}
+export const nombreEmbudos = (lista: Embudo[] | null) => (lista ? lista.join(" + ") : null)
+
 export type AgendaEnlace = { id: string; person_id: string | null; nombre: string; telefono: string | null; fuente: string | null; fecha_closer: string | null }
 export type PagoEnlace = { fecha?: string | null; cliente?: string | null; telefono?: string | null; person_id?: string | null; fuente?: string | null }
 

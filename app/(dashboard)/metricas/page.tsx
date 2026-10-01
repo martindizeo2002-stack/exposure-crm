@@ -65,6 +65,7 @@ interface MetricasData {
     ad_spend?: number; ad_spend_available?: boolean; roas?: number | null; cac?: number | null
   }
   embudo?: string | null
+  embudos?: string[] | null
   setters: Setter[]
   nuevos_leads?: number | null
   conversaciones_asignadas_total?: number
@@ -107,9 +108,21 @@ function mesActual() {
 export default function MetricasPage() {
   const [mes, setMes] = useState(mesActual)
   const [weekIdx, setWeekIdx] = useState(0)
-  // "" = todos los embudos juntos; si no, todo se recorta a ese embudo (misma regla que Ventas → Embudos)
-  const [embudo, setEmbudo] = useState("")
-  const qEmb = embudo ? `&embudo=${encodeURIComponent(embudo)}` : ""
+  // [] = todos los embudos juntos; si no, todo se recorta a los elegidos (misma regla que Ventas → Embudos).
+  // Con dos o más (Alex, 01/10/2026: "orgánico y outbound juntos"), se suman como un solo embudo.
+  const [embudos, setEmbudos] = useState<string[]>([])
+  const embudo = embudos.join(" + ")
+  const qEmb = embudos.length ? `&embudo=${encodeURIComponent(embudos.join(","))}` : ""
+  const ORDEN_EMBUDOS = ["Webinar", "Orgánico", "Outbound", "Sin fuente"]
+  function alternarEmbudo(v: string) {
+    if (!v) return setEmbudos([])
+    setEmbudos((prev) => {
+      const sig = prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]
+      return sig.length === ORDEN_EMBUDOS.length ? [] : ORDEN_EMBUDOS.filter((x) => sig.includes(x))
+    })
+  }
+  // Con varios embudos, cada uno por separado para compararlos contra la suma
+  const [porSeparado, setPorSeparado] = useState<Record<string, MetricasData> | null>(null)
   const [data, setData] = useState<MetricasData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -128,6 +141,17 @@ export default function MetricasPage() {
       .then(d => { if (d.error) { setError(d.error); setData(null) } else setData(d) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
+  }, [mes, weekIdx, qEmb])
+
+  useEffect(() => {
+    if (embudos.length < 2) { setPorSeparado(null); return }
+    let vivo = true
+    setPorSeparado(null)
+    Promise.all(embudos.map((e) => fetch(`/api/metricas?month=${mes}&week=${weekIdx}&embudo=${encodeURIComponent(e)}`)
+      .then((r) => r.json()).then((d) => [e, d] as const)))
+      .then((pares) => { if (vivo) setPorSeparado(Object.fromEntries(pares.filter(([, d]) => !d.error))) })
+      .catch(() => { if (vivo) setPorSeparado(null) })
+    return () => { vivo = false }
   }, [mes, weekIdx, qEmb])
 
   useEffect(() => { if (editingManual) inputRef.current?.focus() }, [editingManual])
@@ -235,10 +259,47 @@ export default function MetricasPage() {
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Embudo</span>
         {[["", "Todos"], ["Webinar", "Webinar"], ["Orgánico", "Orgánico"], ["Outbound", "Outbound"], ["Sin fuente", "Sin fuente"]].map(([v, l]) => (
-          <button key={v || "todos"} onClick={() => setEmbudo(v)} className={filterBtn(embudo === v)}>{l}</button>
+          <button key={v || "todos"} onClick={() => alternarEmbudo(v)} className={filterBtn(v ? embudos.includes(v) : embudos.length === 0)}>{l}</button>
         ))}
-        {embudo && <span className="text-xs text-muted-foreground">Agendas por su fuente; pagos por la agenda del cliente (igual que Ventas → Embudos). Los leads y conversaciones de ManyChat no se separan por embudo.</span>}
+        {embudo && <span className="text-xs text-muted-foreground">
+          {embudos.length > 1 ? "Se suman como un solo embudo: las tasas salen de los totales. Tocá otro embudo para sumarlo o uno elegido para sacarlo. " : "Tocá otro embudo para sumarlo. "}
+          Agendas por su fuente; pagos por la agenda del cliente (igual que Ventas → Embudos). Los leads y conversaciones de ManyChat no se separan por embudo.
+        </span>}
       </div>
+
+      {/* Varios embudos: cada uno por separado y la suma */}
+      {embudos.length > 1 && data && !loading && (
+        <div className="premium-panel overflow-x-auto p-5">
+          <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Por separado y juntos</h3>
+          {!porSeparado ? <div className="text-sm text-muted-foreground">Calculando cada embudo por separado…</div> : (
+            <table className="w-full min-w-[760px] text-sm">
+              <thead>
+                <tr className="border-b border-border/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="py-2 pr-3">Embudo</th>
+                  {["Agendas", "Presentadas", "Show", "Cierres FE", "Tasa de cierre", "Cash total", "FECCU", "AOV TC", "Inversión", "ROAS", "CAC"].map((h) => <th key={h} className="px-2 py-2 text-right">{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {[...embudos.map((e) => [e, porSeparado[e]] as const), [embudo, data] as const].map(([nombre, d], i, arr) => {
+                  const ff = d?.funnel, cc = d?.cash, total = i === arr.length - 1
+                  const celdas = !ff || !cc ? Array(11).fill("—") : [
+                    String(ff.total_agendas), String(ff.presentadas), fmtPct(ff.show_total), String(ff.cierres_fe), fmtPct(ff.tc_presentadas),
+                    fmt$(cc.cc_total), fmt$(cc.feccu), fmt$(cc.aov_tc), cc.ad_spend_available ? fmt$(cc.ad_spend ?? 0) : "—",
+                    cc.roas == null ? "—" : `${cc.roas.toLocaleString("es-AR", { maximumFractionDigits: 2 })}x`, cc.cac == null ? "—" : fmt$(cc.cac),
+                  ]
+                  return (
+                    <tr key={nombre} className={total ? "border-t-2 border-foreground/20 font-bold" : "border-b border-border/40"}>
+                      <td className="py-2 pr-3">{total ? `Juntos · ${nombre}` : nombre}</td>
+                      {celdas.map((v, j) => <td key={j} className="px-2 py-2 text-right tabular-nums">{v}</td>)}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">La fila "Juntos" no es el promedio de las filas: suma agendas, presentadas, cierres, cash e inversión, y saca las tasas, el ROAS y el CAC de esos totales. Así un embudo chico no pesa lo mismo que uno grande.</p>
+        </div>
+      )}
 
       {/* Pestañas */}
       <div className="grid grid-cols-2 gap-1 rounded-[18px] border border-white/70 bg-white/50 p-1.5 shadow-inner shadow-black/[.035] dark:border-white/10 dark:bg-white/[.03]">
@@ -382,7 +443,7 @@ export default function MetricasPage() {
             <div className="premium-panel p-5">
               <h3 className="text-muted-foreground font-medium text-sm uppercase tracking-wide mb-4">Meta Ads{embudo ? ` — ${embudo}` : ""}</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatBox label="Inversión" value={c!.ad_spend_available ? fmt$(c!.ad_spend ?? 0) : "—"} sub={embudo ? "campañas de este embudo" : "toda la cuenta de Meta"} />
+                <StatBox label="Inversión" value={c!.ad_spend_available ? fmt$(c!.ad_spend ?? 0) : "—"} sub={embudos.length > 1 ? "campañas de estos embudos" : embudo ? "campañas de este embudo" : "toda la cuenta de Meta"} />
                 <StatBox label="ROAS" value={c!.roas == null ? "—" : `${c!.roas.toLocaleString("es-AR", { maximumFractionDigits: 2 })}x`} sub="FECCU ÷ inversión" />
                 <StatBox label="CAC" value={c!.cac == null ? "—" : fmt$(c!.cac)} sub="inversión ÷ cierres FE" />
               </div>
