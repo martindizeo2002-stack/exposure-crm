@@ -118,3 +118,28 @@ export async function inversionAds(sb: SupabaseClient, meses: string[], opciones
   }
   return out
 }
+
+// Gasto en Meta de un rango cualquiera (una semana, un rango libre) separado por embudo, leyendo campaña por campaña.
+// Usa los embudos cambiados a mano en Ventas → Embudos. Lo usa Operaciones → Métricas cuando se filtra por embudo.
+export async function gastoAdsPorEmbudo(sb: SupabaseClient, desde: string, hasta: string): Promise<Record<string, number>> {
+  const token = process.env.META_ADS_ACCESS_TOKEN || process.env.META_CAPI_ACCESS_TOKEN
+  const cuenta = process.env.META_ADS_ACCOUNT_ID
+  if (!token || !cuenta) throw new Error("Falta META_ADS_ACCESS_TOKEN o META_ADS_ACCOUNT_ID")
+  const r = await fetch(`https://graph.facebook.com/v21.0/${cuenta}/insights?` + new URLSearchParams({
+    level: "campaign", fields: "campaign_id,campaign_name,spend", time_range: JSON.stringify({ since: desde.slice(0, 10), until: hasta.slice(0, 10) }), limit: "200", access_token: token,
+  }), { next: { revalidate: 300 } })
+  const j = await r.json() as { data?: FilaMeta[]; error?: { message?: string } }
+  if (!r.ok || j.error) throw new Error(`Meta: ${j.error?.message || r.status}`)
+  const filas = j.data || []
+  const manuales = new Map<string, string>()
+  if (filas.length) {
+    const { data } = await sb.from("ads_campanas_mes").select("campaign_id,embudo").in("campaign_id", filas.map((f) => f.campaign_id)).eq("embudo_manual", true)
+    for (const x of data || []) manuales.set(x.campaign_id, x.embudo)
+  }
+  const out: Record<string, number> = Object.fromEntries(EMBUDOS_ADS.map((e) => [e, 0]))
+  for (const f of filas) {
+    const e = manuales.get(f.campaign_id) || embudoDeCampana(f.campaign_name)
+    out[e] = Math.round(((out[e] || 0) + Number(f.spend || 0)) * 100) / 100
+  }
+  return out
+}

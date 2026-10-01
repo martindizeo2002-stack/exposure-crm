@@ -5,6 +5,8 @@ import { BECCPP_TYPES, BECCU_TYPES, FECCPP_TYPES, FECCU_TYPES, frontendCohort, w
 import { ALL_SALE_TYPES, BACK_END_SALE_TYPES, CLOSED_IN_CALL_TYPES, FRONT_END_SALE_TYPES } from "@/lib/revenue"
 import { FEE_TIPOS, FRONT_END_FEE_TIPOS } from "@/lib/cash-collected"
 import { nombreCanonico } from "@/lib/equipo"
+import { armarEnlazador, cargarAgendasEnlace, embudoDe, esEmbudo } from "@/lib/embudo-atribucion"
+import { gastoAdsPorEmbudo } from "@/lib/ads-embudos"
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -115,6 +117,10 @@ export async function GET(request: Request) {
     const endParam = searchParams.get("end")
     const { start, end } = (startParam && endParam) ? { start: startParam, end: endParam } : getDateRange(mes, weekIdx)
     const sb = getSupabase()
+    // ?embudo=Webinar|Orgánico|Outbound|Sin fuente: todo se recorta a ese embudo (misma regla que Ventas → Embudos).
+    // Agendas por su fuente; pagos y planes por la agenda del cliente. Sin el parámetro, todos los embudos juntos.
+    const embudoParam = searchParams.get("embudo")
+    const embudo = esEmbudo(embudoParam) ? embudoParam : null
 
     const [
       { data: pagos, error: pErr },
@@ -123,7 +129,7 @@ export async function GET(request: Request) {
       { data: agendasSetterRaw, error: asErr },
       metaSpend,
     ] = await Promise.all([
-      sb.from("pagos").select("fecha,cliente,tipo,operacion,ppp,monto,closer,setter,calificacion,person_id,telefono").eq("record_status", "active").gte("fecha", start).lte("fecha", end),
+      sb.from("pagos").select("fecha,cliente,tipo,operacion,ppp,monto,closer,setter,calificacion,person_id,telefono,fuente").eq("record_status", "active").gte("fecha", start).lte("fecha", end),
       // Fuente de verdad igual a producción: contrato estructurado cargado en
       // el período, sumando los ítems del plan, estén pagos o pendientes.
       sb.from("planes_pago")
@@ -131,7 +137,7 @@ export async function GET(request: Request) {
         .gte("created_at", `${start}T00:00:00`)
         .lte("created_at", `${end}T23:59:59.999`),
       sb.from("agendas")
-        .select("id,person_id,telefono,cuenta,closer,setter,show,estado,calificacion,fecha_closer,created_at,call_confirmer,calificaba_realmente")
+        .select("id,person_id,telefono,cuenta,fuente,closer,setter,show,estado,calificacion,fecha_closer,created_at,call_confirmer,calificaba_realmente")
         .or("estado.is.null,estado.neq.Archivada manualmente")
         .gte("fecha_closer", `${start}T00:00:00`)
         .lte("fecha_closer", `${end}T23:59:59`),
@@ -152,8 +158,14 @@ export async function GET(request: Request) {
     if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 })
     if (asErr) return NextResponse.json({ error: asErr.message }, { status: 500 })
 
-    // EXPOSURE opera una sola cuenta (@alexmcarrera): se toman todos los pagos.
-    const p = pagos || []
+    // EXPOSURE opera una sola cuenta (@alexmcarrera): se toman todos los pagos (o los del embudo elegido).
+    const enlace = embudo ? armarEnlazador(await cargarAgendasEnlace(sb)) : null
+    const p = (pagos || []).filter((x) => !enlace || enlace.embudoDePago(x) === embudo)
+    // inversión en Meta del embudo elegido (campaña por campaña, lib/ads-embudos.ts); sin embudo, la de toda la cuenta
+    if (embudo) {
+      const g = await gastoAdsPorEmbudo(sb, start, end).catch(() => null)
+      if (g) Object.assign(metaSpend, { spend: g[embudo] || 0, available: true, source: "meta", estimated: false })
+    }
 
     // La ventana del setter se cuenta desde el primer pago frontend histórico
     // de cada cliente, aunque el período visible empiece después.
@@ -177,8 +189,9 @@ export async function GET(request: Request) {
       if (!firstFrontendPayment.has(key) && payment.fecha) firstFrontendPayment.set(key, payment.fecha)
     }
     // Sin dedup: la data viene limpia del Sheets (1 fila = 1 agenda real)
-    const a = agendasRaw || []
+    const a = (agendasRaw || []).filter((x) => !embudo || embudoDe(x.fuente) === embudo)
     const setterAgendaSeen = new Set<string>()
+    // primero se sacan los repetidos (mismo setter + misma persona) y después se recorta al embudo: así los embudos suman el total
     const aBySetterFecha = (agendasSetterRaw || []).filter((agenda: any) => {
       const phone = String(agenda.telefono || "").replace(/\D/g, "")
       const name = String(agenda.nombre || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")
@@ -187,8 +200,8 @@ export async function GET(request: Request) {
       if (setterAgendaSeen.has(key)) return false
       setterAgendaSeen.add(key)
       return true
-    })
-    const planes = planesRaw || []
+    }).filter((agenda: any) => !embudo || embudoDe(agenda.fuente) === embudo)
+    const planes = (planesRaw || []).filter((plan: any) => !enlace || enlace.embudoDePago({ person_id: plan.person_id, telefono: plan.telefono, fecha: plan.fecha_alta || plan.created_at }) === embudo)
     const revenue = r2(planes.reduce((total, plan: any) =>
       total + (plan.plan_pago_items || []).reduce(
         (subtotal: number, item: any) => subtotal + Number(item.monto || 0),
@@ -460,7 +473,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      mes, weekIdx, weekCount, volumen,
+      mes, weekIdx, weekCount, volumen, embudo,
       funnel: {
         total_agendas, calls_evaluables: callsOccurred.length, calificadas, presentadas, calif_presentadas,
         cierres, cierres_fe, cierres_be, cierres_llamada, cierres_seguimiento,

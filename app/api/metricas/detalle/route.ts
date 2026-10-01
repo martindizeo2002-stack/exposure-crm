@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { armarEnlazador, cargarAgendasEnlace, embudoDe, esEmbudo } from "@/lib/embudo-atribucion"
 import { BECCPP_TYPES, BECCU_TYPES, FECCPP_TYPES, FECCU_TYPES } from "@/lib/commission-scheme"
 import { ALL_SALE_TYPES, BACK_END_SALE_TYPES, CLOSED_IN_CALL_TYPES } from "@/lib/revenue"
 import { FEE_TIPOS, FRONT_END_FEE_TIPOS } from "@/lib/cash-collected"
@@ -114,18 +115,24 @@ export async function GET(request: Request) {
 
     const { start, end } = getDateRange(mes, weekIdx)
     const sb = getSupabase()
+    // ?embudo=: mismo recorte que /api/metricas (agendas por fuente, pagos por la agenda del cliente)
+    const embudoParam = searchParams.get("embudo")
+    const embudo = esEmbudo(embudoParam) ? embudoParam : null
+    const deEmbudo = (r: { fuente?: string | null }) => !embudo || embudoDe(r.fuente) === embudo
+    const enlace = embudo ? armarEnlazador(await cargarAgendasEnlace(sb)) : null
+    const pagoDeEmbudo = (r: { fecha?: string | null; cliente?: string | null; telefono?: string | null; person_id?: string | null; fuente?: string | null }) => !enlace || enlace.embudoDePago(r) === embudo
 
     if (key === "agendas") {
       const { data, error } = await sb
         .from("agendas")
-        .select("id,person_id,telefono,nombre,instagram,closer,setter,calificacion,show,fecha_agenda,fecha_closer")
+        .select("id,person_id,telefono,nombre,instagram,closer,setter,calificacion,show,fecha_agenda,fecha_closer,fuente")
         .or("estado.is.null,estado.neq.Archivada manualmente")
         .gte("fecha_agenda", argentinaAgendaBoundary(start))
         .lte("fecha_agenda", argentinaAgendaBoundary(end, true))
         .order("fecha_agenda", { ascending: false })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       const seen = new Set<string>()
-      const rows = (data || []).filter((agenda: any) => {
+      const rows = (data || []).filter(deEmbudo).filter((agenda: any) => {
         const phone = String(agenda.telefono || "").replace(/\D/g, "")
         const name = String(agenda.nombre || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")
         const identity = agenda.person_id ? `person:${agenda.person_id}` : phone ? `phone:${phone}` : `name:${name}`
@@ -140,14 +147,14 @@ export async function GET(request: Request) {
     if (key === "canceladas_triage" || key === "no_show" || key === "no_response" || key === "sin_resultado") {
       const { data, error } = await sb
         .from("agendas")
-        .select("id,nombre,instagram,closer,setter,calificacion,show,estado,fecha_agenda,fecha_closer,call_confirmer")
+        .select("id,nombre,instagram,closer,setter,calificacion,show,estado,fecha_agenda,fecha_closer,call_confirmer,fuente")
         .or("estado.is.null,estado.neq.Archivada manualmente")
         .gte("fecha_closer", `${start}T00:00:00`)
         .lte("fecha_closer", `${end}T23:59:59`)
         .order("fecha_agenda", { ascending: false })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       const nowMs = Date.now()
-      const noShows = (data || []).filter((r: any) => {
+      const noShows = (data || []).filter(deEmbudo).filter((r: any) => {
         const scheduled = r.fecha_closer ? new Date(r.fecha_closer).getTime() : NaN
         return Number.isFinite(scheduled) && scheduled <= nowMs && r.show !== true && r.estado !== "Cancelado"
       })
@@ -164,7 +171,7 @@ export async function GET(request: Request) {
     if (key === "calificaba_realmente") {
       const { data, error } = await sb
         .from("agendas")
-        .select("id,nombre,instagram,closer,setter,calificacion,show,fecha_agenda,fecha_closer,calificaba_realmente")
+        .select("id,nombre,instagram,closer,setter,calificacion,show,fecha_agenda,fecha_closer,calificaba_realmente,fuente")
         .or("estado.is.null,estado.neq.Archivada manualmente")
         .eq("show", true)
         .in("calificacion", ["LEAD S", "LEAD A", "LEAD B"])
@@ -172,7 +179,7 @@ export async function GET(request: Request) {
         .lte("fecha_closer", `${end}T23:59:59`)
         .order("fecha_closer", { ascending: false })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      const rows = (data || []).filter((r: any) => r.calificaba_realmente === "Si" || r.calificaba_realmente === "No")
+      const rows = (data || []).filter(deEmbudo).filter((r: any) => r.calificaba_realmente === "Si" || r.calificaba_realmente === "No")
       return NextResponse.json({ kind: "agendas", rows })
     }
 
@@ -190,7 +197,7 @@ export async function GET(request: Request) {
         .lte("fecha_agenda", `${end}T23:59:59`)
         .order("fecha_agenda", { ascending: false })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      const rows = (data || []).filter((r: any) => normalizeVolumenVal(field, r[field]) === value)
+      const rows = (data || []).filter(deEmbudo).filter((r: any) => normalizeVolumenVal(field, r[field]) === value)
       return NextResponse.json({ kind: "agendas", rows })
     }
 
@@ -203,7 +210,7 @@ export async function GET(request: Request) {
       const label = `LEAD ${tier}`
       const { data, error } = await sb
         .from("pagos")
-        .select("cliente,tipo,monto,fecha,closer,calificacion")
+        .select("cliente,tipo,monto,fecha,closer,calificacion,person_id,telefono,fuente")
         .eq("record_status", "active")
         .eq("calificacion", label)
         .gte("fecha", start)
@@ -213,6 +220,7 @@ export async function GET(request: Request) {
       const closerKeyOf = (s: string) => (s || "").trim().split(/\s+/)[0].normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
       const closerTarget = closerKeyOf(closer)
       const rows = (data || [])
+        .filter(pagoDeEmbudo)
         .filter(r => CASH_POR_CALL_TIPOS.has(r.tipo))
         .filter(r => !closer || closerKeyOf(r.closer || "") === closerTarget)
       return NextResponse.json({ kind: "pagos", rows })
@@ -223,13 +231,13 @@ export async function GET(request: Request) {
 
     const { data, error } = await sb
       .from("pagos")
-      .select("cliente,tipo,monto,fecha,closer,operacion")
+      .select("cliente,tipo,monto,fecha,closer,operacion,person_id,telefono,fuente")
       .eq("record_status", "active")
       .gte("fecha", start)
       .lte("fecha", end)
       .order("fecha", { ascending: false })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    const rows = (data || []).filter(r => filterFn(r as PagoRow))
+    const rows = (data || []).filter(pagoDeEmbudo).filter(r => filterFn(r as PagoRow))
     return NextResponse.json({ kind: "pagos", rows })
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error" }, { status: 500 })

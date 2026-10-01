@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { inversionAds } from "@/lib/ads-embudos"
+import { EMBUDOS, armarEnlazador, embudoDe, mismoNombre, tokens, type Embudo } from "@/lib/embudo-atribucion"
 
 export const dynamic = "force-dynamic"
 
@@ -13,23 +14,11 @@ export const dynamic = "force-dynamic"
 //    agenda del cliente. Las ventas internas / back end (clientes que ya estaban) no entran en ningún embudo: van aparte.
 // Cada pago se enlaza a su agenda por persona, por teléfono o por nombre (nombre de pila igual + un apellido igual).
 
-const EMBUDOS = ["Webinar", "Orgánico", "Outbound", "Sin fuente"] as const
-type Embudo = (typeof EMBUDOS)[number]
 const CAL = new Set(["LEAD S", "LEAD A", "LEAD B", "LEAD C"])
 const FE = new Set(["Venta Nueva", "Adentro en Seguimiento", "Adentro en Seguimiento y Post Fee", "Completó PIF", "Venta Nueva (En Call)", "Venta Nueva (Post Fee)", "Completó PIF (Post Fee)", "Completó PIF + Acceso Total Consulting", "Completa Total (Post Venta)"])
 const BE = new Set(["Venta Interna", "Venta Nueva Interna", "Upsell (Agency)", "Upsell /Agency)", "Venta Nueva Interna (Post Fee)", "Cuota Venta Interna", "Fee Venta Interna"])
 const FEE = new Set(["Fee", "Refuerzo de Fee"])
 
-const minus = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
-const tokens = (s: unknown) => minus(s).replace(/[^a-z ]/g, " ").split(/\s+/).filter(Boolean)
-const tel9 = (s: unknown) => { const d = String(s ?? "").replace(/\D/g, ""); return d.length >= 9 ? d.slice(-9) : "" }
-function embudoDe(fuente: unknown): Embudo {
-  const f = minus(fuente).trim()
-  if (!f) return "Sin fuente"
-  if (/webinar|masterclass/.test(f)) return "Webinar"
-  if (/outbound|prospecci/.test(f)) return "Outbound"
-  return "Orgánico"
-}
 const r0 = (n: number) => Math.round(n)
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null)
 const prom = (xs: number[]) => (xs.length ? r0(xs.reduce((s, x) => s + x, 0) / xs.length) : null)
@@ -85,36 +74,8 @@ export async function GET(request: Request) {
     const todas = (agTodas.data || []) as Array<{ id: string; person_id: string | null; nombre: string; telefono: string | null; fuente: string | null; fecha_closer: string | null }>
     const pagos = (pagosMes.data || []) as Pago[]
 
-    // índices de agendas (todas, últimos 13 meses) para enlazar pagos
-    const porPersona = new Map<string, typeof todas[number]>(), porTel = new Map<string, typeof todas[number]>()
-    const porNombre: Array<{ t: string[]; a: typeof todas[number] }> = []
-    for (const a of todas) {
-      if (a.person_id && !porPersona.has(a.person_id)) porPersona.set(a.person_id, a)
-      const t = tel9(a.telefono); if (t && !porTel.has(t)) porTel.set(t, a)
-      const tk = tokens(a.nombre); if (tk.length >= 2) porNombre.push({ t: tk, a })
-    }
-    // misma persona si comparten nombre de pila y un apellido, o dos palabras de más de 2 letras ("Tiago Agustin Alegre" = "Agustín Alegre")
-    const mismoNombre = (x: string[], y: string[]) => {
-      if (x.length < 2 || y.length < 2) return false
-      if (x[0] === y[0] && x.slice(1).some((s) => s.length > 2 && y.slice(1).includes(s))) return true
-      const largas = x.filter((s) => s.length > 2 && y.includes(s))
-      return largas.length >= 2
-    }
-    function agendaDe(pg: Pago) {
-      if (pg.person_id && porPersona.has(pg.person_id)) return { a: porPersona.get(pg.person_id)!, via: "persona" }
-      const t = tel9(pg.telefono); if (t && porTel.has(t)) return { a: porTel.get(t)!, via: "teléfono" }
-      const tk = tokens(pg.cliente)
-      // preferimos la agenda más cercana a la fecha del pago entre las que coinciden por nombre
-      let cand = porNombre.filter((x) => mismoNombre(tk, x.t)).map((x) => x.a)
-      // nombre con una sola palabra útil ("Jeyson R"): se acepta solo si hay una única agenda con ese nombre de pila
-      if (!cand.length && tk.length && tk.filter((s) => s.length > 2).length === 1 && tk[0].length > 3) {
-        const unicos = porNombre.filter((x) => x.t[0] === tk[0]).map((x) => x.a)
-        if (unicos.length === 1) cand = unicos
-      }
-      cand = cand.sort((a, b) => Math.abs(Date.parse(a.fecha_closer || "") - Date.parse(pg.fecha)) - Math.abs(Date.parse(b.fecha_closer || "") - Date.parse(pg.fecha)))
-      if (cand.length) return { a: cand[0], via: "nombre" }
-      return null
-    }
+    // enlace pago → agenda del cliente (lib/embudo-atribucion.ts, la misma regla que usa Métricas)
+    const { agendaDe } = armarEnlazador(todas)
 
     // pagos agrupados por cliente
     const clientes = new Map<string, Cliente>()

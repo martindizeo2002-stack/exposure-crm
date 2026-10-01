@@ -62,7 +62,9 @@ interface MetricasData {
   cash: {
     feccu: number; feccp: number; beccu: number; beccpp: number; cc_total: number
     fees_count: number; fees_sum: number; aov_dia1: number | null; aov_tc: number | null
+    ad_spend?: number; ad_spend_available?: boolean; roas?: number | null; cac?: number | null
   }
+  embudo?: string | null
   setters: Setter[]
   nuevos_leads?: number | null
   conversaciones_asignadas_total?: number
@@ -105,6 +107,9 @@ function mesActual() {
 export default function MetricasPage() {
   const [mes, setMes] = useState(mesActual)
   const [weekIdx, setWeekIdx] = useState(0)
+  // "" = todos los embudos juntos; si no, todo se recorta a ese embudo (misma regla que Ventas → Embudos)
+  const [embudo, setEmbudo] = useState("")
+  const qEmb = embudo ? `&embudo=${encodeURIComponent(embudo)}` : ""
   const [data, setData] = useState<MetricasData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -118,17 +123,17 @@ export default function MetricasPage() {
 
   useEffect(() => {
     setLoading(true); setError(null)
-    fetch(`/api/metricas?month=${mes}&week=${weekIdx}`)
+    fetch(`/api/metricas?month=${mes}&week=${weekIdx}${qEmb}`)
       .then(r => r.json())
       .then(d => { if (d.error) { setError(d.error); setData(null) } else setData(d) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [mes, weekIdx])
+  }, [mes, weekIdx, qEmb])
 
   useEffect(() => { if (editingManual) inputRef.current?.focus() }, [editingManual])
 
   async function saveManual(tipo: string, persona: string, val: string) {
-    if (!val.trim() || weekIdx === 0) return
+    if (!val.trim() || weekIdx === 0 || embudo) return
     setSavingConv(true)
     await fetch("/api/metricas/conv-asig", {
       method: "POST",
@@ -137,7 +142,7 @@ export default function MetricasPage() {
     })
     setSavingConv(false)
     setEditingManual(null)
-    fetch(`/api/metricas?month=${mes}&week=${weekIdx}`)
+    fetch(`/api/metricas?month=${mes}&week=${weekIdx}${qEmb}`)
       .then(r => r.json()).then(d => { if (!d.error) setData(d) })
   }
 
@@ -171,12 +176,12 @@ export default function MetricasPage() {
   }
 
   function openDetail(key: string, label: string) {
-    openDetailUrl(`/api/metricas/detalle?month=${mes}&week=${weekIdx}&key=${key}`, label)
+    openDetailUrl(`/api/metricas/detalle?month=${mes}&week=${weekIdx}${qEmb}&key=${key}`, label)
   }
 
   function openVolumenDetail(field: string, value: string, blockTitle: string) {
     openDetailUrl(
-      `/api/metricas/detalle?month=${mes}&week=${weekIdx}&key=volumen&field=${field}&value=${encodeURIComponent(value)}`,
+      `/api/metricas/detalle?month=${mes}&week=${weekIdx}${qEmb}&key=volumen&field=${field}&value=${encodeURIComponent(value)}`,
       `${blockTitle} — ${value}`
     )
   }
@@ -184,7 +189,7 @@ export default function MetricasPage() {
   function openCashCalifDetail(tier: string, closer?: string) {
     const closerParam = closer ? `&closer=${encodeURIComponent(closer)}` : ""
     openDetailUrl(
-      `/api/metricas/detalle?month=${mes}&week=${weekIdx}&key=cash_calificacion&tier=${tier}${closerParam}`,
+      `/api/metricas/detalle?month=${mes}&week=${weekIdx}${qEmb}&key=cash_calificacion&tier=${tier}${closerParam}`,
       closer ? `Cash Collected — ${closer} — Lead ${tier}` : `Cash Collected — Lead ${tier}`
     )
   }
@@ -226,6 +231,15 @@ export default function MetricasPage() {
         </div>
       </div>
 
+      {/* Embudo: Webinar / Orgánico (incluye Ads) / Outbound / Sin fuente */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Embudo</span>
+        {[["", "Todos"], ["Webinar", "Webinar"], ["Orgánico", "Orgánico"], ["Outbound", "Outbound"], ["Sin fuente", "Sin fuente"]].map(([v, l]) => (
+          <button key={v || "todos"} onClick={() => setEmbudo(v)} className={filterBtn(embudo === v)}>{l}</button>
+        ))}
+        {embudo && <span className="text-xs text-muted-foreground">Agendas por su fuente; pagos por la agenda del cliente (igual que Ventas → Embudos). Los leads y conversaciones de ManyChat no se separan por embudo.</span>}
+      </div>
+
       {/* Pestañas */}
       <div className="grid grid-cols-2 gap-1 rounded-[18px] border border-white/70 bg-white/50 p-1.5 shadow-inner shadow-black/[.035] dark:border-white/10 dark:bg-white/[.03]">
         {([["general", "General"], ["volumen", "Volumen"]] as const).map(([key, label]) => (
@@ -243,7 +257,7 @@ export default function MetricasPage() {
 
       {data && !loading && tab === "general" && (
         <div className="space-y-8">
-          {weekIdx === 0 && <section className="premium-panel overflow-hidden border-fuchsia-400/15 bg-gradient-to-br from-fuchsia-500/[.13] via-white/[.04] to-cyan-500/[.08] p-6">
+          {weekIdx === 0 && !embudo && <section className="premium-panel overflow-hidden border-fuchsia-400/15 bg-gradient-to-br from-fuchsia-500/[.13] via-white/[.04] to-cyan-500/[.08] p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[.18em] text-fuchsia-400">Objetivo mensual</p>
@@ -362,6 +376,15 @@ export default function MetricasPage() {
                 <StatBox label="AOV Día 1" value={fmt$(c!.aov_dia1)} sub="Venta Nueva + Fee" onClick={canDrill ? () => openDetail("aov_dia1", "AOV Día 1 — Venta Nueva + Fee") : undefined} />
                 <StatBox label="AOV TC" value={fmt$(c!.aov_tc)} sub="Promedio por cierre" onClick={canDrill ? () => openDetail("aov_tc", "AOV TC — Promedio por cierre") : undefined} />
                 <StatBox label="Fees" value={fmt$(c!.fees_sum)} sub={`${c!.fees_count} fee${c!.fees_count !== 1 ? "s" : ""}`} onClick={canDrill ? () => openDetail("fees", "Fees") : undefined} />
+              </div>
+            </div>
+
+            <div className="premium-panel p-5">
+              <h3 className="text-muted-foreground font-medium text-sm uppercase tracking-wide mb-4">Meta Ads{embudo ? ` — ${embudo}` : ""}</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatBox label="Inversión" value={c!.ad_spend_available ? fmt$(c!.ad_spend ?? 0) : "—"} sub={embudo ? "campañas de este embudo" : "toda la cuenta de Meta"} />
+                <StatBox label="ROAS" value={c!.roas == null ? "—" : `${c!.roas.toLocaleString("es-AR", { maximumFractionDigits: 2 })}x`} sub="FECCU ÷ inversión" />
+                <StatBox label="CAC" value={c!.cac == null ? "—" : fmt$(c!.cac)} sub="inversión ÷ cierres FE" />
               </div>
             </div>
           </section>
@@ -496,7 +519,7 @@ export default function MetricasPage() {
                     setEditing={setEditingManual}
                     onSave={saveManual}
                     saving={savingConv}
-                    disabled={weekIdx === 0}
+                    disabled={weekIdx === 0 || !!embudo}
                     inputRef={inputRef}
                   />
                 </div>
@@ -542,7 +565,7 @@ export default function MetricasPage() {
                               setEditing={setEditingManual}
                               onSave={saveManual}
                               saving={savingConv}
-                              disabled={weekIdx === 0}
+                              disabled={weekIdx === 0 || !!embudo}
                               inputRef={inputRef}
                             />
                           </td>
@@ -555,7 +578,7 @@ export default function MetricasPage() {
                               setEditing={setEditingManual}
                               onSave={saveManual}
                               saving={savingConv}
-                              disabled={weekIdx === 0}
+                              disabled={weekIdx === 0 || !!embudo}
                               inputRef={inputRef}
                             />
                           </td>
