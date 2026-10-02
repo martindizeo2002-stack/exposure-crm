@@ -21,7 +21,7 @@ const OUTPUT_TOOL = {
       cta: { type: "string", description: "CTA exacto y coherente con la pieza" },
       recording_direction: { type: "string", description: "Indicaciones breves de grabación y edición" },
       format: { type: "string", description: "Formato recomendado" },
-      awareness_level: { type: "string", enum: ["PROBLEMA", "SOLUCIÓN", "PRODUCTO", "MENTALIDAD"] },
+      awareness_level: { type: "string", enum: ["NO CONSCIENTE", "PROBLEMA", "SOLUCIÓN", "PRODUCTO", "MENTALIDAD"] },
       rationale: { type: "string", description: "Por qué esta estructura puede funcionar, en una oración" },
     },
     required: ["title", "hook", "development", "closing", "cta", "recording_direction", "format", "awareness_level", "rationale"],
@@ -91,6 +91,7 @@ CRITERIOS EDITORIALES
 - Anti-posicionamiento frente a los gurús que venden humo: transparencia del proceso, mostrar el adentro.
 - Una sola tesis por pieza. Primero tensión concreta, después causa, ejemplo o contraste, cierre y CTA.
 - Si el ángulo viene definido, respetalo. Si no, elegí uno del banco y nombralo en rationale por su número.
+- NO CONSCIENTE: para quien todavía no sabe que tiene el problema ni que hay una salida. Entra por algo de su día a día, curiosidad o entretenimiento; no arranca nombrando el dolor ni el programa, y deja la tensión planteada para que se reconozca recién al final.
 - PROBLEMA: reconocimiento + causa invisible + costo práctico (el techo, la oferta pobre, la prospección que quema).
 - SOLUCIÓN: mecanismo aplicable + pasos (oferta por resultado, embudo de DM, sistema de adquisición).
 - PRODUCTO: mostrar diagnóstico, proceso o criterio del programa; nunca un elogio genérico.

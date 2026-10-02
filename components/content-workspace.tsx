@@ -95,7 +95,8 @@ const OFFICIAL_FORMAT_OPTIONS = [
   "REACCIÓN", "TALKING HEAD", "TALKING IMAGEN", "B-ROLL + VOZ EN OFF", "ANÁLISIS", "MIRO", "PIZARRÓN", "HORIZONTAL", "VOLUMEN", "CÁMARA + PC", "CARRUSEL", "ESTRATEGIA", "TESTIMONIO", "CASO DE ÉXITO", "TOP TIER",
 ]
 
-const AWARENESS_OPTIONS = ["PROBLEMA", "SOLUCIÓN", "MENTALIDAD", "PRODUCTO"]
+// NO CONSCIENTE (Alex, 02/10/2026): para quien todavía no sabe que tiene el problema; no tiene formato sugerido automático
+const AWARENESS_OPTIONS = ["NO CONSCIENTE", "PROBLEMA", "SOLUCIÓN", "MENTALIDAD", "PRODUCTO"]
 const STORY_ONLY_FORMATS = /^(¿QUÉ HAGO\??|HAND RAISER|CTA|WHY NOW|AUDITORÍA)$/i
 
 function canonicalFormatLabel(value: string) {
