@@ -78,6 +78,10 @@
     {
       "path": "/api/radar-sync?paso=historias&turno=2",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/radar-sync?paso=seguidores",
+      "schedule": "5 3 * * *"
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import useSWR from "swr"
-import { Filter, Info, Loader2, Megaphone, RefreshCw } from "lucide-react"
+import { Filter, Info, Loader2, Megaphone, RefreshCw, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CrmPageIntro } from "@/components/crm-ui"
 import { cn } from "@/lib/utils"
@@ -17,7 +17,8 @@ type Detalle = { cierres: Array<{ cliente: string; dia: string; cobrado: number;
 type Bloque = { agendas: number; presentadas: number; no_show: number; sin_resultado: number; futuras: number; show_up: number | null; calificadas: number; calif_presentadas: number; show_up_calif: number | null; cierres: number; tc_calif_presentadas: number | null; tc_presentadas: number | null; fees: number; fees_usd: number; fees_sin_pago: number; aov_trato_cerrado: number | null; aov_dia_1: number | null; cash_total: number; cash_leads_mes: number; cuotas: number; back_end: number; detalle: Detalle }
 type Campana = { campaign_id: string; campaign_name: string | null; objetivo: string | null; embudo: string; embudo_manual: boolean; spend: number; impresiones: number | null; clics: number | null }
 type Ads = { total: number; por_embudo: Record<string, number>; campanas: Campana[]; actualizado: string | null; error?: string }
-type Respuesta = { mes: string; corte: string; ads?: Ads; embudos: Record<string, Bloque>; origenes: Array<{ origen: string; embudo: string; agendas: number; presentadas: number; calificadas: number; cierres: number; fees: number; cash_leads_mes: number }>; outbound: { leads: Array<{ id: string; nombre: string; fecha: string | null; origen: string | null; setter: string | null; closer: string | null; calificacion: string | null; show: boolean | null; estado: string | null; motivo: string | null; recurso: string | null; pagos: string; cash: number }>; por_setter: Array<{ setter: string; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number }> }; pagos_sin_fuente: Array<{ cliente: string; via: string; pagos: string; cash: number }>; ventas_internas: { pagos: Array<{ cliente: string; fecha: string; tipo: string | null; monto: number }>; total: number }; pagos_del_mes: number; cash_del_mes: number; cash_front_end: number }
+type Seguidores = { nuevos?: number; neto?: number | null; gasto?: number; costo_por_seguidor?: number | null; costo_por_seguidor_neto?: number | null; seguidores_hoy?: number | null; diario?: Array<{ dia: string; nuevos: number | null; neto: number | null; gasto: number; costo: number | null }>; error?: string }
+type Respuesta = { mes: string; corte: string; ads?: Ads; seguidores?: Seguidores; embudos: Record<string, Bloque>; origenes: Array<{ origen: string; embudo: string; agendas: number; presentadas: number; calificadas: number; cierres: number; fees: number; cash_leads_mes: number }>; outbound: { leads: Array<{ id: string; nombre: string; fecha: string | null; origen: string | null; setter: string | null; closer: string | null; calificacion: string | null; show: boolean | null; estado: string | null; motivo: string | null; recurso: string | null; pagos: string; cash: number }>; por_setter: Array<{ setter: string; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number }> }; pagos_sin_fuente: Array<{ cliente: string; via: string; pagos: string; cash: number }>; ventas_internas: { pagos: Array<{ cliente: string; fecha: string; tipo: string | null; monto: number }>; total: number }; pagos_del_mes: number; cash_del_mes: number; cash_front_end: number }
 
 const usd = (n: number | null | undefined) => (n === null || n === undefined ? "—" : n.toLocaleString("es-AR", { maximumFractionDigits: 0 }))
 const pc = (n: number | null | undefined) => (n === null || n === undefined ? "—" : `${n.toLocaleString("es-AR", { maximumFractionDigits: 1 })} %`)
@@ -145,6 +146,25 @@ export default function EmbudosPage() {
           <td className="text-right tabular-nums">{c.clics ? usd2(c.spend / c.clics) : "—"}</td>
         </tr>)}</tbody>
       </table></div>}
+      {data?.seguidores && <div className="mt-4 rounded-xl border bg-muted/30 p-3">
+        <h3 className="flex items-center gap-2 text-sm font-black"><UserPlus className="h-4 w-4" />Costo por seguidor · Follow Me Ads</h3>
+        {data.seguidores.error && !data.seguidores.diario && <p className="mt-1 text-sm text-red-500">No se pudo calcular: {data.seguidores.error}</p>}
+        {data.seguidores.diario && <>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              ["Costo por seguidor", data.seguidores.costo_por_seguidor != null ? `USD ${usd2(data.seguidores.costo_por_seguidor)}` : "—", "gasto orgánico ÷ seguidores nuevos"],
+              ["Seguidores nuevos", (data.seguidores.nuevos ?? 0).toLocaleString("es-AR"), "ManyChat · Nuevo Seguidor"],
+              ["Gasto Follow Me Ads", `USD ${usd2(data.seguidores.gasto ?? 0)}`, "campañas del embudo orgánico"],
+              ["Crecimiento neto", data.seguidores.neto != null ? `${data.seguidores.neto > 0 ? "+" : ""}${data.seguidores.neto.toLocaleString("es-AR")}` : "—", data.seguidores.costo_por_seguidor_neto != null ? `USD ${usd2(data.seguidores.costo_por_seguidor_neto)} por seguidor neto` : "con la foto diaria desde el 02/10"],
+            ].map(([l, v, s]) => <div key={l} className="rounded-lg border bg-card px-3 py-2"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">{l}</p><p className="text-lg font-black tabular-nums">{v}</p><p className="text-[11px] text-muted-foreground">{s}</p></div>)}
+          </div>
+          <details className="mt-2"><summary className="cursor-pointer text-xs text-muted-foreground">Día por día</summary>
+            <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[520px] text-sm"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1 text-left">Día</th><th className="text-right">Seguidores nuevos</th><th className="text-right">Neto</th><th className="text-right">Gasto USD</th><th className="text-right">Costo por seguidor</th></tr></thead>
+              <tbody>{data.seguidores.diario.map((d) => <tr key={d.dia} className="border-t"><td className="py-1">{fecha(d.dia)}</td><td className="text-right tabular-nums">{d.nuevos ?? "—"}</td><td className="text-right tabular-nums">{d.neto ?? "—"}</td><td className="text-right tabular-nums">{usd2(d.gasto)}</td><td className="text-right font-bold tabular-nums">{d.costo != null ? usd2(d.costo) : "—"}</td></tr>)}</tbody></table></div>
+          </details>
+          <p className="mt-2 text-[11px] text-muted-foreground">Costo mezclado: Meta no informa seguidores en esta campaña (es de tráfico), así que se divide lo pautado por todos los seguidores nuevos, también los que llegaron por orgánico. El seguidor pagado sale más caro. Seguidores nuevos = contactos que ManyChat etiquetó "Nuevo Seguidor", por día de alta. Crecimiento neto = foto diaria del total de la cuenta (descuenta a los que dejan de seguir).</p>
+        </>}
+      </div>}
       {ads.actualizado && <p className="mt-2 text-[11px] text-muted-foreground">Leído de Meta el {new Date(ads.actualizado).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}. El mes en curso se vuelve a leer cada 3 horas; los meses cerrados quedan guardados.</p>}
     </section>}
 

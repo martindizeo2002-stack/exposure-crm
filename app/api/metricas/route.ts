@@ -7,6 +7,7 @@ import { FEE_TIPOS, FRONT_END_FEE_TIPOS } from "@/lib/cash-collected"
 import { nombreCanonico } from "@/lib/equipo"
 import { armarEnlazador, cargarAgendasEnlace, embudoDe, EMBUDOS, leerEmbudos, nombreEmbudos, type Embudo } from "@/lib/embudo-atribucion"
 import { gastoAdsPorEmbudo } from "@/lib/ads-embudos"
+import { seguidoresPeriodo } from "@/lib/seguidores"
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -168,6 +169,8 @@ export async function GET(request: Request) {
     // (exp-…, "masterclass", "webinar") → Webinar; FM ADS → Orgánico. Con embudo elegido, la inversión es la de ese
     // embudo; sin embudo, la de toda la cuenta (solo como total: el ROAS y el CAC van por embudo en `por_embudo`).
     const gastoEmbudos = await gastoAdsPorEmbudo(sb, start, end).catch(() => null)
+    // costo por seguidor del período (Follow Me Ads = campañas del embudo orgánico ÷ seguidores nuevos de ManyChat)
+    const seguidoresP = seguidoresPeriodo(sb, start, end).catch(() => null)
     if (embudos) Object.assign(metaSpend, gastoEmbudos
       ? { spend: r2(embudos.reduce((s, e) => s + (gastoEmbudos[e] || 0), 0)), available: true, source: "meta", estimated: false }
       : { spend: 0, available: false, source: "unavailable", estimated: false })
@@ -537,6 +540,7 @@ export async function GET(request: Request) {
         tc_unidades_presentadas: pct(unidades_cerradas, presentadas),
         tc_unidades_calificadas: pct(unidades_cerradas, calif_presentadas),
       },
+      seguidores: await seguidoresP.then((x) => x && { nuevos: x.nuevos, gasto: x.gasto, costo_por_seguidor: x.costo_por_seguidor, neto: x.neto, costo_por_seguidor_neto: x.costo_por_seguidor_neto }),
       setters,
       nuevos_leads,
       conversaciones_asignadas_total,

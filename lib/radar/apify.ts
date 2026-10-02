@@ -57,6 +57,14 @@ export async function lanzarActor(actor: string, input: unknown, o: { segundos?:
   return r.data
 }
 
+// Corre un actor y espera los items (solo para lecturas chicas, como un perfil: Apify corta a los `segundos`).
+export async function correrActorSync<T = Record<string, unknown>>(actor: string, input: unknown, segundos = 120) {
+  const q = new URLSearchParams({ timeout: String(segundos), clean: "true", format: "json" })
+  const tope = Number(process.env.RADAR_TOPE_USD || 3)
+  if (tope > 0) q.set("maxTotalChargeUsd", String(tope))
+  return pedir<T[]>(`/acts/${encodeURIComponent(actor)}/run-sync-get-dataset-items?${q}`, { method: "POST", body: JSON.stringify(input) })
+}
+
 export async function leerCorrida(runId: string) {
   return (await pedir<{ data: CorridaApify }>(`/actor-runs/${encodeURIComponent(runId)}`)).data
 }

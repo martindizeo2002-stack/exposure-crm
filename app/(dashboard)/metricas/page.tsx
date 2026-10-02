@@ -68,6 +68,7 @@ interface MetricasData {
   embudos?: string[] | null
   setters: Setter[]
   nuevos_leads?: number | null
+  seguidores?: { nuevos: number; gasto: number; costo_por_seguidor: number | null; neto: number | null; costo_por_seguidor_neto: number | null } | null
   conversaciones_asignadas_total?: number
   comparacion_cierre?: {
     pagos_totales: number; unidades_cerradas: number
@@ -446,6 +447,7 @@ export default function MetricasPage() {
                 <StatBox label="Inversión" value={c!.ad_spend_available ? fmt$(c!.ad_spend ?? 0) : "—"} sub={embudos.length > 1 ? "campañas de estos embudos" : embudo ? "campañas de este embudo" : "toda la cuenta de Meta"} />
                 <StatBox label="ROAS" value={c!.roas == null ? "—" : `${c!.roas.toLocaleString("es-AR", { maximumFractionDigits: 2 })}x`} sub="FECCU ÷ inversión" />
                 <StatBox label="CAC" value={c!.cac == null ? "—" : fmt$(c!.cac)} sub="inversión ÷ cierres FE" />
+                <StatBox label="Costo por seguidor" value={data.seguidores?.costo_por_seguidor != null && (!embudos.length || embudos.includes("Orgánico")) ? `$${data.seguidores.costo_por_seguidor.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"} sub={data.seguidores ? `Follow Me Ads ÷ ${data.seguidores.nuevos.toLocaleString("es-AR")} seguidores nuevos` : "sin dato"} />
               </div>
             </div>
           </section>
