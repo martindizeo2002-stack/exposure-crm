@@ -15,7 +15,7 @@ const TAGS = /^[a-z0-9áéíóúñ-]{2,24}$/
 const limpiarTags = (v: unknown) =>
   [...new Set((Array.isArray(v) ? v : String(v || "").split(",")).map((t) => String(t).trim().toLowerCase().replace(/\s+/g, "-")).filter((t) => TAGS.test(t)))].slice(0, 6)
 
-// Saca la cuenta y lo que el radar guardó de ella: piezas, comentarios, historias e imágenes.
+// Saca la cuenta y lo que el radar guardó de ella: piezas, comentarios, historias, fichas e imágenes.
 async function quitarCuenta(db: ReturnType<typeof createSupabaseAdmin>, handle: string) {
   const { data: s } = await db.from("radar_semillas").select("handle").eq("handle", handle).maybeSingle()
   if (!s) return null
@@ -30,6 +30,8 @@ async function quitarCuenta(db: ReturnType<typeof createSupabaseAdmin>, handle: 
   for (let k = 0; k < ids.length; k += 300) await db.from("radar_comentarios_crudos").delete().in("pieza_id", ids.slice(k, k + 300))
   await db.from("radar_piezas").delete().eq("cuenta_fuente", handle)
   await db.from("radar_historias").delete().eq("cuenta", handle)
+  // también sus fichas de historias, para que dejen de entrar al corpus de la skill (radar-a-skill.ts)
+  await db.from("radar_secuencias").delete().eq("cuenta", handle)
   await db.from("radar_semillas").delete().eq("handle", handle)
   return { piezas: ids.length, historias: (historias || []).length }
 }
