@@ -516,7 +516,7 @@ function SearchRow({ agenda, stage, pays, onOpenDetail }: { agenda: Agenda; stag
 }
 
 // ── Detalle del lead (modal al hacer click en la tarjeta) ─────────────────────
-function DetailField({ label, value, icon: Icon, wide = false }: { label: string; value: React.ReactNode; icon?: React.ElementType; wide?: boolean }) {
+function DetailField({ label, value, icon: Icon, wide = false }: { label: string; value: React.ReactNode; icon?: React.ComponentType<{ className?: string }>; wide?: boolean }) {
   if (value === null || value === undefined || value === "") return null
   return (
     <div className={cn("group rounded-2xl border border-white/70 bg-white/65 p-3.5 shadow-[0_8px_30px_rgba(15,23,42,.04)] backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-[0_12px_35px_rgba(124,58,237,.09)] dark:border-white/10 dark:bg-white/[.045]", wide && "sm:col-span-2")}>
@@ -529,7 +529,7 @@ function DetailField({ label, value, icon: Icon, wide = false }: { label: string
   )
 }
 
-function DetailSection({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
+function DetailSection({ icon: Icon, title, children }: { icon: React.ComponentType<{ className?: string }>; title: string; children: React.ReactNode }) {
   return (
     <section>
       <div className="mb-3 flex items-center gap-2 px-1">

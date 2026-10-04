@@ -37,6 +37,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
   ["/whatsapp", OPERATIONS],               // grupos de WhatsApp del equipo
   ["/testimonios", [...OPERATIONS, "CSM", "Editor"]],
   ["/youtube", [...OPERATIONS, "Editor"]],   // videos largos del canal + los clips de cada uno
+  ["/ciudad", OPERATIONS],                   // Exposure OS · vista ciudad (todo el negocio en 3D, solo lectura)
   ["/radar", [...OPERATIONS, "Editor"]],     // radar de contenido: cuentas seguidas, piezas, historias (página y su index.html)
   ["/contenido", [...OPERATIONS, "Editor"]],
   ["/contenido-angulos", [...OPERATIONS, "Editor"]],
@@ -75,6 +76,7 @@ const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/imagen", [...OPERATIONS, "Editor"]],   // subir miniaturas y portadas desde la compu
   ["/api/banco-formatos", [...OPERATIONS, "Editor"]],  // catálogo de formatos (escritura solo CEO, se valida en la ruta)
   ["/api/angulos-manychat", OPERATIONS],
+  ["/api/ciudad", OPERATIONS],
   ["/api/setting-resumen", SALES_OPERATIONS],
   ["/api/whatsapp", OPERATIONS],
   ["/api/security/activity", CRM_ROLES as unknown as CRMRole[]],

@@ -19,7 +19,7 @@ import {
   Eye, LogOut, Menu, Monitor, Moon, Palette, Radar, RotateCcw, Telescope, Search, Settings2, Sparkles, Sun, Trophy, Type, UserRound,
   UsersRound, Volume2, WalletCards, ShieldCheck, MessageSquareQuote,
   Wallet, Target, Kanban, CalendarRange, Compass, Coins, Mic, Layers, NotebookPen, MessageCircle, Youtube,
-  Filter,
+  Filter, Building2,
 } from "lucide-react"
 
 export type GroupName = "General" | "Panel del negocio" | "Ventas" | "Producto" | "Marketing" | "Operaciones" | "Sistema IA · maqueta"
@@ -87,6 +87,7 @@ export const modules: NavItem[] = [
   { label: "YouTube", href: "/youtube", icon: Youtube, match: ["/youtube"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Radar", href: "/radar", icon: Telescope, match: ["/radar"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Testimonios", href: "/testimonios", icon: MessageSquareQuote, match: ["/testimonios"], ramp: ramps.testimonios, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "CSM", "Editor"] },
+  { label: "Ciudad", href: "/ciudad", icon: Building2, match: ["/ciudad"], ramp: ramps.metricas, group: "Operaciones", roles: ["CEO", "Sales Manager", "Manager MKT"] },
   { label: "Métricas", href: "/rendimiento", icon: BarChart3, match: ["/rendimiento", "/metricas", "/evolucion-diaria"], ramp: ramps.metricas, group: "Operaciones", roles: ["CEO", "Sales Manager", "Manager MKT", "Contaduria"] },
   { label: "Calidad", href: "/calidad-datos", icon: ShieldCheck, match: ["/calidad-datos"], ramp: ramps.metricas, group: "Operaciones", roles: ["CEO", "Sales Manager", "Manager MKT", "CSM"] },
   { label: "Reporte llamadas", href: "/reporte-llamadas", icon: PhoneCall, match: ["/reporte-llamadas"], ramp: ramps.metricas, group: "Operaciones", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer"] },
