@@ -161,14 +161,14 @@ export function VistaCiudad({ datos, dia, onDia, cargando, onRecargar }: { datos
                 <div>
                   <div className="mb-1 font-medium text-[#6E6590]">Islas · ángulo de la pieza</div>
                   {Object.entries(COLOR_ANGULO).map(([a, c]) => <div key={a} className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: c }} />{a}</div>)}
-                  <div className="mt-1 max-w-[220px] text-[#6E6590]">En las cintas caminan los últimos contactos de hoy que entraron por cada pieza.</div>
+                  <div className="mt-1 max-w-[220px] text-[#6E6590]">Por las cintas bajan los últimos contactos que entraron por cada pieza.</div>
                 </div>
                 <div>
                   <div className="mb-1 font-medium text-[#6E6590]">Sillas · estado de la call</div>
                   {Object.entries(datos.estados).map(([k, e]) => <div key={k} className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: COLOR_ESTADO[k as keyof typeof COLOR_ESTADO] }} />{e.label}</div>)}
                 </div>
               </div>
-              <div className="mt-2 max-w-[440px] text-[#6E6590]">Cada persona es un registro real. Cuando un grupo tiene más gente de la que entra en la sala se ve una muestra y el cartel dice el total. Azul oscuro = equipo. Arrastrá para moverte; rueda o pellizco para acercar.</div>
+              <div className="mt-2 max-w-[440px] text-[#6E6590]">Cada persona es un registro real de esa etapa; los que caminan muestran el recorrido (Captación → Espera → Setters, Closers → Seguimiento → Clientes → Formación) y se repiten en bucle. Los totales exactos están en los carteles. Azul oscuro = equipo. «Pausar» congela todo. Arrastrá para moverte; rueda o pellizco para acercar.</div>
             </details>
             {panelAbierto ? (
               <aside className="absolute bottom-3 right-3 top-3 w-[380px] overflow-y-auto rounded-2xl border bg-card p-4 shadow-xl">

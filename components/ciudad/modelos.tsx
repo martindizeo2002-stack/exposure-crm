@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useFrame, type ThreeEvent } from "@react-three/fiber"
 import * as THREE from "three"
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js"
@@ -89,34 +89,58 @@ export function interactivo(onClick?: () => void, tip?: string, alto = 2) {
 }
 
 // ── personas ──────────────────────────────────────────────────────────────────────────────────────────────
-export type Pose = "parado" | "caminando" | "presentando" | "sentado" | "trabajando" | "conversando" | "dormido"
+export type Pose = "parado" | "caminando" | "presentando" | "charlando" | "sentado" | "trabajando" | "conversando" | "alumno" | "dormido"
 const PIEL = "#F0CDB9"
 const ROPAS = ["#7550EF", "#E94ACB", "#527BEA", "#FFFFFF", "#FF8A70", "#9B87F5", "#4FB3C9"]
 const PELOS = ["#2B2133", "#4A3426", "#7A5A3A", "#1E1E2A", "#5B3B5E"]
 const hash = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h) }
 export const ropaDe = (id: string) => ROPAS[hash(id) % ROPAS.length]
 export const peloDe = (id: string) => PELOS[hash(id + "p") % PELOS.length]
+const SENTADAS = new Set<Pose>(["sentado", "trabajando", "conversando", "alumno", "dormido"])
+export const esSentada = (p: Pose) => SENTADAS.has(p)
 
-export function Persona({ p, rot = 0, pose = "parado", ropa, pantalon = "#2B2F6B", pelo = "#2B2133", asiento = 0.45, onClick, tip, seleccionada, atenuada, zz }: {
-  p: V3; rot?: number; pose?: Pose; ropa: string; pantalon?: string; pelo?: string; asiento?: number
-  onClick?: () => void; tip?: string; seleccionada?: boolean; atenuada?: boolean; zz?: boolean
-}) {
-  const sentado = pose !== "parado" && pose !== "caminando" && pose !== "presentando"
+// ¿se anima la escena? (botón Pausar / Animar y «reducir movimiento» del sistema)
+export const AnimCtx = createContext(true)
+
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
+type Grupo = { current: THREE.Group | null }
+const rotar = (r: Grupo, x: number, z?: number, y?: number) => {
+  if (!r.current) return
+  r.current.rotation.x = x
+  if (z !== undefined) r.current.rotation.z = z
+  if (y !== undefined) r.current.rotation.y = y
+}
+
+type PersonaProps = {
+  p: V3; rot?: number; pose?: Pose; poseRef?: { current: Pose }; ropa: string; pantalon?: string; pelo?: string; asiento?: number
+  onClick?: () => void; tip?: string; seleccionada?: boolean; atenuada?: boolean; zz?: boolean; semilla?: string
+}
+
+// Persona con cuerpo articulado. La pose fija la postura (parada o sentada) y la animación le da vida: caminar con
+// piernas y brazos, tipear, gesticular al hablar, mirar el celular, levantar la mano, girar la cabeza, respirar.
+export function Persona({ p, rot = 0, pose = "parado", poseRef, ropa, pantalon = "#2B2F6B", pelo = "#2B2133", asiento = 0.45, onClick, tip, seleccionada, atenuada, zz, semilla }: PersonaProps) {
+  const animar = useContext(AnimCtx)
+  const sentado = esSentada(pose)
   const hipY = sentado ? asiento + 0.07 : 0.84
   const op = atenuada ? { opacity: 0.45 } : {}
   const mRopa = mat(ropa, 0.85, op), mPant = mat(pantalon, 0.85, op), mPiel = mat(PIEL, 0.7, op), mPelo = mat(pelo, 0.9, op), mZap = mat("#20265F", 0.6, op)
+  const cuerpo = useRef<THREE.Group>(null), torsoR = useRef<THREE.Group>(null), cabezaR = useRef<THREE.Group>(null)
+  const brazoI = useRef<THREE.Group>(null), brazoD = useRef<THREE.Group>(null)
+  const musloI = useRef<THREE.Group>(null), musloD = useRef<THREE.Group>(null)
+  const rodillaI = useRef<THREE.Group>(null), rodillaD = useRef<THREE.Group>(null)
+  const fase = useMemo(() => (hash(semilla || `${ropa}${p[0]}${p[1]}${p[2]}`) % 997) / 31, [semilla, ropa, p])
+
   const piernas = (lado: number) => {
-    let muslo = 0, rodilla = 0
-    if (sentado) { muslo = -Math.PI / 2; rodilla = Math.PI / 2 }
-    else if (pose === "caminando") { muslo = lado * 0.42; rodilla = lado > 0 ? 0.35 : 0.05 }
-    return { muslo, rodilla }
+    if (sentado) return { muslo: -Math.PI / 2, rodilla: Math.PI / 2 }
+    if (pose === "caminando") return { muslo: lado * 0.42, rodilla: lado > 0 ? 0.35 : 0.05 }
+    return { muslo: 0, rodilla: 0 }
   }
   const brazo = (lado: number): [number, number] => {
     switch (pose) {
       case "caminando": return [lado * -0.38, 0.06]
-      case "sentado": return [-0.45, 0.1]
+      case "sentado": case "alumno": return [-0.45, 0.1]
       case "trabajando": return [-1.15, 0.04]
-      case "conversando": return lado > 0 ? [-0.95, 0.28] : [-0.4, 0.1]
+      case "conversando": case "charlando": return lado > 0 ? [-0.95, 0.28] : [-0.4, 0.1]
       case "dormido": return [-0.35, 0.05]
       case "presentando": return lado > 0 ? [-1.25, 0.55] : [0, 0.1]
       default: return [0, 0.1]
@@ -124,34 +148,94 @@ export function Persona({ p, rot = 0, pose = "parado", ropa, pantalon = "#2B2F6B
   }
   const torso = pose === "trabajando" ? 0.1 : pose === "dormido" ? 0.38 : sentado ? -0.06 : 0
   const cabeza = pose === "dormido" ? 0.5 : 0
+
+  useFrame(({ clock }) => {
+    if (!animar) return
+    const t = clock.getElapsedTime() + fase
+    const ps = poseRef?.current ?? pose
+    if (ps === "caminando") {
+      const s = Math.sin(t * 7.5)
+      rotar(musloI, -0.5 * s); rotar(musloD, 0.5 * s)
+      rotar(rodillaI, 0.1 + 0.55 * Math.max(0, s)); rotar(rodillaD, 0.1 + 0.55 * Math.max(0, -s))
+      rotar(brazoI, 0.45 * s, -0.08); rotar(brazoD, -0.45 * s, 0.08)
+      if (cuerpo.current) cuerpo.current.position.y = hipY + Math.abs(Math.cos(t * 7.5)) * 0.035
+      rotar(torsoR, 0.06, 0, 0); rotar(cabezaR, 0, 0, 0)
+      return
+    }
+    if (!sentado) {
+      rotar(musloI, 0); rotar(musloD, 0); rotar(rodillaI, 0); rotar(rodillaD, 0)
+      if (cuerpo.current) cuerpo.current.position.y = hipY
+    }
+    if (torsoR.current) torsoR.current.scale.y = 1 + Math.sin(t * 2.1) * 0.012
+    switch (ps) {
+      case "parado":
+        rotar(brazoI, Math.sin(t * 1.3) * 0.06, -0.1); rotar(brazoD, Math.sin(t * 1.3 + 1) * 0.06, 0.1)
+        rotar(torsoR, 0, 0, 0); rotar(cabezaR, 0, 0, Math.sin(t * 0.45) * 0.45)
+        break
+      case "charlando":
+        rotar(brazoD, -0.95 + Math.sin(t * 2.3) * 0.4, 0.28 + Math.sin(t * 1.7) * 0.2); rotar(brazoI, -0.2 + Math.sin(t * 1.1) * 0.1, -0.1)
+        rotar(torsoR, 0, 0, Math.sin(t * 0.6) * 0.12); rotar(cabezaR, Math.sin(t * 2.8) * 0.07, 0, Math.sin(t * 0.9) * 0.3)
+        break
+      case "presentando":
+        rotar(brazoD, -1.25 + Math.sin(t * 1.7) * 0.25, 0.55 + Math.sin(t * 1.1) * 0.15); rotar(brazoI, -0.2 + Math.sin(t * 1.3) * 0.1, -0.1)
+        rotar(torsoR, 0, 0, Math.sin(t * 0.5) * 0.5); rotar(cabezaR, 0, 0, Math.sin(t * 0.5) * 0.3)
+        break
+      case "sentado": {
+        // de vez en cuando mira el celular
+        const e = clamp01((Math.sin(t * 0.35) - 0.55) / 0.3)
+        rotar(brazoD, -0.45 - e * 1.75, 0.1 + e * 0.15); rotar(brazoI, -0.45 - e * 0.5, -0.1)
+        rotar(torsoR, -0.06 + e * 0.1); rotar(cabezaR, e * 0.32, 0, (1 - e) * Math.sin(t * 0.4) * 0.45)
+        break
+      }
+      case "trabajando":
+        rotar(brazoI, -1.15 + Math.sin(t * 13) * 0.07, -0.04); rotar(brazoD, -1.15 + Math.sin(t * 13 + 1.7) * 0.07, 0.04)
+        rotar(torsoR, 0.1); rotar(cabezaR, 0.06 + Math.sin(t * 0.7) * 0.04, 0, Math.sin(t * 0.3) * 0.15)
+        break
+      case "conversando":
+        rotar(brazoD, -0.95 + Math.sin(t * 2.3) * 0.4, 0.28 + Math.sin(t * 1.7) * 0.2); rotar(brazoI, -0.4 + Math.sin(t * 1.1) * 0.08, -0.1)
+        rotar(torsoR, -0.06 + Math.sin(t * 0.6) * 0.05); rotar(cabezaR, Math.sin(t * 2.8) * 0.07, 0, Math.sin(t * 0.9) * 0.3)
+        break
+      case "alumno": {
+        // escucha, asiente y a veces levanta la mano
+        const e = clamp01((Math.sin(t * 0.16) - 0.82) / 0.12)
+        rotar(brazoD, -0.45 - e * 2.45, 0.1 + e * 0.05); rotar(brazoI, -0.45, -0.1)
+        rotar(torsoR, -0.04); rotar(cabezaR, -0.05 + Math.sin(t * 1.9) * 0.04, 0, Math.sin(t * 0.35) * 0.2)
+        break
+      }
+      case "dormido":
+        rotar(torsoR, 0.38 + Math.sin(t * 0.9) * 0.03); rotar(cabezaR, 0.5 + Math.sin(t * 0.9) * 0.05)
+        break
+    }
+  })
+
   return (
     <group position={p} rotation={[0, rot, 0]} {...interactivo(onClick, tip, sentado ? 1.6 : 2)}>
       {sentado ? null : <Sombra r={0.42} fuerza={0.9} />}
-      <group position={[0, hipY, sentado ? -0.12 : 0]}>
-        {[-1, 1].map((lado) => {
+      <group ref={cuerpo} position={[0, hipY, sentado ? -0.12 : 0]}>
+        {([[-1, musloI, rodillaI], [1, musloD, rodillaD]] as const).map(([lado, mr, rr]) => {
           const { muslo, rodilla } = piernas(lado)
           return (
-            <group key={lado} position={[lado * 0.1, 0, 0]} rotation={[muslo, 0, 0]}>
+            <group key={lado} ref={mr} position={[lado * 0.1, 0, 0]} rotation={[muslo, 0, 0]}>
               <M g={cap(0.085, 0.26)} m={mPant} p={[0, -0.21, 0]} />
-              <group position={[0, -0.42, 0]} rotation={[rodilla, 0, 0]}>
+              <group ref={rr} position={[0, -0.42, 0]} rotation={[rodilla, 0, 0]}>
                 <M g={cap(0.072, 0.28)} m={mPant} p={[0, -0.21, 0]} />
                 <M g={rbox(0.15, 0.09, 0.26, 0.04)} m={mZap} p={[0, -0.4, 0.05]} />
               </group>
             </group>
           )
         })}
-        <group rotation={[torso, 0, 0]}>
+        <group ref={torsoR} rotation={[torso, 0, 0]}>
           <M g={cap(0.2, 0.2)} m={mRopa} p={[0, 0.29, 0]} s={[1.08, 1, 0.78]} />
-          {[-1, 1].map((lado) => {
+          {([[-1, brazoI], [1, brazoD]] as const).map(([lado, br]) => {
             const [bx, bz] = brazo(lado)
             return (
-              <group key={lado} position={[lado * 0.26, 0.5, 0]} rotation={[bx, 0, lado * bz]}>
+              <group key={lado} ref={br} position={[lado * 0.26, 0.5, 0]} rotation={[bx, 0, lado * bz]}>
                 <M g={cap(0.062, 0.36)} m={mRopa} p={[0, -0.22, 0]} />
                 <M g={sph(0.062)} m={mPiel} p={[0, -0.45, 0]} />
               </group>
             )
           })}
-          <group position={[0, 0.66, 0]} rotation={[cabeza, 0, 0]}>
+          <group ref={cabezaR} position={[0, 0.66, 0]} rotation={[cabeza, 0, 0]}>
             <M g={cap(0.06, 0.06)} m={mPiel} p={[0, 0.0, 0]} />
             <M g={sph(0.165)} m={mPiel} p={[0, 0.17, 0]} />
             <M g={hemi(0.172)} m={mPelo} p={[0, 0.2, -0.012]} />
@@ -160,6 +244,55 @@ export function Persona({ p, rot = 0, pose = "parado", ropa, pantalon = "#2B2F6B
       </group>
       {seleccionada ? <mesh geometry={anillo(0.42, 0.56)} material={mat(PALETA.violeta, 0.5, { basica: true, opacity: 0.85 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} /> : null}
       {zz ? <Zz /> : null}
+    </group>
+  )
+}
+
+// Persona que recorre un camino. De ida (entra al llegar: se achica y vuelve a salir desde el principio) o de ida y
+// vuelta con pausas (el formador frente a la pantalla). La fase reparte a varios en el mismo camino.
+export function Paseante({ ruta, vel = 1.2, fase = 0, pausa = 0, idaYVuelta = false, poseQuieto = "parado", ...persona }: {
+  ruta: V3[]; vel?: number; fase?: number; pausa?: number; idaYVuelta?: boolean; poseQuieto?: Pose
+} & Omit<PersonaProps, "p" | "pose" | "poseRef" | "rot">) {
+  const animar = useContext(AnimCtx)
+  const ref = useRef<THREE.Group>(null)
+  const poseRef = useRef<Pose>("caminando")
+  const largos = useMemo(() => ruta.slice(1).map((q, i) => Math.hypot(q[0] - ruta[i][0], q[2] - ruta[i][2]) || 0.0001), [ruta])
+  const total = largos.reduce((a, b) => a + b, 0)
+  const caminar = total / vel
+  const ciclo = idaYVuelta ? 2 * (caminar + pausa) : caminar + pausa
+  const estado = (tiempo: number) => {
+    let tt = (((tiempo / ciclo + fase) % 1) + 1) % 1 * ciclo
+    if (tt < caminar) return { d: tt * vel, quieto: false, vuelta: false }
+    tt -= caminar
+    if (!idaYVuelta || tt < pausa) return { d: total, quieto: true, vuelta: false }
+    tt -= pausa
+    if (tt < caminar) return { d: total - tt * vel, quieto: false, vuelta: true }
+    return { d: 0, quieto: true, vuelta: true }
+  }
+  const punto = (d: number): { pos: V3; ang: number } => {
+    let i = 0, r = d
+    while (i < largos.length - 1 && r > largos[i]) { r -= largos[i]; i++ }
+    const a = ruta[i], b = ruta[i + 1], f = Math.min(1, r / largos[i])
+    return { pos: [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f], ang: Math.atan2(b[0] - a[0], b[2] - a[2]) }
+  }
+  const escala = (d: number) => (idaYVuelta ? 1 : Math.max(0.001, Math.min(1, d / 0.5, (total - d) / 0.5)))
+  const inicio = estado(0)
+  const p0 = punto(inicio.d)
+  useFrame(({ clock }) => {
+    const g = ref.current
+    if (!animar || !g) return
+    const e = estado(clock.getElapsedTime())
+    const { pos, ang } = punto(e.d)
+    g.position.set(pos[0], pos[1], pos[2])
+    const objetivo = e.vuelta ? ang + Math.PI : ang
+    const dA = Math.atan2(Math.sin(objetivo - g.rotation.y), Math.cos(objetivo - g.rotation.y))
+    g.rotation.y += dA * 0.18
+    g.scale.setScalar(escala(e.d))
+    poseRef.current = e.quieto ? poseQuieto : "caminando"
+  })
+  return (
+    <group ref={ref} position={p0.pos} rotation={[0, inicio.vuelta ? p0.ang + Math.PI : p0.ang, 0]} scale={escala(inicio.d)}>
+      <Persona p={[0, 0, 0]} pose="caminando" poseRef={poseRef} {...persona} />
     </group>
   )
 }
@@ -280,15 +413,21 @@ export function Planta({ p, escala = 1 }: { p: V3; escala?: number }) {
 }
 
 export function Arbol({ p, escala = 1 }: { p: V3; escala?: number }) {
+  const animar = useContext(AnimCtx)
+  const copa = useRef<THREE.Group>(null)
+  const fase = p[0] * 0.7 + p[2] * 0.3
+  useFrame(({ clock }) => { if (animar && copa.current) copa.current.rotation.z = Math.sin(clock.getElapsedTime() * 0.8 + fase) * 0.03 })
   return (
     <group position={p} scale={escala}>
       <Sombra r={0.85} />
       <M g={rbox(0.9, 0.46, 0.9, 0.1)} m={mat("#FFFFFF", 0.6)} p={[0, 0.23, 0]} />
       <M g={cyl(0.07, 0.09, 1.1, 10)} m={mat("#9C7A63", 0.9)} p={[0, 0.95, 0]} />
-      <M g={sph(0.55)} m={mat("#6FBF8E", 0.9)} p={[0, 1.75, 0]} />
-      <M g={sph(0.42)} m={mat("#5AAE7E", 0.9)} p={[0.32, 1.55, 0.12]} />
-      <M g={sph(0.4)} m={mat("#7DCC9B", 0.9)} p={[-0.3, 1.6, -0.1]} />
-      <M g={sph(0.36)} m={mat("#64B786", 0.9)} p={[0.05, 2.2, 0.05]} />
+      <group ref={copa} position={[0, 0.5, 0]}>
+        <M g={sph(0.55)} m={mat("#6FBF8E", 0.9)} p={[0, 1.25, 0]} />
+        <M g={sph(0.42)} m={mat("#5AAE7E", 0.9)} p={[0.32, 1.05, 0.12]} />
+        <M g={sph(0.4)} m={mat("#7DCC9B", 0.9)} p={[-0.3, 1.1, -0.1]} />
+        <M g={sph(0.36)} m={mat("#64B786", 0.9)} p={[0.05, 1.7, 0.05]} />
+      </group>
     </group>
   )
 }
@@ -337,6 +476,12 @@ export function Cartel({ p, titulo, contador, alto = 1.8, onClick, giro = Math.P
 // Portal de captación: arco curvo con borde de luz; la cinta entra por el medio (eje z).
 export function Portal({ p, sel, onClick, children }: { p: V3; sel?: boolean; onClick?: () => void; children?: ReactNode }) {
   const R = 2.3
+  const animar = useContext(AnimCtx)
+  useFrame(({ clock }) => {
+    if (!animar) return
+    const m = mat("#F2B8FF", 0.4, { emissive: "#D86BFF", ei: 1.1 }) as THREE.MeshStandardMaterial
+    m.emissiveIntensity = 0.9 + Math.sin(clock.getElapsedTime() * 2) * 0.45
+  })
   return (
     <group position={p}>
       <group {...interactivo(onClick)}>
@@ -419,8 +564,11 @@ export function Holograma({ titulo, formato, fecha, color, imagen, p, onClick, t
   const tex = useMemo(() => holograma({ titulo, formato, fecha, color, imagen: imagen ? img : null }), [titulo, formato, fecha, color, imagen, img])
   const marco = useMemo(() => marcoDegrade(), [])
   const W = 2.6, H = 3.05
+  const animar = useContext(AnimCtx)
+  const ref = useRef<THREE.Group>(null)
+  useFrame(({ clock }) => { if (animar && ref.current) ref.current.position.y = p[1] + Math.sin(clock.getElapsedTime() * 1.1 + p[0] + p[2]) * 0.09 })
   return (
-    <group position={p} rotation={[0, Math.PI / 4, 0]} {...interactivo(onClick, tip, 3.6)}>
+    <group ref={ref} position={p} rotation={[0, Math.PI / 4, 0]} {...interactivo(onClick, tip, 3.6)}>
       <mesh geometry={plano(W + 0.7, H + 0.7)} position={[0, 0, -0.12]}>
         <meshBasicMaterial color="#C9A8FF" transparent opacity={0.22} toneMapped={false} depthWrite={false} />
       </mesh>
@@ -459,11 +607,15 @@ export function Cinta({ desde, hasta, ancho = 1.2, y = ISLA_ALTO, pilares = true
     return t
   }, [largo, ancho])
   const cx = (desde[0] + hasta[0]) / 2, cz = (desde[1] + hasta[1]) / 2
+  const animar = useContext(AnimCtx)
+  const superficie = useRef<THREE.MeshStandardMaterial>(null)
+  // las flechas avanzan a ~1,1 m/s, en el sentido de la cinta
+  useFrame((_, dt) => { const m = superficie.current?.map; if (animar && m) m.offset.x -= (dt * 1.1 * m.repeat.x) / largo })
   return (
     <group position={[cx, 0, cz]} rotation={[0, ang, 0]} {...interactivo(onClick)}>
       <M g={rbox(largo, 0.24, ancho, 0.08)} m={mat("#6A50E0", 0.6)} p={[0, y - 0.14, 0]} />
       <mesh geometry={plano(largo, ancho * 0.72)} rotation={[-Math.PI / 2, 0, 0]} position={[0, y - 0.015, 0]} receiveShadow>
-        <meshStandardMaterial map={tex} roughness={0.6} />
+        <meshStandardMaterial ref={superficie} map={tex} roughness={0.6} />
       </mesh>
       {[-1, 1].map((l) => <M key={l} g={rbox(largo, 0.14, 0.13, 0.05)} m={mat("#B9A8FF", 0.6)} p={[0, y + 0.03, l * (ancho / 2 - 0.065)]} />)}
       {pilares ? Array.from({ length: Math.max(1, Math.floor(largo / 3.2)) }, (_, i) => {

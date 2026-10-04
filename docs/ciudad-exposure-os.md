@@ -76,8 +76,16 @@ la presentación contra la imagen de referencia sin tocar datos, métricas ni pe
   agenda son las únicas capas HTML fijas, y se esconden cuando la vista está muy alejada. El resto aparece al pasar el
   mouse (un solo tooltip) o en el panel.
 - **Islas:** cuatro a la vista (orden: más contactos en 7 días o más recientes) y un paginador para las demás.
-- **Movimiento:** solo por eventos reales. Cuando la actualización trae contactos nuevos, cada uno camina una vez desde
-  su isla hasta el portal. Las figuras quietas en las cintas son los últimos contactos de hoy de esa pieza.
+- **Movimiento (pedido de Alex, 04/10: «tiene que ser 3D real»):** la ciudad está viva. Las personas tienen cuerpo
+  articulado y animación propia: caminan con piernas y brazos, tipean (setters), gesticulan al hablar (closers,
+  seguimiento, espera), miran el celular, asienten y levantan la mano (alumnos), y el formador camina frente a la
+  pantalla y se detiene a explicar. Por las cintas bajan los últimos contactos de cada pieza hasta el portal, y por
+  los caminos pasan registros reales de cada etapa: Captación → Espera, Espera → Setters (asignados), Closers →
+  Seguimiento, entrada a Clientes y Seguimiento → Clientes (clientes nuevos), Clientes → Formación (alumnos). Los
+  recorridos se repiten en bucle (`Paseante` en `modelos.tsx`, rutas en `RUTAS` de `escena.tsx`): muestran el flujo,
+  no cuentan eventos; los totales siguen en los carteles. Las flechas de las cintas avanzan, los hologramas flotan,
+  el portal late y los árboles se mecen. «Pausar» y «reducir movimiento» del sistema congelan todo. Además, cuando la
+  actualización trae contactos nuevos, cada uno camina una vez desde su isla hasta el portal.
 - **Trampa de drei + React 19:** las capas HTML se montan recién cuando el lienzo conectó sus eventos
   (`TrasConectar`); si se crean antes, drei las recrea al conectarse y la primera queda vacía.
 
