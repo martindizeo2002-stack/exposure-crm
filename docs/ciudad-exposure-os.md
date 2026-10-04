@@ -52,6 +52,39 @@ Las fórmulas completas están en el **Diccionario** (botón arriba a la derecha
 - Migración `20261003000001_indice_suscripcion_manychat.sql`: solo un índice sobre la fecha de suscripción de los
   contactos de ManyChat (sin él, la consulta recorría los 82 mil contactos).
 
+## Segunda versión visual (04/10/2026)
+
+La primera escena (cajas con techo de color, figuras tipo pin, carteles HTML flotantes) no estaba aprobada. Se rehízo
+la presentación contra la imagen de referencia sin tocar datos, métricas ni permisos. Capturas en `docs/ciudad-capturas/`
+(01 = antes, 02 = prototipo de una sala y una isla, 03 a 09 = después).
+
+- **Cámara:** ortográfica en tres cuartos, 35° de elevación y 45° de azimut. Las zonas se ubican en coordenadas de
+  pantalla (`components/ciudad/layout.ts`: islas a la izquierda, Setters/Closers/Formación arriba, Agendas al frente,
+  Clientes a la derecha) y cada sala queda alineada a los ejes del mundo y abierta hacia la cámara.
+- **Vista general reproducible:** el encuadre se calcula con las huellas de la escena y el área útil; botón «Vista
+  general». Al abrir el panel (se superpone a la derecha del lienzo) la cámara se corre solo si lo elegido quedó tapado.
+  En el celular arranca cerca, sobre Captación → Espera → Agendas.
+- **Modelos** (`components/ciudad/modelos.tsx`, procedurales, a escala: persona 1,7; asiento 0,45; escritorio 0,75;
+  pared 3): personas con cabeza, torso, brazos y piernas en poses (parado, caminando, sentado, trabajando, conversando,
+  presentando, dormido); sillón, sofá, mesas, escritorio con monitor, sillas de oficina y de aula, plantas y árboles;
+  salas abiertas (piso, pared de fondo y lateral), portal de Captación, pabellón de Clientes con frente de vidrio, islas
+  con holograma y cintas con bordes, flechas y pilares. Sombras suaves y sombra de contacto bajo cada persona y mueble.
+- **Cada sala se reconoce por sus muebles:** Setters (escritorios con monitores), Closers (dos ambientes con mesa
+  redonda y sillones enfrentados), Espera y Seguimiento (sofás y sillones), Formación (pantalla y dos filas de sillas),
+  Clientes (recepción con entrada), Agendas (plaza con butacas en filas que en pantalla quedan horizontales).
+- **Textos:** el nombre de cada área va en un cartel montado sobre la pared (con un contador chico); los horarios de la
+  agenda son las únicas capas HTML fijas, y se esconden cuando la vista está muy alejada. El resto aparece al pasar el
+  mouse (un solo tooltip) o en el panel.
+- **Islas:** cuatro a la vista (orden: más contactos en 7 días o más recientes) y un paginador para las demás.
+- **Movimiento:** solo por eventos reales. Cuando la actualización trae contactos nuevos, cada uno camina una vez desde
+  su isla hasta el portal. Las figuras quietas en las cintas son los últimos contactos de hoy de esa pieza.
+- **Trampa de drei + React 19:** las capas HTML se montan recién cuando el lienzo conectó sus eventos
+  (`TrasConectar`); si se crean antes, drei las recrea al conectarse y la primera queda vacía.
+
+Pendiente de esta parte visual: la mayoría de las islas no tiene miniatura (el radar captura pocas piezas propias), el
+formador del aula representa al equipo y no a una persona puntual, y la iluminación interior cálida de la referencia
+está aproximada con materiales (no hay luces por sala).
+
 ## Lo que falta (etapas D a F)
 
 - **Estado en vivo de las llamadas:** hoy no existe. Se puede sacar de iClosed o de Fathom (llamada empezada /

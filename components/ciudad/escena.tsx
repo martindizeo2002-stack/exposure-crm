@@ -1,550 +1,582 @@
 "use client"
 
-import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber"
-import { Html, MapControls, OrthographicCamera, RoundedBox } from "@react-three/drei"
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
+import { Canvas, useFrame, useThree } from "@react-three/fiber"
+import { Html, MapControls, OrthographicCamera } from "@react-three/drei"
+import { useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react"
 import * as THREE from "three"
-import { COLOR_ANGULO, COLOR_ESTADO, ZONAS, fechaCorta, nombreVisible, numero, type CiudadVista, type Seleccion, type Zona } from "./tipos"
+import { COLOR_ANGULO, COLOR_ESTADO, fechaCorta, horaArt, nombreVisible, numero, type CiudadVista, type EstadoSilla, type Seleccion, type Zona } from "./tipos"
+import {
+  Arbol, Cartel, Cinta, Escritorio, Holograma, Isla, ISLA_ALTO, MesaBaja, MesaRedonda, PantallaAula, Pabellon, Persona, PISO, Planta, Portal,
+  Sala, SillaAula, SillaOficina, Sillon, Sofa, Tablero, mat, peloDe, ropaDe, tipStore, type Pose,
+} from "./modelos"
+import { PALETA } from "./texturas"
+import { AGUA, CAMINOS, CINTA_ANCHO, CINTA_DESDE, CINTA_HASTA, CINTA_X, DIR_CAMARA, ELEVACION, ISLA_D, ISLA_W, ISLAS, PRUEBA, TAM, Z, at, encuadre, huellasCiudad, huellasPrueba, type Huella } from "./layout"
 
-// Exposure OS · Vista ciudad. Escena isométrica (cámara ortográfica) armada con geometría simple: cada figura es un
-// registro real del CRM y cada edificio, una etapa del embudo. Los textos van como capas HTML para que se lean bien.
-// Mapa (unidades de mundo): agua con las islas a la izquierda (x < -10), la cinta de ManyChat entra a Captación,
-// fila de arriba Captación → Espera → Setters → plaza de Agendas, fila de abajo Closers → Seguimiento → Clientes → Formación.
+// Exposure OS · Vista ciudad (segunda versión visual). Diorama isométrico: islas con hologramas sobre el agua, cintas
+// que se juntan en la de ManyChat y entran por el portal de Captación, y salas abiertas con muebles que explican qué
+// pasa en cada una. Cada persona es un registro real (o un integrante real del equipo); los grupos grandes se
+// muestran con una muestra y el cartel da el total exacto. Nada se mueve si no hay un evento real (un contacto nuevo
+// que llega con la actualización de datos).
 
-type Props = { datos: CiudadVista; seleccion: Seleccion; onSeleccion: (s: Seleccion) => void; animar: boolean; nombres: boolean }
-
-const PIEL = "#F6E4DA"
-const BLANCO = "#FCFBFF"
-const LAVANDA = "#E6DEFB"
-const SUELO = "#F1EDFC"
-const CALLE = "#DCD2F7"
-const AGUA = "#B7C6FF"
-
-const POS: Record<Exclude<Zona, "contenido" | "agendas" | "closers">, { x: number; z: number }> = {
-  captacion: { x: -5, z: -9 }, espera: { x: 5.5, z: -9 }, setters: { x: 16, z: -9 },
-  formacion: { x: -5, z: 9 }, clientes: { x: 5.5, z: 9 }, seguimiento: { x: 16, z: 9 },
+type IslaDato = CiudadVista["islas"][number]
+export type Llegada = { id: string; nombre: string; isla: string | null }
+type Props = {
+  datos: CiudadVista; islas: IslaDato[]; seleccion: Seleccion; onSeleccion: (s: Seleccion) => void
+  animar: boolean; nombres: boolean; panel: number; vistaToken: number; modo?: "ciudad" | "prueba"
+  llegadas?: Llegada[]; onLlegadaFin?: (id: string) => void
 }
-const PLAZA = { x0: 23.5, z0: -14, ancho: 12 }
-const OFICINAS = { x0: 23.5, z: 9, paso: 4.6 }
-const CINTA_Z = -9
-// dirección de la cámara (desde el centro): mayormente de frente (+z) y un poco de costado (+x), así el flujo
-// islas → captación → agendas se lee de izquierda a derecha y se ven el frente y un lateral de cada edificio
-const CAM: [number, number, number] = [28, 56, 62]
-const GIRO_HOLO = Math.atan2(CAM[0], CAM[2])
+type V3 = [number, number, number]
 
-type Tip = { p: [number, number, number]; texto: string } | null
-const tipStore = (() => {
-  let actual: Tip = null
-  const subs = new Set<() => void>()
-  return {
-    get: () => actual,
-    set: (t: Tip) => { actual = t; subs.forEach((f) => f()) },
-    sub: (f: () => void) => { subs.add(f); return () => { subs.delete(f) } },
-  }
-})()
+const TEAM = "#2E3A8C"
+
+// Las capas HTML de drei se montan recién cuando el lienzo conectó sus eventos: si se crean antes, drei las vuelve a
+// crear al conectarse y React 19 deja la primera vacía (se perdía un horario de la agenda).
+function TrasConectar({ children }: { children: ReactNode }) {
+  const conectado = useThree((s) => Boolean(s.events.connected))
+  return conectado ? <>{children}</> : null
+}
 
 function Tooltip() {
   const tip = useSyncExternalStore(tipStore.sub, tipStore.get, () => null)
   return (
-    <Html position={tip?.p || [0, -50, 0]} center zIndexRange={[50, 0]} style={{ pointerEvents: "none" }}>
-      <div className={`whitespace-nowrap rounded-lg bg-[#2A2140] px-2 py-1 text-[11px] text-white shadow-lg ${tip ? "" : "hidden"}`}>{tip?.texto}</div>
+    <Html position={tip?.p || [0, -80, 0]} center zIndexRange={[60, 0]} style={{ pointerEvents: "none" }}>
+      <div className={`whitespace-nowrap rounded-lg bg-[#20265F] px-2.5 py-1 text-[12px] font-medium text-white shadow-lg ${tip ? "" : "hidden"}`}>{tip?.texto}</div>
     </Html>
   )
 }
 
-function cursor(v: boolean) { if (typeof document !== "undefined") document.body.style.cursor = v ? "pointer" : "" }
-const parar = (e: ThreeEvent<MouseEvent>) => e.stopPropagation()
+// zoom actual de la cámara, para esconder los rótulos chicos cuando la vista está muy alejada
+const zoomStore = (() => {
+  let z = 14
+  const subs = new Set<() => void>()
+  return { get: () => z, set: (v: number) => { const r = Math.round(v * 2) / 2; if (r !== z) { z = r; subs.forEach((f) => f()) } }, sub: (f: () => void) => { subs.add(f); return () => { subs.delete(f) } } }
+})()
+const ZOOM_ROTULOS = 9
 
-function usePlaca(lineas: string[], color: string) {
-  return useMemo(() => {
-    if (typeof document === "undefined") return null
-    const c = document.createElement("canvas")
-    c.width = 300; c.height = 420
-    const g = c.getContext("2d")
-    if (!g) return null
-    g.fillStyle = "#F6F2FF"; g.fillRect(0, 0, 300, 420)
-    g.fillStyle = color; g.fillRect(0, 0, 300, 14)
-    g.fillStyle = "#2A2140"; g.textAlign = "center"
-    g.font = "600 34px system-ui, sans-serif"; g.fillText(lineas[0] || "", 150, 170)
-    g.font = "28px system-ui, sans-serif"; g.fillStyle = "#6E6590"; g.fillText(lineas[1] || "", 150, 215)
-    g.font = "italic 24px system-ui, sans-serif"; g.fillStyle = "#9A90C2"; g.fillText("sin vista previa", 150, 300)
-    const t = new THREE.CanvasTexture(c)
-    t.colorSpace = THREE.SRGBColorSpace
-    return t
-  }, [lineas, color])
+function Hora(props: { p: V3; hora: string; estado: EstadoSilla; sel: boolean }) {
+  return <TrasConectar><HoraHtml {...props} /></TrasConectar>
 }
-
-function useTextura(url: string | null | undefined) {
-  const [tex, setTex] = useState<THREE.Texture | null>(null)
-  useEffect(() => {
-    if (!url) return
-    let vivo = true
-    const l = new THREE.TextureLoader()
-    l.setCrossOrigin("anonymous")
-    l.load(url, (t) => { if (!vivo) return; t.colorSpace = THREE.SRGBColorSpace; setTex(t) }, undefined, () => { if (vivo) setTex(null) })
-    return () => { vivo = false }
-  }, [url])
-  return url ? tex : null
-}
-
-// ── piezas básicas ─────────────────────────────────────────────────────────────────────────────────────────
-
-function Caja({ p, s, color, sombra = true, opacity }: { p: [number, number, number]; s: [number, number, number]; color: string; sombra?: boolean; opacity?: number }) {
+function HoraHtml({ p, hora, estado, sel }: { p: V3; hora: string; estado: EstadoSilla; sel: boolean }) {
+  const zoom = useSyncExternalStore(zoomStore.sub, zoomStore.get, () => 14)
+  // se esconde con CSS y no se desmonta: montar y desmontar capas HTML seguido hace que React 19 pierda alguna
+  const oculta = zoom < ZOOM_ROTULOS && !sel
   return (
-    <mesh position={p} castShadow={sombra} receiveShadow>
-      <boxGeometry args={s} />
-      <meshStandardMaterial color={color} roughness={0.85} transparent={opacity !== undefined} opacity={opacity ?? 1} />
-    </mesh>
-  )
-}
-
-function Etiqueta({ p, children, onClick, chica }: { p: [number, number, number]; children: ReactNode; onClick?: () => void; chica?: boolean }) {
-  return (
-    <Html position={p} center zIndexRange={[40, 0]} style={{ pointerEvents: onClick ? "auto" : "none" }}>
-      <div
-        // el lienzo escucha los clics del contenedor: sin esto, el clic en el cartel también "erra" la escena y deselecciona
-        onClick={onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
-        // en el celular solo quedan los carteles de los edificios (más chicos); el resto está en el panel
-        className={`select-none whitespace-nowrap rounded-xl border border-violet-200/80 bg-white/95 text-[#2A2140] shadow-[0_6px_18px_-8px_rgba(91,81,216,0.45)] ${chica ? "px-2 py-0.5 text-[10px] max-sm:hidden" : "px-3 py-1.5 text-xs max-sm:px-1.5 max-sm:py-0.5 max-sm:text-[10px]"} ${onClick ? "cursor-pointer hover:border-violet-400" : ""}`}
-      >
-        {children}
+    <Html position={p} center zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
+      <div className={`${oculta ? "hidden" : "flex"} items-center gap-1 whitespace-nowrap rounded-full px-2 py-[1px] text-[12.5px] font-semibold tabular-nums shadow-[0_2px_8px_-2px_rgba(32,38,95,0.35)] ${sel ? "bg-[#7550EF] text-white" : "bg-white text-[#20265F]"}`}>
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: COLOR_ESTADO[estado] }} />{hora}
       </div>
     </Html>
   )
 }
 
-function Figura({ p, color, etiqueta, onClick, escala = 1, atenuada, rot = 0 }: { p: [number, number, number]; color: string; etiqueta?: string; onClick?: () => void; escala?: number; atenuada?: boolean; rot?: number }) {
-  const ref = useRef<THREE.Group>(null)
-  return (
-    <group
-      ref={ref} position={p} scale={escala} rotation={[0, rot, 0]}
-      onClick={(e) => { parar(e); onClick?.() }}
-      onPointerOver={(e) => {
-        e.stopPropagation(); cursor(true)
-        if (etiqueta && ref.current) { const w = new THREE.Vector3(); ref.current.getWorldPosition(w); tipStore.set({ p: [w.x, w.y + 1.5 * escala, w.z], texto: etiqueta }) }
-      }}
-      onPointerOut={() => { cursor(false); tipStore.set(null) }}
-    >
-      <mesh position={[0, 0.42, 0]} castShadow>
-        <capsuleGeometry args={[0.2, 0.34, 4, 10]} />
-        <meshStandardMaterial color={color} roughness={0.6} transparent={atenuada} opacity={atenuada ? 0.5 : 1} />
-      </mesh>
-      <mesh position={[0, 0.93, 0]} castShadow>
-        <sphereGeometry args={[0.19, 16, 12]} />
-        <meshStandardMaterial color={PIEL} roughness={0.7} transparent={atenuada} opacity={atenuada ? 0.5 : 1} />
-      </mesh>
-    </group>
-  )
-}
-
-// figuras de un grupo, en grilla; si hay más registros que lugares se dibujan los más recientes y el resto queda en el contador
-function Gente<T extends { id: string; nombre: string }>({ lista, total, x, z, cols = 6, max = 18, color, colorDe, zona, onSeleccion, nombres, paso = 0.72 }: {
-  lista: T[]; total: number; x: number; z: number; cols?: number; max?: number; color: string; colorDe?: (r: T) => string; zona: Zona; onSeleccion: Props["onSeleccion"]; nombres: boolean; paso?: number
-}) {
-  const visibles = lista.slice(0, Math.min(max, total))
-  return (
-    <group>
-      {visibles.map((r, i) => (
-        <Figura key={r.id} p={[x + (i % cols) * paso, 0.2, z + Math.floor(i / cols) * paso]} color={colorDe ? colorDe(r) : color} etiqueta={nombreVisible(r.nombre, nombres)} onClick={() => onSeleccion({ zona, id: r.id })} escala={0.85} />
-      ))}
-    </group>
-  )
-}
-
-function Edificio({ x, z, w = 7, d = 5, h = 3, techo, zona, titulo, valor, detalle, seleccion, onSeleccion, ventanas = true, children }: {
-  x: number; z: number; w?: number; d?: number; h?: number; techo: string; zona: Zona; titulo: string; valor: string; detalle?: string
-  seleccion: Seleccion; onSeleccion: Props["onSeleccion"]; ventanas?: boolean; children?: ReactNode
-}) {
-  const sel = seleccion?.zona === zona
-  const abrir = () => onSeleccion({ zona })
-  const nV = Math.max(2, Math.floor(w / 1.6))
-  return (
-    <group>
-      <group position={[x, 0, z]} onClick={(e) => { parar(e); abrir() }} onPointerOver={(e) => { e.stopPropagation(); cursor(true) }} onPointerOut={() => cursor(false)}>
-        <Caja p={[0, 0.1, 0]} s={[w + 0.9, 0.2, d + 0.9]} color={sel ? techo : LAVANDA} sombra={false} />
-        <RoundedBox args={[w, h, d]} radius={0.3} smoothness={3} position={[0, h / 2 + 0.2, 0]} castShadow receiveShadow>
-          <meshStandardMaterial color={BLANCO} roughness={0.9} />
-        </RoundedBox>
-        <RoundedBox args={[w + 0.25, 0.4, d + 0.25]} radius={0.15} smoothness={2} position={[0, h + 0.38, 0]} castShadow>
-          <meshStandardMaterial color={techo} roughness={0.55} />
-        </RoundedBox>
-        {ventanas ? Array.from({ length: nV }, (_, i) => (
-          <group key={i}>
-            <Caja p={[-w / 2 + (i + 0.5) * (w / nV), h * 0.62, d / 2 + 0.02]} s={[0.8, 0.7, 0.05]} color="#CFC3F6" sombra={false} />
-            <Caja p={[w / 2 + 0.02, h * 0.62, -d / 2 + (i + 0.5) * (d / nV)]} s={[0.05, 0.7, Math.min(0.8, d / nV - 0.3)]} color="#D9CFF8" sombra={false} />
-          </group>
-        )) : null}
-        <Caja p={[0, 0.78, d / 2 + 0.03]} s={[1.1, 1.15, 0.06]} color={techo} sombra={false} />
-      </group>
-      <Etiqueta p={[x, h + 1.5, z]} onClick={abrir}>
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full" style={{ background: techo }} />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5B4E86] max-sm:text-[8px] max-sm:tracking-normal">{titulo}</span>
-          <span className="text-sm font-bold tabular-nums">{valor}</span>
-        </div>
-        {detalle && sel ? <div className="mt-0.5 text-[10px] text-[#6E6590]">{detalle}</div> : null}
-      </Etiqueta>
-      {children}
-    </group>
-  )
-}
-
-// ── cintas: tramos planos con paquetes que avanzan (un paquete no es una persona: marca el caudal) ─────────────
-
-function Cinta({ puntos, paquetes, color, colorPaquete, ancho = 0.5, animar, velocidad = 1.4, onClick }: {
-  puntos: Array<[number, number]>; paquetes: number; color: string; colorPaquete: string; ancho?: number; animar: boolean; velocidad?: number; onClick?: () => void
-}) {
-  const tramos = useMemo(() => {
-    const out: Array<{ a: [number, number]; b: [number, number]; len: number; ang: number; desde: number }> = []
-    let acc = 0
-    for (let i = 0; i < puntos.length - 1; i++) {
-      const a = puntos[i], b = puntos[i + 1]
-      const dx = b[0] - a[0], dz = b[1] - a[1]
-      const len = Math.hypot(dx, dz)
-      out.push({ a, b, len, ang: Math.atan2(-dz, dx), desde: acc })
-      acc += len
-    }
-    return { out, total: acc }
-  }, [puntos])
-  const posEn = (d: number): [number, number] => {
-    const t = tramos.out.find((s) => d >= s.desde && d <= s.desde + s.len) || tramos.out[tramos.out.length - 1]
-    const f = t.len ? (d - t.desde) / t.len : 0
-    return [t.a[0] + (t.b[0] - t.a[0]) * f, t.a[1] + (t.b[1] - t.a[1]) * f]
-  }
-  const refs = useRef<Array<THREE.Mesh | null>>([])
-  useFrame(({ clock }) => {
-    if (!animar || !tramos.total) return
-    const t = clock.getElapsedTime() * velocidad
-    refs.current.forEach((m, i) => {
-      if (!m) return
-      const [x, z] = posEn((t + (i / paquetes) * tramos.total) % tramos.total)
-      m.position.set(x, 0.32, z)
-    })
-  })
-  return (
-    <group onClick={onClick ? (e) => { parar(e); onClick() } : undefined}>
-      {tramos.out.map((s, i) => (
-        <mesh key={i} position={[(s.a[0] + s.b[0]) / 2, 0.08, (s.a[1] + s.b[1]) / 2]} rotation={[0, s.ang, 0]} receiveShadow>
-          <boxGeometry args={[s.len + ancho, 0.14, ancho]} />
-          <meshStandardMaterial color={color} roughness={0.5} />
-        </mesh>
-      ))}
-      {Array.from({ length: paquetes }, (_, i) => {
-        const [x, z] = posEn(((i + 0.5) / paquetes) * tramos.total)
-        return (
-          <mesh key={i} ref={(m) => { refs.current[i] = m }} position={[x, 0.32, z]} castShadow>
-            <boxGeometry args={[0.26, 0.2, 0.26]} />
-            <meshStandardMaterial color={colorPaquete} emissive={colorPaquete} emissiveIntensity={0.25} />
-          </mesh>
-        )
-      })}
-    </group>
-  )
-}
-
-// ── islas ──────────────────────────────────────────────────────────────────────────────────────────────────
-
-type IslaDato = CiudadVista["islas"][number]
-const LUGARES_ISLA = (() => {
-  // dos filas pegadas a la cinta (norte y sur) y dos más afuera, corridas medio paso para que sus cintas pasen entre islas
-  const out: Array<{ x: number; z: number }> = []
-  const filas = [{ z: CINTA_Z - 3.6, off: 0 }, { z: CINTA_Z + 3.6, off: 0 }, { z: CINTA_Z - 7.8, off: 1.9 }, { z: CINTA_Z + 7.8, off: 1.9 }]
-  for (const f of filas) for (let k = 0; k < 6; k++) out.push({ x: -13 - k * 3.8 - f.off, z: f.z })
-  return out
-})()
-
-function Isla({ isla, x, z, sel, conEtiqueta, onSeleccion, animar }: { isla: IslaDato; x: number; z: number; sel: boolean; conEtiqueta: boolean; onSeleccion: Props["onSeleccion"]; animar: boolean }) {
-  const tex = useTextura(isla.preview?.imagen)
-  const color = COLOR_ANGULO[isla.angulo || ""] || "#B8B0D8"
-  const lineas = useMemo(() => [String(isla.formato || isla.categoria || "Pieza").slice(0, 16), fechaCorta(isla.fecha)], [isla.formato, isla.categoria, isla.fecha])
-  const placa = usePlaca(lineas, color)
-
-  const holo = useRef<THREE.Group>(null)
-  const alto = isla.categoria === "Carrusel" ? 1.9 : 2.4
-  useFrame(({ clock }) => { if (animar && holo.current) holo.current.position.y = 3.2 + Math.sin(clock.getElapsedTime() * 1.1 + x) * 0.12 })
-  const abrir = () => onSeleccion({ zona: "contenido", id: isla.id })
-  return (
-    <group position={[x, 0, z]} onClick={(e) => { parar(e); abrir() }} onPointerOver={(e) => { e.stopPropagation(); cursor(true); tipStore.set({ p: [x, 1.4, z + 1.6], texto: `${isla.nombre} · ${isla.leads === null ? "leads N/D" : `${numero(isla.leads)} leads`}${isla.semana ? ` · ${numero(isla.semana)} en 7 días` : ""}` }) }} onPointerOut={() => { cursor(false); tipStore.set(null) }}>
-      <mesh position={[0, -0.2, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[1.55, 1.05, 0.95, 24]} />
-        <meshStandardMaterial color="#EEDDC4" roughness={0.95} />
-      </mesh>
-      <mesh position={[0, 0.33, 0]} receiveShadow>
-        <cylinderGeometry args={[1.45, 1.55, 0.14, 24]} />
-        <meshStandardMaterial color={sel ? "#FFFFFF" : color} roughness={0.7} />
-      </mesh>
-      <mesh position={[0, 1.1, 0]} castShadow>
-        <cylinderGeometry args={[0.12, 0.3, 1.5, 12]} />
-        <meshStandardMaterial color="#F4F0FF" />
-      </mesh>
-      <group ref={holo} position={[0, 3.2, 0]} rotation={[0, GIRO_HOLO, 0]}>
-        <mesh position={[0, 0, -0.03]}>
-          <planeGeometry args={[1.62, alto + 0.12]} />
-          <meshBasicMaterial color={color} transparent opacity={0.55} side={THREE.DoubleSide} />
-        </mesh>
-        <mesh key={tex ? "con" : "sin"}>
-          <planeGeometry args={[1.5, alto]} />
-          <meshBasicMaterial map={tex || placa} side={THREE.DoubleSide} toneMapped={false} />
-        </mesh>
-      </group>
-      {conEtiqueta || sel ? (
-        <Etiqueta p={[0, 0.2, 2.0]} chica onClick={abrir}>
-          <span className="font-semibold">{isla.formato || isla.categoria || "Pieza"}</span> · {fechaCorta(isla.fecha)} · <span className="tabular-nums">{isla.leads === null ? "leads N/D" : `${numero(isla.leads)} leads`}</span>{isla.semana ? <span className="text-[#C13584]"> · {numero(isla.semana)} en 7 días</span> : null}
-        </Etiqueta>
-      ) : null}
-    </group>
-  )
-}
-
-// ── agendas: una fila de sillas por closer ──────────────────────────────────────────────────────────────────
-
-function useCartel(texto: string, fondo: string) {
-  return useMemo(() => {
-    if (typeof document === "undefined") return null
-    const c = document.createElement("canvas")
-    c.width = 160; c.height = 72
-    const g = c.getContext("2d")
-    if (!g) return null
-    g.fillStyle = fondo; g.fillRect(0, 0, 160, 72)
-    g.fillStyle = "#FFFFFF"; g.textAlign = "center"; g.textBaseline = "middle"
-    g.font = "700 46px system-ui, sans-serif"; g.fillText(texto, 80, 38)
-    const t = new THREE.CanvasTexture(c)
-    t.colorSpace = THREE.SRGBColorSpace
-    return t
-  }, [texto, fondo])
-}
-
-function Silla({ x, z, estado, nombre, hora, onClick, nombres }: { x: number; z: number; estado: keyof typeof COLOR_ESTADO; nombre: string; hora: string; onClick: () => void; nombres: boolean }) {
-  const c = COLOR_ESTADO[estado]
-  const vacia = estado === "no_show" || estado === "cancelada"
-  const cartel = useCartel(hora, c)
-  return (
-    <group position={[x, 0, z]} onClick={(e) => { parar(e); onClick() }} onPointerOver={(e) => { e.stopPropagation(); cursor(true) }} onPointerOut={() => cursor(false)}>
-      <Caja p={[0, 0.25, 0]} s={[0.14, 0.5, 0.14]} color="#CFC6EE" />
-      <Caja p={[0, 0.55, 0]} s={[0.78, 0.12, 0.72]} color={c} />
-      <Caja p={[0, 1.15, -0.33]} s={[0.86, 1.15, 0.1]} color={c} />
-      <mesh position={[0, 1.5, -0.27]}>
-        <planeGeometry args={[0.84, 0.4]} />
-        <meshBasicMaterial map={cartel} toneMapped={false} />
-      </mesh>
-      {vacia ? null : <Figura p={[0, 0.32, 0.12]} color="#3F3566" atenuada={estado === "sin_resultado" || estado === "reprogramada"} etiqueta={`${hora} · ${nombreVisible(nombre, nombres)}`} onClick={onClick} escala={0.82} />}
-    </group>
-  )
-}
-
-function Plaza({ datos, seleccion, onSeleccion, nombres }: Pick<Props, "datos" | "seleccion" | "onSeleccion" | "nombres">) {
-  const { x0, z0, ancho } = PLAZA
-  const carriles = datos.agendas.carriles
-  const fondoCarril = 3.4
-  const largo = Math.max(9, 2.6 + carriles.length * fondoCarril)
-  const porFila = 7
-  const sel = seleccion?.zona === "agendas"
-  const dia = new Date(`${datos.dia}T12:00:00Z`).toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "UTC" })
-  return (
-    <group>
-      <group onClick={(e) => { parar(e); onSeleccion({ zona: "agendas" }) }}>
-        <Caja p={[x0 + ancho / 2, 0.1, z0 + largo / 2]} s={[ancho, 0.2, largo]} color={sel ? "#E9E4FF" : "#F7F5FF"} sombra={false} />
-        <Caja p={[x0 + ancho / 2, 0.3, z0]} s={[ancho, 0.4, 0.25]} color="#5B51D8" />
-        <Caja p={[x0, 0.3, z0 + largo / 2]} s={[0.25, 0.4, largo]} color="#5B51D8" />
-      </group>
-      <Etiqueta p={[x0 + ancho / 2, 2.4, z0 - 0.6]} onClick={() => onSeleccion({ zona: "agendas" })}>
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-[#5B51D8]" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5B4E86] max-sm:text-[8px] max-sm:tracking-normal">Agendas · {dia}</span>
-          <span className="text-sm font-bold tabular-nums">{datos.agendas.total}</span>
-        </div>
-      </Etiqueta>
-      {carriles.map((c, i) => {
-        const cz = z0 + 2 + i * fondoCarril + fondoCarril / 2
-        const filas = Math.max(1, Math.ceil(c.sillas.length / porFila))
-        return (
-          <group key={c.closer}>
-            <Caja p={[x0 + ancho / 2 + 0.6, 0.22, cz]} s={[ancho - 1.6, 0.05, fondoCarril - 0.5]} color="#ECE6FF" sombra={false} />
-            <Etiqueta p={[x0 + 1.3, 0.7, cz + 0.4]} chica onClick={() => onSeleccion({ zona: "closers", id: c.closer })}>
-              <span className={c.en_equipo ? "font-semibold" : "italic text-[#8A80AE]"}>{c.closer.split(" ")[0]}</span> · <span className="tabular-nums">{c.sillas.length}</span>
-            </Etiqueta>
-            {c.sillas.map((s, j) => (
-              <Silla key={s.id} x={x0 + 3.6 + (j % porFila) * 1.25} z={cz + (filas > 1 ? (Math.floor(j / porFila) - (filas - 1) / 2) * 1.3 : 0)} estado={s.estado} nombre={s.nombre} hora={s.hora} nombres={nombres} onClick={() => onSeleccion({ zona: "agendas", id: s.id })} />
-            ))}
-          </group>
-        )
-      })}
-    </group>
-  )
-}
-
-// ── closers: una oficina amueblada por closer ───────────────────────────────────────────────────────────────
-
-function Oficina({ c, x, z, onSeleccion, animar, nombres }: { c: CiudadVista["closers"][number]; x: number; z: number; onSeleccion: Props["onSeleccion"]; animar: boolean; nombres: boolean }) {
-  const pantalla = useRef<THREE.MeshStandardMaterial>(null)
-  const enLlamada = Boolean(c.en_horario)
-  useFrame(({ clock }) => { if (pantalla.current && enLlamada && animar) pantalla.current.emissiveIntensity = 0.6 + Math.sin(clock.getElapsedTime() * 3) * 0.3 })
-  const abrir = () => onSeleccion({ zona: "closers", id: c.nombre })
-  return (
-    <group>
-      <group position={[x, 0, z]} onClick={(e) => { parar(e); abrir() }} onPointerOver={(e) => { e.stopPropagation(); cursor(true) }} onPointerOut={() => cursor(false)}>
-        <Caja p={[0, 0.1, 0]} s={[3.4, 0.2, 3.4]} color="#F7F4FF" sombra={false} />
-        <Caja p={[0, 1.25, -1.65]} s={[3.4, 2.1, 0.12]} color={BLANCO} />
-        <Caja p={[-1.65, 1.25, 0]} s={[0.12, 2.1, 3.4]} color="#F0EBFF" />
-        <Caja p={[0, 1.95, -1.58]} s={[3.4, 0.18, 0.04]} color="#405DE6" sombra={false} />
-        {/* escritorio, monitor y sillas */}
-        <Caja p={[0, 0.78, -0.55]} s={[1.7, 0.1, 0.8]} color="#D8CCF7" />
-        <Caja p={[-0.75, 0.45, -0.55]} s={[0.08, 0.6, 0.7]} color="#C9BCF0" />
-        <Caja p={[0.75, 0.45, -0.55]} s={[0.08, 0.6, 0.7]} color="#C9BCF0" />
-        <mesh position={[0, 1.2, -0.25]} rotation={[0, Math.PI, 0]} castShadow>
-          <boxGeometry args={[0.9, 0.55, 0.05]} />
-          <meshStandardMaterial ref={pantalla} color="#2B2440" emissive={enLlamada ? "#E1306C" : "#5B51D8"} emissiveIntensity={enLlamada ? 0.7 : 0.15} />
-        </mesh>
-        <Caja p={[0, 0.45, -1.15]} s={[0.6, 0.1, 0.55]} color="#B9AEE6" />
-        <Figura p={[0, 0.2, -1.1]} color="#405DE6" etiqueta={`${c.nombre}${c.en_equipo ? "" : " (no figura en el equipo)"}`} onClick={abrir} />
-        {c.en_horario ? <Figura p={[0, 0.2, 0.45]} rot={Math.PI} color={COLOR_ESTADO.en_horario} etiqueta={`${c.en_horario.hora} · ${nombreVisible(c.en_horario.nombre, nombres)} (en horario)`} onClick={() => onSeleccion({ zona: "agendas", id: c.en_horario?.id })} /> : null}
-        {/* planta */}
-        <mesh position={[1.25, 0.4, -1.2]} castShadow><cylinderGeometry args={[0.22, 0.17, 0.4, 12]} /><meshStandardMaterial color="#E9D9C0" /></mesh>
-        <mesh position={[1.25, 0.85, -1.2]} castShadow><sphereGeometry args={[0.34, 12, 10]} /><meshStandardMaterial color="#7FC8A9" /></mesh>
-      </group>
-      <Etiqueta p={[x, 2.9, z - 1.2]} chica onClick={abrir}>
-        <span className={c.en_equipo ? "font-semibold" : "italic text-[#8A80AE]"}>{c.nombre.split(" ")[0]}</span> · <span className="tabular-nums">{c.llamadas}</span>
-      </Etiqueta>
-    </group>
-  )
-}
-
-// ── suelo, agua y calles ────────────────────────────────────────────────────────────────────────────────────
-
-function Suelo() {
-  return (
-    <group>
-      <mesh position={[-23.5, -0.45, CINTA_Z]} receiveShadow>
-        <boxGeometry args={[28, 0.5, 23]} />
-        <meshStandardMaterial color={AGUA} roughness={0.25} metalness={0.05} transparent opacity={0.92} />
-      </mesh>
-      <Caja p={[13.5, -0.2, 0.5]} s={[47, 0.4, 39]} color={SUELO} sombra={false} />
-      <Caja p={[6.5, 0.02, -4.4]} s={[31, 0.05, 1.3]} color={CALLE} sombra={false} />
-      <Caja p={[13.5, 0.02, 15.2]} s={[45, 0.05, 1.3]} color={CALLE} sombra={false} />
-      <Caja p={[21.6, 0.02, 5.4]} s={[1.3, 0.05, 20.4]} color={CALLE} sombra={false} />
-      <Caja p={[28.5, 0.02, 3.6]} s={[13, 0.05, 1.3]} color={CALLE} sombra={false} />
-    </group>
-  )
-}
-
-// encuadre inicial: el zoom se ajusta una vez al tamaño del lienzo (después manda el usuario)
-function Camara() {
+// ── encuadre: vista general reproducible y la selección nunca queda debajo del panel ─────────────────────────
+function Encuadre({ huellas, panel, token, foco, esPrueba }: { huellas: Huella[]; panel: number; token: number; foco: V3 | null; esPrueba?: boolean }) {
   const size = useThree((s) => s.size)
-  const hayControles = useThree((s) => Boolean(s.controls))
   const get = useThree((s) => s.get)
-  const ajustada = useRef(false)
+  const hayControles = useThree((s) => Boolean(s.controls))
+  const libre = useRef(false)
+
   useEffect(() => {
-    const { camera, controls } = get()
+    const c = get().controls as unknown as THREE.EventDispatcher<{ start: object }> | null
+    if (!c) return
+    const f = () => { libre.current = true }
+    const g = () => zoomStore.set((get().camera as THREE.OrthographicCamera).zoom)
+    c.addEventListener("start", f)
+    ;(c as unknown as THREE.EventDispatcher<{ change: object }>).addEventListener("change", g)
+    return () => { c.removeEventListener("start", f); (c as unknown as THREE.EventDispatcher<{ change: object }>).removeEventListener("change", g) }
+  }, [hayControles, get])
+
+  const aplicar = (objetivo: THREE.Vector3, zoom?: number) => {
+    const { camera, controls, invalidate } = get()
     const cam = camera as THREE.OrthographicCamera
     const ctl = controls as unknown as { target: THREE.Vector3; update: () => void } | null
-    if (ajustada.current || !size.width || !cam.isOrthographicCamera || !ctl) return
-    ajustada.current = true
-    if (size.width < 640) {
-      // celular: arranca cerca, sobre el embudo (captación → agendas); las islas quedan a un arrastre
-      const t = new THREE.Vector3(6, 0, 0)
-      cam.position.set(t.x + CAM[0], CAM[1], t.z + CAM[2])
-      ctl.target.copy(t)
-      ctl.update()
-      cam.zoom = size.width / 34
-    } else {
-      cam.zoom = Math.max(3, Math.min(size.width / 80, size.height / 46))
-    }
+    if (!ctl || !cam.isOrthographicCamera) return
+    cam.position.copy(objetivo).addScaledVector(DIR_CAMARA, 200)
+    if (zoom) cam.zoom = zoom
     cam.updateProjectionMatrix()
-  }, [size, hayControles, get])
+    ctl.target.copy(objetivo)
+    ctl.update()
+    zoomStore.set(cam.zoom)
+    invalidate()
+  }
+  // en el celular no se muestra la ciudad entera (quedaría diminuta): arranca cerca, sobre Captación → Espera → Agendas
+  const general = () => {
+    if (size.width < 640 && !esPrueba) {
+      const [x, z] = at(32, 31)
+      return { objetivo: new THREE.Vector3(x, 0, z), zoom: size.width / 20 }
+    }
+    return encuadre(huellas, size.width, size.height, panel)
+  }
+
+  // vista general al abrir, al pedirla con el botón y al cambiar el tamaño (si el usuario no movió la cámara)
+  useEffect(() => {
+    if (!hayControles || !size.width) return
+    libre.current = false
+    const e = general()
+    aplicar(e.objetivo, e.zoom)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, hayControles, huellas])
+  useEffect(() => {
+    if (!hayControles || !size.width || libre.current) return
+    const e = general()
+    aplicar(e.objetivo, e.zoom)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size.width, size.height, panel])
+
+  // si lo elegido quedó debajo del panel o fuera de cuadro, se corre la cámara lo justo (sin cambiar el zoom)
+  useEffect(() => {
+    if (!foco || !hayControles) return
+    const { camera, controls } = get()
+    const ctl = controls as unknown as { target: THREE.Vector3 } | null
+    if (!ctl) return
+    const v = new THREE.Vector3(...foco).project(camera)
+    const px = ((v.x + 1) / 2) * size.width, py = ((1 - v.y) / 2) * size.height
+    const util = size.width - panel
+    if (px > 40 && px < util - 40 && py > 40 && py < size.height - 40) return
+    const cam = camera as THREE.OrthographicCamera
+    const dx = (px - util / 2) / cam.zoom, dy = (py - size.height / 2) / cam.zoom
+    const derecha = new THREE.Vector3(1, 0, -1).normalize()
+    const abajo = new THREE.Vector3(1, 0, 1).normalize().multiplyScalar(1 / Math.sin(ELEVACION))
+    const objetivo = ctl.target.clone().addScaledVector(derecha, dx).addScaledVector(abajo, dy)
+    libre.current = true
+    aplicar(objetivo)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [foco?.[0], foco?.[1], foco?.[2], panel])
   return null
 }
 
-// ── escena completa ─────────────────────────────────────────────────────────────────────────────────────────
+// Luz principal con sombras suaves, apuntada al centro de la escena (el target tiene que estar en la escena).
+function LuzPrincipal({ centro }: { centro: V3 }) {
+  const ref = useRef<THREE.DirectionalLight>(null)
+  const scene = useThree((s) => s.scene)
+  useEffect(() => {
+    const l = ref.current
+    if (!l) return
+    l.target.position.set(...centro)
+    scene.add(l.target)
+    return () => { scene.remove(l.target) }
+  }, [scene, centro])
+  return (
+    <directionalLight
+      ref={ref} position={[centro[0] - 20, 44, centro[2] + 6]} intensity={2.3} color="#FFFDFB" castShadow
+      shadow-mapSize-width={2048} shadow-mapSize-height={2048} shadow-radius={3} shadow-blurSamples={10}
+      shadow-camera-left={-48} shadow-camera-right={48} shadow-camera-top={48} shadow-camera-bottom={-48} shadow-camera-near={1} shadow-camera-far={160} shadow-bias={-0.0004}
+    />
+  )
+}
 
-function Ciudad({ datos, seleccion, onSeleccion, animar, nombres }: Props) {
-  const islas = datos.islas.slice(0, LUGARES_ISLA.length)
-  const destacadas = new Set([...islas].filter((i) => (i.semana || 0) > 0).sort((a, b) => (b.semana || 0) - (a.semana || 0)).slice(0, 4).map((i) => i.id))
-  const segC = datos.seguimiento.lista.map((s) => ({ ...s, id: String(s.id) }))
-  const nuevos = datos.clientes.lista.filter((c) => c.nuevo).map((c) => ({ ...c, id: String(c.id) }))
-  const alumnos = datos.clientes.lista.map((c) => ({ ...c, id: String(c.id) }))
-  const setters = datos.setters.equipo.map((s) => ({ ...s, id: s.nombre }))
-  const caudal = (n: number | null) => (n ? Math.min(6, Math.max(1, Math.ceil(Math.log2(n + 1)))) : 0)
+// ── suelo y agua ──────────────────────────────────────────────────────────────────────────────────────────
+function Suelo() {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[30, -0.06, -6]} receiveShadow>
+      <planeGeometry args={[400, 400]} />
+      <meshStandardMaterial color="#FBF9FF" roughness={0.95} />
+    </mesh>
+  )
+}
 
+function Agua({ x0, x1, z0, z1 }: { x0: number; x1: number; z0: number; z1: number }) {
+  const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2
+  const borde = mat("#ECE6FB", 0.8)
+  const tramos: Array<[number, number, number, number]> = [[cx, z0 - 0.25, w + 1, 0.5], [cx, z1 + 0.25, w + 1, 0.5], [x0 - 0.25, cz, 0.5, d], [x1 + 0.25, cz, 0.5, d]]
   return (
     <group>
-      <Suelo />
-
-      {/* cinta principal de ManyChat → Captación */}
-      <Cinta puntos={[[-37, CINTA_Z], [-8.6, CINTA_Z]]} paquetes={Math.min(26, Math.max(3, Math.ceil(datos.captacion.semana / 50)))} color="#F3C3DA" colorPaquete="#E1306C" ancho={1.1} animar={animar} velocidad={2.2} onClick={() => onSeleccion({ zona: "captacion" })} />
-      <Etiqueta p={[-34, 0.9, CINTA_Z]} chica onClick={() => onSeleccion({ zona: "captacion" })}>
-        <span className="font-semibold text-[#C13584]">ManyChat</span> · {numero(datos.captacion.semana)} contactos en 7 días
-      </Etiqueta>
-
-      {/* islas de contenido y sus cintas */}
-      {islas.map((isla, i) => {
-        const l = LUGARES_ISLA[i]
-        const haciaCinta = l.z < CINTA_Z ? CINTA_Z - 0.55 : CINTA_Z + 0.55
-        const borde = l.z < CINTA_Z ? l.z + 1.4 : l.z - 1.4
-        const activa = (isla.semana || 0) > 0
-        return (
-          <group key={isla.id}>
-            <Cinta puntos={[[l.x, borde], [l.x, haciaCinta]]} paquetes={caudal(isla.semana)} color={activa ? "#E7D5F6" : "#E4E0EF"} colorPaquete={COLOR_ANGULO[isla.angulo || ""] || "#B8B0D8"} ancho={0.42} animar={animar && activa} velocidad={0.9} />
-            <Isla isla={isla} x={l.x} z={l.z} sel={seleccion?.zona === "contenido" && seleccion.id === isla.id} conEtiqueta={destacadas.has(isla.id)} onSeleccion={onSeleccion} animar={animar} />
-          </group>
-        )
-      })}
-      {datos.islas.length > islas.length ? <Etiqueta p={[-36, 1.2, CINTA_Z + 11]} chica onClick={() => onSeleccion({ zona: "contenido" })}>+{datos.islas.length - islas.length} piezas en la lista</Etiqueta> : null}
-
-      {/* fila de arriba */}
-      <Edificio {...POS.captacion} h={3.4} techo={ZONAS.captacion.color} zona="captacion" titulo="Captación" valor={numero(datos.captacion.hoy)} detalle={`hoy · ayer ${numero(datos.captacion.ayer)} · 7 días ${numero(datos.captacion.semana)}`} seleccion={seleccion} onSeleccion={onSeleccion}>
-        <Gente lista={datos.captacion.lista} total={datos.captacion.hoy} x={POS.captacion.x - 2.6} z={POS.captacion.z + 3.4} color="#E1306C" zona="captacion" onSeleccion={onSeleccion} nombres={nombres} max={14} cols={7} />
-      </Edificio>
-      <Edificio {...POS.espera} h={2.6} techo={ZONAS.espera.color} zona="espera" titulo="Sala de espera" valor={numero(datos.espera.total)} detalle="sin asignar ni agendar · 7 días" seleccion={seleccion} onSeleccion={onSeleccion}>
-        <Caja p={[POS.espera.x, 0.35, POS.espera.z + 3.1]} s={[5.6, 0.12, 0.5]} color="#E8DDFB" />
-        <Gente lista={datos.espera.lista} total={datos.espera.total} x={POS.espera.x - 2.6} z={POS.espera.z + 3.4} color="#F77737" zona="espera" onSeleccion={onSeleccion} nombres={nombres} max={14} cols={7} />
-      </Edificio>
-      <Edificio {...POS.setters} h={3.1} techo={ZONAS.setters.color} zona="setters" titulo="Setters" valor={numero(datos.setters.conversando.total)} detalle={`en conversación · ${datos.setters.equipo.filter((s) => s.en_equipo).length} setter(s) en el equipo`} seleccion={seleccion} onSeleccion={onSeleccion}>
-        {setters.map((s, i) => (
-          <group key={s.id}>
-            <Caja p={[POS.setters.x - 2.4 + i * 1.6, 0.75, POS.setters.z + 3.0]} s={[1.2, 0.1, 0.6]} color="#D8CCF7" />
-            <Figura p={[POS.setters.x - 2.4 + i * 1.6, 0.2, POS.setters.z + 2.5]} color={s.en_equipo ? "#C13584" : "#B8B0D8"} etiqueta={`${s.nombre} · ${s.agendas_7d} agendas en 7 días`} onClick={() => onSeleccion({ zona: "setters", id: s.id })} />
-          </group>
-        ))}
-        <Gente lista={datos.setters.conversando.lista} total={datos.setters.conversando.total} x={POS.setters.x - 2.6} z={POS.setters.z + 4.2} color="#C13584" zona="setters" onSeleccion={onSeleccion} nombres={nombres} max={14} cols={7} />
-      </Edificio>
-
-      <Plaza datos={datos} seleccion={seleccion} onSeleccion={onSeleccion} nombres={nombres} />
-
-      {/* fila de abajo */}
-      {datos.closers.map((c, i) => (
-        <Oficina key={c.nombre} c={c} x={OFICINAS.x0 + 2 + (i % 3) * OFICINAS.paso} z={OFICINAS.z + Math.floor(i / 3) * 5} onSeleccion={onSeleccion} animar={animar} nombres={nombres} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0.0, cz]} receiveShadow>
+        <planeGeometry args={[w, d]} />
+        <meshStandardMaterial color="#BDEBFA" roughness={0.3} metalness={0} />
+      </mesh>
+      {tramos.map(([x, z, ww, dd], i) => (
+        <mesh key={i} position={[x, 0.09, z]} material={borde} castShadow receiveShadow><boxGeometry args={[ww, 0.3, dd]} /></mesh>
       ))}
-      <Etiqueta p={[OFICINAS.x0 + 7, 0.6, OFICINAS.z + 3.4]} chica onClick={() => onSeleccion({ zona: "closers" })}>
-        <span className="font-semibold text-[#405DE6]">Closers</span> · {datos.closers.reduce((t, c) => t + c.llamadas, 0)} calls del día
-      </Etiqueta>
-      <Edificio {...POS.seguimiento} h={2.8} techo={ZONAS.seguimiento.color} zona="seguimiento" titulo="Seguimiento" valor={numero(datos.seguimiento.total)} detalle={`${datos.seguimiento.vencidos} con FUP vencido · ${datos.seguimiento.sin_fecha} sin fecha`} seleccion={seleccion} onSeleccion={onSeleccion}>
-        <Gente lista={segC} total={datos.seguimiento.total} x={POS.seguimiento.x - 2.6} z={POS.seguimiento.z + 3.4} color="#B23A9E" colorDe={(s) => (s.vencido ? "#F77737" : s.proximo_fup ? "#405DE6" : "#B8B0D8")} zona="seguimiento" onSeleccion={onSeleccion} nombres={nombres} max={14} cols={7} />
-      </Edificio>
-      <Edificio {...POS.clientes} h={3.2} techo={ZONAS.clientes.color} zona="clientes" titulo="Clientes" valor={numero(datos.clientes.nuevos_30d)} detalle={`entraron en 30 días · ${datos.clientes.cuotas_vencidas.total} cuotas vencidas`} seleccion={seleccion} onSeleccion={onSeleccion}>
-        <Gente lista={nuevos} total={datos.clientes.nuevos_30d} x={POS.clientes.x - 2.6} z={POS.clientes.z + 3.4} color="#22A37A" zona="clientes" onSeleccion={onSeleccion} nombres={nombres} max={14} cols={7} />
-      </Edificio>
-      <Edificio {...POS.formacion} h={3.6} w={7.5} techo={ZONAS.formacion.color} zona="formacion" titulo="Formación" valor={numero(datos.formacion.alumnos)} detalle={datos.formacion.disponible ? `${datos.formacion.con_actividad} con actividad` : "alumnos · actividad no disponible"} seleccion={seleccion} onSeleccion={onSeleccion}>
-        <Gente lista={alumnos} total={datos.formacion.alumnos} x={POS.formacion.x - 2.6} z={POS.formacion.z + 3.4} color="#6D5DD3" zona="formacion" onSeleccion={onSeleccion} nombres={nombres} max={14} cols={7} />
-      </Edificio>
     </group>
   )
 }
 
-export default function Escena(props: Props) {
+// ── islas ─────────────────────────────────────────────────────────────────────────────────────────────────
+function IslaContenido({ isla, x, z, lado, sel, onSeleccion, gente, nombres, idSel, hastaX = CINTA_X + lado * (CINTA_ANCHO / 2 - 0.05) }: {
+  isla: IslaDato; x: number; z: number; lado: number; sel: boolean; onSeleccion: Props["onSeleccion"]
+  gente: CiudadVista["captacion"]["lista"]; nombres: boolean; idSel?: string; hastaX?: number
+}) {
+  const color = COLOR_ANGULO[isla.angulo || ""] || "#9B87F5"
+  const titulo = String(isla.formato || isla.categoria || isla.nombre || "Pieza").slice(0, 22)
+  const formato = isla.categoria === "Carrusel" ? "Carrusel" : isla.categoria === "Historia" ? "Historia" : "Reel"
+  const abrir = () => onSeleccion({ zona: "contenido", id: isla.id })
+  const tip = `${isla.nombre} · ${isla.leads === null ? "leads N/D" : `${numero(isla.leads)} leads`}${isla.semana ? ` · ${numero(isla.semana)} en 7 días` : ""}`
+  // la cinta de la isla sale hacia la cinta principal
+  const x0 = x - lado * (ISLA_W / 2 - 0.2), x1 = hastaX
   return (
-    <Canvas shadows="percentage" dpr={[1, 2]} frameloop={props.animar ? "always" : "demand"} gl={{ antialias: true, alpha: true }} onPointerMissed={() => props.onSeleccion(null)}>
-      <OrthographicCamera makeDefault position={[CAM[0] - 0.5, CAM[1], CAM[2]]} zoom={12} near={-500} far={1000} />
-      <Camara />
-      <MapControls makeDefault target={[-0.5, 0, 0]} enableRotate={false} zoomToCursor enableDamping dampingFactor={0.12} minZoom={4} maxZoom={70} screenSpacePanning />
-      <ambientLight intensity={1.7} color="#F6F2FF" />
-      <hemisphereLight args={["#FFFFFF", "#D9CCFF", 0.8]} />
-      <directionalLight
-        position={[30, 50, 22]} intensity={1.25} castShadow
-        shadow-mapSize-width={2048} shadow-mapSize-height={2048}
-        shadow-camera-left={-60} shadow-camera-right={60} shadow-camera-top={45} shadow-camera-bottom={-45} shadow-camera-near={1} shadow-camera-far={160} shadow-bias={-0.0005}
-      />
-      <Ciudad {...props} />
-      <Tooltip />
+    <group>
+      <Cinta desde={[x0, z]} hasta={[x1, z]} ancho={1.15} />
+      <Isla p={[x, 0, z]} w={ISLA_W} d={ISLA_D} sel={sel} onClick={abrir}>
+        <Holograma p={[-0.5, 1.75, -0.6]} titulo={titulo} formato={formato} fecha={fechaCorta(isla.fecha)} color={color} imagen={isla.preview?.imagen} onClick={abrir} tip={tip} />
+        <mesh position={[-0.5, 0.1, -0.6]} castShadow receiveShadow material={mat("#EAE3FF", 0.6)}><cylinderGeometry args={[0.75, 0.85, 0.2, 28]} /></mesh>
+        <mesh position={[-0.5, 0.21, -0.6]} material={mat(color, 0.5, { emissive: color, ei: 0.5 })}><cylinderGeometry args={[0.55, 0.55, 0.03, 28]} /></mesh>
+        <Arbol p={[lado < 0 ? -1.75 : 1.75, 0, 1.25]} escala={0.7} />
+        <Planta p={[lado < 0 ? 1.7 : -1.7, 0, -1.4]} escala={0.8} />
+      </Isla>
+      {/* los últimos contactos de hoy que entraron por esta pieza, caminando por su cinta */}
+      {gente.slice(0, 2).map((g, i) => {
+        const t = 0.32 + i * 0.36
+        return <Persona key={g.id} p={[x0 + (x1 - x0) * t, ISLA_ALTO, z]} rot={lado < 0 ? Math.PI / 2 : -Math.PI / 2} pose="caminando" ropa={ropaDe(g.id)} pelo={peloDe(g.id)} tip={`${nombreVisible(g.nombre, nombres)} · entró ${horaArt(g.desde)}`} onClick={() => onSeleccion({ zona: "captacion", id: g.id })} seleccionada={idSel === g.id} />
+      })}
+    </group>
+  )
+}
+
+// Contacto nuevo que llegó con la última actualización: camina una vez por su cinta hasta el portal.
+function Caminante({ ruta, l, onFin }: { ruta: Array<[number, number]>; l: Llegada; onFin: () => void }) {
+  const ref = useRef<THREE.Group>(null)
+  const t0 = useRef<number | null>(null)
+  const listo = useRef(false)
+  const largos = useMemo(() => ruta.slice(1).map((p, i) => Math.hypot(p[0] - ruta[i][0], p[1] - ruta[i][1])), [ruta])
+  const total = largos.reduce((a, b) => a + b, 0)
+  useFrame(({ clock, invalidate }) => {
+    if (!ref.current || listo.current) return
+    if (t0.current === null) t0.current = clock.getElapsedTime()
+    let d = (clock.getElapsedTime() - t0.current) * 2.4
+    if (d >= total) { listo.current = true; onFin(); return }
+    let i = 0
+    while (i < largos.length - 1 && d > largos[i]) { d -= largos[i]; i++ }
+    const a = ruta[i], b = ruta[i + 1], f = largos[i] ? d / largos[i] : 1
+    ref.current.position.set(a[0] + (b[0] - a[0]) * f, ISLA_ALTO, a[1] + (b[1] - a[1]) * f)
+    ref.current.rotation.y = Math.atan2(b[0] - a[0], b[1] - a[1])
+    invalidate()
+  })
+  return (
+    <group ref={ref} position={[ruta[0][0], ISLA_ALTO, ruta[0][1]]}>
+      <Persona p={[0, 0, 0]} pose="caminando" ropa={ropaDe(l.id)} pelo={peloDe(l.id)} tip={`Recién llegado: ${l.nombre}`} />
+    </group>
+  )
+}
+
+// ── salas ─────────────────────────────────────────────────────────────────────────────────────────────────
+type ZonaProps = { datos: CiudadVista; seleccion: Seleccion; onSeleccion: Props["onSeleccion"]; nombres: boolean }
+const elegida = (s: Seleccion, z: Zona) => s?.zona === z
+
+function SalaSeguimiento({ p, datos, seleccion, onSeleccion, nombres }: ZonaProps & { p: V3 }) {
+  const { w, d } = TAM.seguimiento
+  const lista = datos.seguimiento.lista.slice(0, 5)
+  const asientos: Array<{ p: V3; rot: number; pose: Pose }> = [
+    { p: [-2.15, 0, -1.55], rot: 0, pose: "conversando" },
+    { p: [-1.43, 0, -1.55], rot: 0, pose: "sentado" },
+    { p: [0.15, 0, -0.75], rot: -Math.PI / 2, pose: "conversando" },
+    { p: [1.05, 0, 1.45], rot: Math.PI / 2, pose: "conversando" },
+    { p: [2.75, 0, 1.45], rot: -Math.PI / 2, pose: "sentado" },
+  ]
+  const abrir = () => onSeleccion({ zona: "seguimiento" })
+  return (
+    <Sala p={p} w={w} d={d} paredDer={2.2} sel={elegida(seleccion, "seguimiento")} onClick={abrir}>
+      <Sofa p={[-1.79, 0, -1.65]} plazas={2} color="#FFFFFF" acento="#F6B3E2" />
+      <Sillon p={[0.25, 0, -0.75]} rot={-Math.PI / 2} color="#FFFFFF" acento="#B9A8FF" />
+      <MesaBaja p={[-1.2, 0, -0.45]} flor />
+      <Sillon p={[1.0, 0, 1.45]} rot={Math.PI / 2} color="#FFFFFF" acento="#F6B3E2" />
+      <Sillon p={[2.8, 0, 1.45]} rot={-Math.PI / 2} color="#FFFFFF" acento="#B9A8FF" />
+      <MesaBaja p={[1.9, 0, 1.45]} r={0.32} />
+      <Planta p={[2.9, 0, -2.2]} />
+      <Planta p={[-3.0, 0, 2.2]} escala={0.8} />
+      {lista.map((s, i) => {
+        const a = asientos[i]
+        return <Persona key={s.id} p={a.p} rot={a.rot} pose={a.pose} ropa={s.vencido ? PALETA.coral : ropaDe(String(s.id))} pelo={peloDe(String(s.id))}
+          tip={`${nombreVisible(s.nombre, nombres)} · ${s.vencido ? `FUP vencido ${fechaCorta(String(s.proximo_fup).slice(0, 10))}` : s.proximo_fup ? `FUP ${fechaCorta(String(s.proximo_fup).slice(0, 10))}` : "sin próximo FUP"}`}
+          onClick={() => onSeleccion({ zona: "seguimiento", id: String(s.id) })} seleccionada={seleccion?.id === String(s.id)} />
+      })}
+      <Cartel p={[0, 3 + 0.35, -d / 2 + 0.3]} giro={0} titulo="SEGUIMIENTO" contador={numero(datos.seguimiento.total)} onClick={abrir} />
+    </Sala>
+  )
+}
+
+function SalaSetters({ p, datos, seleccion, onSeleccion }: ZonaProps & { p: V3 }) {
+  const { w, d } = TAM.setters
+  const equipo = datos.setters.equipo.filter((s) => s.en_equipo).slice(0, 3)
+  const abrir = () => onSeleccion({ zona: "setters" })
+  const xs = [-2.15, 0, 2.15]
+  return (
+    <Sala p={p} w={w} d={d} paredDer={1.6} sel={elegida(seleccion, "setters")} onClick={abrir}>
+      {xs.map((x, i) => {
+        const s = equipo[i]
+        return (
+          <group key={x}>
+            <Escritorio p={[x, 0, -1.0]} encendido={Boolean(s)} />
+            <SillaOficina p={[x, 0, -0.1]} rot={Math.PI} color={s ? "#7550EF" : "#CFC6F2"} />
+            {s ? <Persona p={[x, 0, -0.1]} rot={Math.PI} pose="trabajando" ropa={TEAM} pelo={peloDe(s.nombre)}
+              tip={`${s.nombre} · ${s.agendas_7d} agendas en 7 días`} onClick={() => onSeleccion({ zona: "setters", id: s.nombre })} seleccionada={seleccion?.id === s.nombre} /> : null}
+          </group>
+        )
+      })}
+      <Tablero p={[-1.6, 1.85, -d / 2 + 0.3]} />
+      <Planta p={[3.0, 0, 1.9]} />
+      <Cartel p={[0, 3 + 0.35, -d / 2 + 0.3]} giro={0} titulo="SETTERS" contador={numero(datos.setters.conversando.total)} onClick={abrir} />
+    </Sala>
+  )
+}
+
+function SalaCloser({ datos, seleccion, onSeleccion, nombres, p }: ZonaProps & { p: V3 }) {
+  const { w, d } = TAM.closers
+  const closers = datos.closers.filter((c) => c.en_equipo).slice(0, 2)
+  const abrir = () => onSeleccion({ zona: "closers" })
+  return (
+    <Sala p={p} w={w} d={d} sel={elegida(seleccion, "closers")} onClick={abrir}>
+      {/* dos ambientes de reunión separados por un vidrio */}
+      <mesh position={[0, 1.35, -0.75]} material={mat("#DCD3FF", 0.2, { opacity: 0.35 })}><boxGeometry args={[0.06, 2.7, d - 1.6]} /></mesh>
+      <mesh position={[0, 2.72, -0.75]} material={mat("#FFFFFF", 0.6)} castShadow><boxGeometry args={[0.12, 0.08, d - 1.6]} /></mesh>
+      {[-2.4, 2.4].map((cx, i) => {
+        const c = closers[i]
+        const lead = c?.en_horario || null
+        return (
+          <group key={cx}>
+            <MesaRedonda p={[cx, 0, 0.1]} />
+            <Sillon p={[cx - 1.05, 0, 0.1]} rot={Math.PI / 2} color="#FFFFFF" acento={i ? "#F6B3E2" : "#B9A8FF"} />
+            <Sillon p={[cx + 1.05, 0, 0.1]} rot={-Math.PI / 2} color="#FFFFFF" acento={i ? "#B9A8FF" : "#F6B3E2"} />
+            {c ? <Persona p={[cx - 1.05, 0, 0.1]} rot={Math.PI / 2} pose="conversando" ropa={TEAM} pelo={peloDe(c.nombre)}
+              tip={`${c.nombre} · ${c.llamadas} calls hoy`} onClick={() => onSeleccion({ zona: "closers", id: c.nombre })} seleccionada={seleccion?.id === c.nombre} /> : null}
+            {lead ? <Persona p={[cx + 1.05, 0, 0.1]} rot={-Math.PI / 2} pose="sentado" ropa={ropaDe(lead.id)} pelo={peloDe(lead.id)}
+              tip={`${lead.hora} · ${nombreVisible(lead.nombre, nombres)} (en horario)`} onClick={() => onSeleccion({ zona: "agendas", id: lead.id })} seleccionada={seleccion?.id === lead.id} /> : null}
+            <Planta p={[cx + (i ? 1.9 : -1.9), 0, -1.9]} escala={0.8} />
+          </group>
+        )
+      })}
+      <Cartel p={[0, 3 + 0.35, -d / 2 + 0.3]} giro={0} titulo="CLOSERS" contador={((n) => `${n} call${n === 1 ? "" : "s"}`)(datos.closers.reduce((t, c) => t + c.llamadas, 0))} onClick={abrir} />
+    </Sala>
+  )
+}
+
+function SalaFormacion({ datos, seleccion, onSeleccion, nombres, p }: ZonaProps & { p: V3 }) {
+  const { w, d } = TAM.formacion
+  const alumnos = datos.clientes.lista.slice(0, 8)
+  const abrir = () => onSeleccion({ zona: "formacion" })
+  const xs = [-2.25, -0.75, 0.75, 2.25], zs = [0.35, 1.8]
+  return (
+    <Sala p={p} w={w} d={d} paredDer={2.4} sel={elegida(seleccion, "formacion")} onClick={abrir}>
+      <PantallaAula p={[0.7, 1.95, -d / 2 + 0.32]} w={3.2} />
+      <Persona p={[-1.7, 0, -1.9]} rot={Math.PI / 5} pose="presentando" ropa={TEAM} pelo="#2B2133" tip="Equipo de formación" />
+      {zs.flatMap((z, f) => xs.map((x, k) => {
+        const a = alumnos[f * 4 + k]
+        return (
+          <group key={`${f}${k}`}>
+            <SillaAula p={[x, 0, z]} rot={Math.PI} />
+            {a ? <Persona p={[x, 0, z]} rot={Math.PI} pose="sentado" ropa={ropaDe(String(a.id))} pelo={peloDe(String(a.id))}
+              tip={`${nombreVisible(a.nombre, nombres)} · actividad N/D`} onClick={() => onSeleccion({ zona: "formacion", id: String(a.id) })} seleccionada={seleccion?.id === String(a.id)} /> : null}
+          </group>
+        )
+      }))}
+      <Planta p={[3.2, 0, -2.4]} />
+      <Cartel p={[0, 3 + 0.35, -d / 2 + 0.3]} giro={0} titulo="FORMACIÓN" contador={numero(datos.formacion.alumnos)} onClick={abrir} />
+    </Sala>
+  )
+}
+
+function SalaEspera({ datos, seleccion, onSeleccion, nombres, p }: ZonaProps & { p: V3 }) {
+  const { w, d } = TAM.espera
+  const lista = datos.espera.lista.slice(0, 6)
+  const abrir = () => onSeleccion({ zona: "espera" })
+  const asientos: Array<{ p: V3; rot: number; pose: Pose }> = [
+    { p: [-1.44, 0, -1.4], rot: 0, pose: "sentado" }, { p: [-0.72, 0, -1.4], rot: 0, pose: "conversando" }, { p: [0.0, 0, -1.4], rot: 0, pose: "sentado" },
+    { p: [-2.15, 0, 0.95], rot: Math.PI / 2, pose: "sentado" }, { p: [2.2, 0, -0.2], rot: -Math.PI / 2, pose: "conversando" }, { p: [2.2, 0, 1.2], rot: -Math.PI / 2, pose: "sentado" },
+  ]
+  return (
+    <Sala p={p} w={w} d={d} alto={2.1} sel={elegida(seleccion, "espera")} onClick={abrir}>
+      <Sofa p={[-0.72, 0, -1.5]} plazas={3} color="#FFFFFF" acento="#F6B3E2" />
+      <Sillon p={[-2.15, 0, 0.95]} rot={Math.PI / 2} color="#FFFFFF" acento="#B9A8FF" />
+      <Sillon p={[2.25, 0, -0.2]} rot={-Math.PI / 2} color="#FFFFFF" acento="#F6B3E2" />
+      <Sillon p={[2.25, 0, 1.2]} rot={-Math.PI / 2} color="#FFFFFF" acento="#B9A8FF" />
+      <MesaBaja p={[-0.4, 0, 0.3]} flor />
+      <Planta p={[2.6, 0, -1.9]} escala={0.9} />
+      {lista.map((g, i) => {
+        const a = asientos[i]
+        return <Persona key={g.id} p={a.p} rot={a.rot} pose={a.pose} ropa={ropaDe(g.id)} pelo={peloDe(g.id)}
+          tip={`${nombreVisible(g.nombre, nombres)} · espera desde ${fechaCorta(g.desde?.slice(0, 10))}`} onClick={() => onSeleccion({ zona: "espera", id: g.id })} seleccionada={seleccion?.id === g.id} />
+      })}
+      <Cartel p={[0, 2.1 + 0.35, -d / 2 + 0.3]} giro={0} titulo="ESPERA" contador={numero(datos.espera.total)} onClick={abrir} />
+    </Sala>
+  )
+}
+
+function ZonaCaptacion({ datos, seleccion, onSeleccion, nombres, p }: ZonaProps & { p: V3 }) {
+  const abrir = () => onSeleccion({ zona: "captacion" })
+  const recientes = datos.captacion.lista.slice(0, 3)
+  return (
+    <Portal p={p} sel={elegida(seleccion, "captacion")} onClick={abrir}>
+      {recientes.map((g, i) => (
+        <Persona key={g.id} p={[1.2 + i * 0.9, 0, -2.0 - (i % 2) * 0.5]} rot={Math.PI / 2} pose={i === 0 ? "caminando" : "parado"} ropa={ropaDe(g.id)} pelo={peloDe(g.id)}
+          tip={`${nombreVisible(g.nombre, nombres)} · entró ${horaArt(g.desde)}`} onClick={() => onSeleccion({ zona: "captacion", id: g.id })} seleccionada={seleccion?.id === g.id} />
+      ))}
+      <Planta p={[-3.0, 0, -2.6]} />
+      <Planta p={[3.0, 0, 1.6]} escala={0.8} />
+      <Cartel p={[0, 2.9 + 2.3 + 0.75, 0.75]} giro={0} titulo="CAPTACIÓN" contador={`${numero(datos.captacion.hoy)} hoy`} onClick={abrir} />
+    </Portal>
+  )
+}
+
+function ZonaClientes({ datos, seleccion, onSeleccion, nombres, p }: ZonaProps & { p: V3 }) {
+  const { w, d } = TAM.clientes
+  const nuevos = datos.clientes.lista.filter((c) => c.nuevo).slice(0, 4)
+  const abrir = () => onSeleccion({ zona: "clientes" })
+  const lugares: Array<{ p: V3; rot: number; pose: Pose }> = [
+    { p: [-0.35, 0, d / 2 + 1.0], rot: Math.PI, pose: "caminando" }, { p: [0.55, 0, d / 2 + 1.7], rot: Math.PI, pose: "caminando" },
+    { p: [2.3, 0, d / 2 + 1.1], rot: -Math.PI / 2, pose: "parado" }, { p: [1.6, 0, d / 2 + 1.4], rot: Math.PI / 2, pose: "parado" },
+  ]
+  return (
+    <Pabellon p={p} w={w} d={d} sel={elegida(seleccion, "clientes")} onClick={abrir}>
+      <mesh position={[-0.9, 0.48, -1.3]} material={mat("#FFFFFF", 0.6)} castShadow receiveShadow><boxGeometry args={[2.3, 0.96, 0.72]} /></mesh>
+      <mesh position={[-0.9, 0.98, -1.3]} material={mat(PALETA.violeta, 0.5)} castShadow><boxGeometry args={[2.4, 0.06, 0.8]} /></mesh>
+      <Planta p={[1.9, 0, -1.9]} />
+      <Planta p={[-2.6, 0, 1.6]} escala={0.8} />
+      {nuevos.map((c, i) => {
+        const l = lugares[i]
+        return <Persona key={c.id} p={[l.p[0], -PISO, l.p[2]]} rot={l.rot} pose={l.pose} ropa={ropaDe(String(c.id))} pelo={peloDe(String(c.id))}
+          tip={`${nombreVisible(c.nombre, nombres)} · entró ${fechaCorta(String(c.fecha_ingreso || "").slice(0, 10))}`} onClick={() => onSeleccion({ zona: "clientes", id: String(c.id) })} seleccionada={seleccion?.id === String(c.id)} />
+      })}
+      <Cartel p={[0, 3.8 + 0.95, d / 2 + 0.45]} giro={0} titulo="CLIENTES" contador={`${numero(datos.clientes.nuevos_30d)} nuevos`} onClick={abrir} alto={1.35} />
+    </Pabellon>
+  )
+}
+
+function PlazaAgendas({ datos, seleccion, onSeleccion, nombres, p }: ZonaProps & { p: V3 }) {
+  const { w, d } = TAM.agendas
+  const abrir = () => onSeleccion({ zona: "agendas" })
+  // una fila por closer (cortes de a 4); se ven hasta 12 sillas, el resto está en el panel
+  const filas: Array<CiudadVista["agendas"]["carriles"][number]["sillas"]> = []
+  for (const c of datos.agendas.carriles) for (let i = 0; i < c.sillas.length; i += 4) filas.push(c.sillas.slice(i, i + 4))
+  const visibles = filas.slice(0, 3)
+  // retícula en diagonal: cada fila queda horizontal en pantalla y las butacas miran a la cámara
+  const lugar = (k: number, f: number): [number, number] => {
+    const i = k - 1.5, j = f - (visibles.length - 1) / 2
+    return [i * 2.6 + j * 2.5, -i * 2.6 + j * 2.5]
+  }
+  const borde = elegida(seleccion, "agendas") ? mat(PALETA.violeta, 0.5, { emissive: PALETA.violeta, ei: 0.35 }) : mat("#E4DEF7", 0.85)
+  return (
+    <group position={p}>
+      <mesh position={[0, 0.1, 0]} material={borde} receiveShadow castShadow onClick={(e) => { e.stopPropagation(); abrir() }}><boxGeometry args={[w + 0.5, 0.2, d + 0.5]} /></mesh>
+      <mesh position={[0, PISO - 0.08, 0]} material={mat("#FFFBF8", 0.8)} receiveShadow onClick={(e) => { e.stopPropagation(); abrir() }}><boxGeometry args={[w, 0.16, d]} /></mesh>
+      <mesh position={[0, PISO + 0.002, 0.5]} rotation={[-Math.PI / 2, 0, 0]} material={mat("#F1ECFE", 0.8)} receiveShadow><planeGeometry args={[w - 1.6, d - 2.6]} /></mesh>
+      <group position={[0, PISO, 0]}>
+        {visibles.flatMap((fila, f) => fila.map((s, k) => {
+          const [x, z] = lugar(k, f)
+          const sel = seleccion?.id === s.id
+          const vacia = s.estado === "no_show" || s.estado === "cancelada"
+          const tenue = s.estado === "sin_resultado" || s.estado === "reprogramada"
+          const tip = `${s.hora} · ${nombreVisible(s.nombre, nombres)} · ${datos.estados[s.estado].label}`
+          return (
+            <group key={s.id}>
+              <mesh position={[x, 0.012, z]} rotation={[-Math.PI / 2, 0, 0]} material={mat(sel ? PALETA.violeta : COLOR_ESTADO[s.estado], 0.6, { basica: true, opacity: sel ? 0.75 : 0.32 })}><circleGeometry args={[0.78, 36]} /></mesh>
+              <Sillon p={[x, 0, z]} rot={Math.PI / 4} color="#FFFFFF" acento={vacia ? "#E9E5F5" : "#ECE6FF"} onClick={() => onSeleccion({ zona: "agendas", id: s.id })} tip={tip} />
+              {vacia ? null : <Persona p={[x, 0, z]} rot={Math.PI / 4} pose="sentado" ropa={ropaDe(s.id)} pelo={peloDe(s.id)} atenuada={tenue} tip={tip} onClick={() => onSeleccion({ zona: "agendas", id: s.id })} seleccionada={sel} />}
+              <Hora p={[x, 2.05, z]} hora={s.hora} estado={s.estado} sel={sel} />
+            </group>
+          )
+        }))}
+        <Arbol p={[-w / 2 + 0.75, 0, d / 2 - 0.75]} escala={0.85} />
+        <Arbol p={[w / 2 - 0.75, 0, -d / 2 + 0.75]} escala={0.85} />
+        <Planta p={[w / 2 - 0.6, 0, d / 2 - 0.6]} />
+        <Planta p={[-w / 2 + 0.6, 0, -d / 2 + 2.2]} escala={0.8} />
+        {[-3.2, 3.2].map((x) => <mesh key={x} position={[x, 1.1, -d / 2 + 0.45]} material={mat("#FFFFFF", 0.6)} castShadow><boxGeometry args={[0.16, 2.2, 0.16]} /></mesh>)}
+        <TrasConectar><Html position={[0, 0.6, 0.5]} center zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
+          <div className={`${datos.agendas.total === 0 ? "" : "hidden"} whitespace-nowrap rounded-full bg-white/95 px-3 py-1 text-[12.5px] font-medium text-[#6E6590] shadow-sm`}>Sin calls este día</div>
+        </Html></TrasConectar>
+        <Cartel p={[0, 2.7, -d / 2 + 0.45]} giro={0} titulo="AGENDAS" contador={String(datos.agendas.total)} onClick={abrir} />
+      </group>
+    </group>
+  )
+}
+
+// ── composición ───────────────────────────────────────────────────────────────────────────────────────────
+const ARBOLES: Array<[number, number, number]> = ([
+  [25.5, 14, 0.95], [37, 16.5, 1], [50, 17, 0.95], [62, 14, 0.9], [48.5, 38, 0.9], [27, 35.5, 0.85], [62.5, 33, 0.9], [37, 30.5, 0.8], [49.5, 1, 0.8],
+] as Array<[number, number, number]>).map(([u, v, e]) => { const [x, z] = at(u, v); return [x, z, e] })
+
+function Ciudad({ datos, islas, seleccion, onSeleccion, nombres, llegadas = [], onLlegadaFin }: Props) {
+  const zp = { datos, seleccion, onSeleccion, nombres }
+  const visibles = islas.slice(0, 4)
+  const idsVisibles = new Set(visibles.map((i) => i.id))
+  const porIsla = (id: string) => datos.captacion.lista.filter((g) => g.isla === id)
+  const otros = datos.captacion.lista.filter((g) => !g.isla || !idsVisibles.has(g.isla)).slice(0, 3)
+  const rutaDe = (l: Llegada): Array<[number, number]> => {
+    const k = visibles.findIndex((i) => i.id === l.isla)
+    if (k < 0) return [[CINTA_X, CINTA_DESDE - 0.5], [CINTA_X, CINTA_HASTA + 0.5]]
+    const s = ISLAS[k]
+    return [[s.x - s.lado * (ISLA_W / 2 - 0.3), s.z], [CINTA_X, s.z], [CINTA_X, CINTA_HASTA + 0.5]]
+  }
+  return (
+    <group>
+      <Suelo />
+      <Agua {...AGUA} />
+      {CAMINOS.map(([x0, z0, x1, z1], i) => (
+        <mesh key={i} position={[(x0 + x1) / 2, 0.0, (z0 + z1) / 2]} material={mat("#EAE4FA", 0.9)} receiveShadow>
+          <boxGeometry args={[Math.abs(x1 - x0) + 1.5, 0.08, Math.abs(z1 - z0) + 1.5]} />
+        </mesh>
+      ))}
+      <Cinta desde={[CINTA_X, CINTA_DESDE]} hasta={[CINTA_X, CINTA_HASTA]} ancho={CINTA_ANCHO} onClick={() => onSeleccion({ zona: "captacion" })} />
+      <Cartel p={[CINTA_X - 1.9, 2.2, 13.6]} giro={Math.PI / 2} titulo="ManyChat" alto={1.3} onClick={() => onSeleccion({ zona: "captacion" })} />
+      <mesh position={[CINTA_X - 1.9, 0.75, 13.6]} material={mat("#FFFFFF", 0.6)} castShadow><boxGeometry args={[0.14, 1.5, 0.14]} /></mesh>
+      {visibles.map((isla, k) => (
+        <IslaContenido key={isla.id} isla={isla} x={ISLAS[k].x} z={ISLAS[k].z} lado={ISLAS[k].lado} sel={seleccion?.zona === "contenido" && seleccion.id === isla.id}
+          onSeleccion={onSeleccion} gente={porIsla(isla.id)} nombres={nombres} idSel={seleccion?.id} />
+      ))}
+      {otros.map((g, i) => (
+        <Persona key={g.id} p={[CINTA_X + (i % 2 ? 0.35 : -0.35), ISLA_ALTO, 22 - i * 3.3]} rot={Math.PI} pose="caminando" ropa={ropaDe(g.id)} pelo={peloDe(g.id)}
+          tip={`${nombreVisible(g.nombre, nombres)} · entró ${horaArt(g.desde)}${g.origen ? ` por ${g.origen}` : ""}`} onClick={() => onSeleccion({ zona: "captacion", id: g.id })} seleccionada={seleccion?.id === g.id} />
+      ))}
+      {llegadas.map((l) => <Caminante key={l.id} l={l} ruta={rutaDe(l)} onFin={() => onLlegadaFin?.(l.id)} />)}
+
+      <ZonaCaptacion {...zp} p={[Z.captacion[0], 0, Z.captacion[1]]} />
+      <SalaEspera {...zp} p={[Z.espera[0], 0, Z.espera[1]]} />
+      <SalaSetters {...zp} p={[Z.setters[0], 0, Z.setters[1]]} />
+      <SalaCloser {...zp} p={[Z.closers[0], 0, Z.closers[1]]} />
+      <SalaFormacion {...zp} p={[Z.formacion[0], 0, Z.formacion[1]]} />
+      <SalaSeguimiento {...zp} p={[Z.seguimiento[0], 0, Z.seguimiento[1]]} />
+      <ZonaClientes {...zp} p={[Z.clientes[0], 0, Z.clientes[1]]} />
+      <PlazaAgendas {...zp} p={[Z.agendas[0], 0, Z.agendas[1]]} />
+      {ARBOLES.map(([x, z, e], i) => <Arbol key={i} p={[x, 0, z]} escala={e} />)}
+    </group>
+  )
+}
+
+function Prueba({ datos, islas, seleccion, onSeleccion, nombres }: Props) {
+  const isla = islas[0]
+  return (
+    <group>
+      <Suelo />
+      <Agua x0={PRUEBA.isla.x - 3.6} x1={PRUEBA.cinta.x + 1.6} z0={PRUEBA.isla.z - 3.2} z1={PRUEBA.isla.z + 3.4} />
+      <Cinta desde={[PRUEBA.cinta.x, PRUEBA.cinta.desde]} hasta={[PRUEBA.cinta.x, PRUEBA.cinta.hasta]} ancho={CINTA_ANCHO} />
+      {isla ? <IslaContenido isla={isla} x={PRUEBA.isla.x} z={PRUEBA.isla.z} lado={-1} sel={false} onSeleccion={onSeleccion} gente={datos.captacion.lista.slice(0, 2)} nombres={nombres} hastaX={PRUEBA.cinta.x - CINTA_ANCHO / 2 + 0.05} /> : null}
+      <SalaSeguimiento datos={datos} seleccion={seleccion} onSeleccion={onSeleccion} nombres={nombres} p={[PRUEBA.sala.x, 0, PRUEBA.sala.z]} />
+    </group>
+  )
+}
+
+// foco de cámara de lo elegido (centro aproximado de su zona)
+function focoDe(s: Seleccion, islas: IslaDato[]): V3 | null {
+  if (!s) return null
+  const k = islas.findIndex((i) => i.id === s.id)
+  if (s.zona === "contenido" && k >= 0 && k < 4) return [ISLAS[k].x, 1.5, ISLAS[k].z]
+  const mapa: Partial<Record<Zona, [number, number]>> = {
+    captacion: Z.captacion, espera: Z.espera, setters: Z.setters, closers: Z.closers, formacion: Z.formacion,
+    seguimiento: Z.seguimiento, clientes: Z.clientes, agendas: Z.agendas, contenido: [CINTA_X, 14],
+  }
+  const c = mapa[s.zona]
+  return c ? [c[0], 1.5, c[1]] : null
+}
+
+export default function Escena(props: Props) {
+  const huellas = useMemo(() => (props.modo === "prueba" ? huellasPrueba() : huellasCiudad()), [props.modo])
+  const foco = focoDe(props.seleccion, props.islas)
+  const contenido: ReactNode = props.modo === "prueba" ? <Prueba {...props} /> : <Ciudad {...props} />
+  return (
+    <Canvas
+      shadows="variance" dpr={[1, 2]} frameloop={props.animar || (props.llegadas?.length ?? 0) > 0 ? "always" : "demand"}
+      gl={{ antialias: true, toneMapping: THREE.NeutralToneMapping }}
+      onCreated={({ scene }) => { scene.background = new THREE.Color(PALETA.fondo) }}
+      onPointerMissed={() => props.onSeleccion(null)}
+    >
+      <OrthographicCamera makeDefault position={[200, 200, 200]} zoom={14} near={-1000} far={2000} />
+      <MapControls makeDefault enableRotate={false} zoomToCursor enableDamping dampingFactor={0.12} minZoom={4} maxZoom={90} />
+      <Encuadre huellas={huellas} panel={props.panel} token={props.vistaToken} foco={foco} esPrueba={props.modo === "prueba"} />
+      <hemisphereLight args={["#FFFFFF", "#DDD3F8", 1.55]} />
+      <ambientLight intensity={0.35} color="#F3EEFF" />
+      <LuzPrincipal centro={props.modo === "prueba" ? [2, 0, 0] : [42, 0, -6]} />
+      <directionalLight position={[-30, 40, 40]} intensity={0.35} color="#E7DEFF" />
+      {contenido}
+      <TrasConectar><Tooltip /></TrasConectar>
     </Canvas>
   )
 }
