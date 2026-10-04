@@ -82,6 +82,10 @@
     {
       "path": "/api/radar-sync?paso=seguidores",
       "schedule": "5 3 * * *"
+    },
+    {
+      "path": "/api/radar-sync?paso=vincular",
+      "schedule": "40 13,23 * * *"
     }
   ]
 }

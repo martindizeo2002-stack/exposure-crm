@@ -7,18 +7,22 @@
 //   minar                                         minería de comentarios de la semana
 //   podar                                         borra imágenes viejas
 //   seguidores                                    foto diaria del total de seguidores de la cuenta propia (costo por seguidor)
+//   vincular                                      qué post de Instagram es cada pieza de ManyChat (Ciudad): pide los
+//                                                 reels propios recientes y los comentarios que falten, y cruza
+//                                                 comentaristas con etiquetas (dos veces por día)
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { analizarPendientes, leerHistoriasPendientes, minarSemana } from "./analisis"
 import { apifyListo, planRadar, presupuesto } from "./apify"
 import { graphListo, sincronizarPropias } from "./graph"
-import { lanzarComentarios, lanzarHistorias, lanzarPerfiles, lanzarPiezas, recoger } from "./ingesta"
+import { lanzarComentarios, lanzarHistorias, lanzarPerfiles, lanzarPiezas, lanzarReelsPropios, recoger } from "./ingesta"
 import { descargarMedios, podarMedios } from "./medios"
 import { local } from "./metricas"
 import { transcribirPendientes } from "./transcribir"
 import { fotoSeguidores } from "../seguidores"
+import { vincularPiezas } from "../ciudad-vinculos"
 
-export const PASOS = ["piezas", "perfiles", "historias", "comentarios", "propias", "ciclo", "minar", "podar", "seguidores"] as const
+export const PASOS = ["piezas", "perfiles", "historias", "comentarios", "propias", "ciclo", "minar", "podar", "seguidores", "vincular"] as const
 export type Paso = (typeof PASOS)[number]
 
 const SIN_APIFY = { ok: false, motivo: "falta APIFY_TOKEN: conectá Apify para que el Radar pueda leer Instagram" }
@@ -60,6 +64,14 @@ export async function correrPaso(db: SupabaseClient, paso: Paso, o: { pedidaPor?
     case "minar": return minarSemana(db)
     case "podar": return podarMedios(db)
     case "seguidores": return apifyListo() ? fotoSeguidores(db) : SIN_APIFY
+    case "vincular": {
+      // 1) pide los reels propios de los últimos días (los recoge el ciclo), 2) pide comentarios de los posts que no
+      // los tienen y 3) rehace el vínculo pieza ↔ post con lo que ya hay
+      const p = apifyListo() ? await presupuesto() : null
+      const leer = apifyListo() && !p?.agotado
+      const reels = leer ? await lanzarReelsPropios(db, { pedidaPor }) : null
+      return { reels, ...(await vincularPiezas(db, { lanzar: leer, pedidaPor })) }
+    }
     case "ciclo": {
       const recogidas = apifyListo() ? await recoger(db) : []
       // Cada tramo tiene su parte del tiempo, para que una cola larga de imágenes no deje sin turno al análisis.

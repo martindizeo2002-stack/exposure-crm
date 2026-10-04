@@ -93,6 +93,25 @@ Pendiente de esta parte visual: la mayoría de las islas no tiene miniatura (el 
 formador del aula representa al equipo y no a una persona puntual, y la iluminación interior cálida de la referencia
 está aproximada con materiales (no hay luces por sala).
 
+## Miniaturas de las islas (04/10/2026)
+
+Cada isla muestra la miniatura del post de Instagram de esa pieza. ManyChat no guarda qué post dispara cada
+automatización, así que el vínculo se arma con evidencia (`lib/ciudad-vinculos.ts`, tabla `crm_piezas_instagram`):
+
+1. El radar trae los posts propios con su miniatura (los reels se piden por la pestaña de reels: la lectura del perfil
+   solo devuelve la primera página, casi todos carruseles).
+2. Se baja una muestra de hasta 30 comentarios de cada post (Apify, US$ 0,0026 por comentario).
+3. Se cruzan los que comentaron con los contactos de ManyChat que tienen cada etiqueta de pieza: gana la etiqueta con
+   más comentaristas en común (al menos 2, y 5 o más o un cuarto de la muestra), a no más de 7 días del post y una
+   sola etiqueta por post. El panel de la isla dice la evidencia («21 de 25 comentaristas del post tienen esta etiqueta»).
+4. Si una pieza todavía no tiene vínculo, se usa el único post del mismo día y tipo, avisando que no está confirmado;
+   si no, la placa dice «sin vista previa».
+
+Se actualiza solo dos veces por día (cron del radar, paso `vincular`, 10:40 y 20:40 hora argentina): pide los reels
+de los últimos 4 días, los comentarios que falten (y repide los de posts recientes con muestra chica) y rehace el
+cruce. A mano: `npx tsx scripts/ciudad-miniaturas.ts esperar`. Primera corrida (04/10): 45 posts propios, 33 piezas
+vinculadas; de las 18 piezas de los últimos 21 días, 16 con miniatura.
+
 ## Lo que falta (etapas D a F)
 
 - **Estado en vivo de las llamadas:** hoy no existe. Se puede sacar de iClosed o de Fathom (llamada empezada /

@@ -65,6 +65,23 @@ export async function lanzarPiezas(db: DB, o: { dias?: number; porCuenta?: numbe
   return { ok: true, corrida: corrida.id, cuentas: semillas.length }
 }
 
+// Reels de la cuenta propia: la lectura de "posts" del perfil trae solo la primera página (unos 12, casi todos
+// carruseles); los reels se piden por la pestaña de reels. La Ciudad los usa para mostrar la miniatura de cada pieza.
+export async function lanzarReelsPropios(db: DB, o: { handle?: string; dias?: number; limite?: number; pedidaPor?: string } = {}) {
+  if (await enCurso(db, "piezas")) return { ok: false, motivo: "ya hay una corrida de piezas en curso" }
+  const handle = o.handle || "alexmcarrera"
+  const actor = ACTORES.piezas()
+  const run = await lanzarActor(actor, {
+    directUrls: [`https://www.instagram.com/${handle}/reels/`],
+    resultsType: "reels",
+    resultsLimit: o.limite || 12,
+    onlyPostsNewerThan: `${o.dias || 4} days`,
+    addParentData: false,
+  })
+  const corrida = await registrar(db, { tipo: "piezas", actor, apify_run_id: run.id, apify_dataset_id: run.defaultDatasetId, cuentas: [handle], pedida_por: o.pedidaPor || "cron", detalle: { resultsType: "reels", dias: o.dias || 4 } })
+  return { ok: true, corrida: corrida.id }
+}
+
 export async function lanzarPerfiles(db: DB, o: { pedidaPor?: string } = {}) {
   if (await enCurso(db, "perfiles")) return { ok: false, motivo: "ya hay una corrida de perfiles en curso" }
   const semillas = await semillasActivas(db)
@@ -95,10 +112,14 @@ export async function lanzarHistorias(db: DB, o: { pedidaPor?: string; incluirPr
 }
 
 // Comentarios de las piezas más comentadas de los últimos días (las de terceros y las propias).
-export async function lanzarComentarios(db: DB, o: { pedidaPor?: string; piezas?: number; porPieza?: number; dias?: number } = {}) {
+// o.ids / o.cuenta: comentarios de piezas puntuales (la Ciudad los usa para saber qué post es cada pieza de ManyChat)
+export async function lanzarComentarios(db: DB, o: { pedidaPor?: string; piezas?: number; porPieza?: number; dias?: number; cuenta?: string; ids?: string[] } = {}) {
   if (await enCurso(db, "comentarios")) return { ok: false, motivo: "ya hay una corrida de comentarios en curso" }
   const desde = new Date(Date.now() - (o.dias || 7) * 864e5).toISOString()
-  const { data, error } = await db.from("radar_piezas").select("id,url,comentarios").gte("fecha", desde).gt("comentarios", 5).order("comentarios", { ascending: false }).limit(o.piezas || Number(process.env.RADAR_PIEZAS_COMENTARIOS || 15))
+  let q = db.from("radar_piezas").select("id,url,comentarios")
+  q = o.ids?.length ? q.in("id", o.ids) : q.gte("fecha", desde).gt("comentarios", 5)
+  if (o.cuenta) q = q.eq("cuenta", o.cuenta)
+  const { data, error } = await q.order("comentarios", { ascending: false }).limit(o.ids?.length || o.piezas || Number(process.env.RADAR_PIEZAS_COMENTARIOS || 15))
   if (error) throw new Error(error.message)
   if (!data?.length) return { ok: false, motivo: "no hay piezas con comentarios en el período" }
   const actor = ACTORES.comentarios()

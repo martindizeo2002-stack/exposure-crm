@@ -83,20 +83,43 @@ export async function leerCiudad(sb: SupabaseClient, opciones: { dia?: string; d
   const { data: radar } = await sb.from("radar_piezas")
     .select("id,url,tipo_media,fecha,thumb_path,thumb_remota,caption,views,likes,comentarios")
     .eq("cuenta", "alexmcarrera").gte("fecha", inicioDia(desdeContenido)).order("fecha", { ascending: false })
-  const radarPorDia = new Map<string, Array<NonNullable<typeof radar>[number]>>()
-  for (const r of radar || []) { const d = diaArt(new Date(r.fecha)); radarPorDia.set(d, [...(radarPorDia.get(d) || []), r]) }
-  const usadas = new Set<string>()
+  type RadarFila = NonNullable<typeof radar>[number]
+  const previa = (r: RadarFila, vinculo: string) => ({ url: r.url, imagen: urlPublica(r.thumb_path) || r.thumb_remota || null, tipo: r.tipo_media, views: r.views, likes: r.likes, comentarios: r.comentarios, vinculo })
+  // vínculo pieza → post: cruce de comentaristas (lib/ciudad-vinculos.ts, se actualiza todos los días)
+  // se compara por el nombre normalizado de la pieza: la misma pieza puede tener variantes de etiqueta en ManyChat
+  // (un emoji con o sin selector invisible) y la isla toma una sola
+  const vinculos = new Map<string, { radar_pieza_id: string; coincidencias: number; comentaristas: number }>()
+  const { data: filasVinculo } = await sb.from("crm_piezas_instagram").select("etiqueta,radar_pieza_id,coincidencias,comentaristas")
+  for (const v of filasVinculo || []) {
+    const nombre = clasificar(v.etiqueta)?.nombre
+    if (!nombre) continue
+    const ya = vinculos.get(nombre)
+    if (!ya || v.coincidencias > ya.coincidencias) vinculos.set(nombre, v)
+  }
+  const porId = new Map<string, RadarFila>((radar || []).map((r) => [String(r.id), r]))
+  const faltan = [...vinculos.values()].map((v) => v.radar_pieza_id).filter((id) => !porId.has(id))
+  if (faltan.length) {
+    const { data } = await sb.from("radar_piezas").select("id,url,tipo_media,fecha,thumb_path,thumb_remota,caption,views,likes,comentarios").in("id", faltan)
+    for (const r of data || []) porId.set(String(r.id), r)
+  }
+  const vinculadas = new Set([...vinculos.values()].map((v) => v.radar_pieza_id))
+  const radarPorDia = new Map<string, RadarFila[]>()
+  for (const r of radar || []) { if (vinculadas.has(String(r.id))) continue; const d = diaArt(new Date(r.fecha)); radarPorDia.set(d, [...(radarPorDia.get(d) || []), r]) }
+  const usadas = new Set<string>(vinculadas)
   const tipoDe = (p: Fila) => (/carru/i.test(`${p.formato} ${p.categoria}`) ? "carrusel" : "reel")
   const islas: Isla[] = piezas.map((p, i) => {
-    const mismoDia = (p.fecha && radarPorDia.get(p.fecha)) || []
-    const candidatas = mismoDia.filter((r) => (tipoDe(p) === "carrusel") === (r.tipo_media === "carrusel"))
-    const r = candidatas.length === 1 ? candidatas[0] : null
-    if (r) usadas.add(String(r.id))
+    const v = vinculos.get(p.nombre)
+    const vinculada = v ? porId.get(v.radar_pieza_id) : undefined
+    let preview: Isla["preview"] = vinculada && v ? previa(vinculada, `${v.coincidencias} de ${v.comentaristas} comentaristas del post tienen esta etiqueta en ManyChat`) : null
+    if (!preview) {
+      // sin vínculo por comentarios: el único post del mismo día y tipo, avisando que no está confirmado
+      const candidatas = ((p.fecha && radarPorDia.get(p.fecha)) || []).filter((r) => (tipoDe(p) === "carrusel") === (r.tipo_media === "carrusel") && !usadas.has(String(r.id)))
+      if (candidatas.length === 1) { usadas.add(String(candidatas[0].id)); preview = previa(candidatas[0], "mismo día y tipo (sin confirmar con comentarios)") }
+    }
     return {
       id: `mc-${i}`, nombre: p.nombre, formato: p.formato || null, categoria: p.categoria || null, angulo: p.angulo || null, fecha: p.fecha || null, etiqueta: p.tag || null,
       leads: p.leads, nuevos: p.nuevos, agendas: p.agendas, presentadas: p.presentadas, cierres: p.cierres, cash: Math.round(p.cash),
-      hoy: 0, semana: 0,
-      preview: r ? { url: r.url, imagen: urlPublica(r.thumb_path) || r.thumb_remota || null, tipo: r.tipo_media, views: r.views, likes: r.likes, comentarios: r.comentarios, vinculo: "misma fecha y mismo tipo en el radar" } : null,
+      hoy: 0, semana: 0, preview,
     }
   })
   for (const r of radar || []) {
@@ -291,7 +314,7 @@ export const DICCIONARIO = [
   { id: "isla.leads", nombre: "Leads de una pieza", formula: "Contactos de ManyChat con la etiqueta de la pieza (p. ej. «Comparación - 🟣VOLUMEN/TOFU - 21/9/2026»)", fuente: "ManyChat → crm_integration_assets", estado: "real", nota: "Atribución por etiqueta del flujo (último toque que etiquetó ManyChat). Las piezas sin etiqueta muestran N/D." },
   { id: "isla.agendas", nombre: "Agendas / presentadas / cierres / cash de una pieza", formula: "Agendas de las personas que tienen la etiqueta, en la ventana; el cash se cuenta una sola vez por persona", fuente: "rpc crm_angulos_manychat (el mismo cálculo que Marketing → Ángulos)", estado: "real", nota: "Una persona con varias etiquetas suma en cada pieza: es atribución multi-toque, no se suman entre islas." },
   { id: "isla.flujo", nombre: "Contactos que bajan por la cinta", formula: "Contactos nuevos (hoy / 7 días) cuya primera etiqueta de pieza es esa isla", fuente: "ManyChat", estado: "real", nota: "ManyChat no guarda el orden de las etiquetas: si un contacto tiene dos piezas, se toma la primera de la lista." },
-  { id: "isla.preview", nombre: "Vista previa", formula: "Pieza propia del radar publicada el mismo día y del mismo tipo (reel / carrusel); si hay más de una candidata no se vincula", fuente: "radar_piezas (cuenta alexmcarrera)", estado: "parcial", nota: "El radar no captura todas las publicaciones: lo que no tiene vista previa se muestra como hueco explícito." },
+  { id: "isla.preview", nombre: "Vista previa", formula: "La miniatura del post de Instagram de esa pieza. El post se identifica cruzando quién lo comentó (muestra de hasta 30 comentarios por post, Apify) con los contactos que tienen la etiqueta de la pieza en ManyChat: gana la etiqueta con más comentaristas en común (al menos 2, y 5 o más o un cuarto de la muestra) y a no más de 7 días. Si todavía no hay comentarios bajados, se usa el único post del mismo día y tipo, avisando que no está confirmado", fuente: "radar_piezas (cuenta alexmcarrera) + radar_comentarios_crudos + crm_piezas_instagram", estado: "real", nota: "El vínculo se actualiza todos los días (cron del radar, paso «vincular»). Una pieza sin post identificado muestra la placa «sin vista previa»." },
   { id: "captacion.hoy", nombre: "Captación hoy", formula: "Contactos de ManyChat cuya fecha de suscripción (hora Argentina) es hoy", fuente: "ManyChat (tarea cada 3 h)", estado: "real", nota: "Corte = última corrida de la tarea de ManyChat; puede atrasar hasta 3 horas." },
   { id: "espera", nombre: "Sala de espera", formula: "Contactos de los últimos 7 días sin la etiqueta ASIGNADO y sin agenda", fuente: "ManyChat + crm_identities + agendas", estado: "real", nota: "No distingue a quien solo pidió un recurso de quien quiere hablar: ManyChat no lo marca." },
   { id: "setters.conversando", nombre: "En conversación con setter", formula: "Contactos de los últimos 7 días con la etiqueta ASIGNADO y sin agenda", fuente: "ManyChat", estado: "real", nota: "ManyChat no dice qué setter tiene cada conversación en la etiqueta: se muestran juntos." },
