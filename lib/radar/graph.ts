@@ -15,7 +15,7 @@ const METRICAS = ["views", "reach", "replies", "shares", "total_interactions", "
 
 export const graphListo = () => Boolean((process.env.IG_INSIGHTS_TOKEN || "").trim())
 
-async function get(host: string, path: string, params: Record<string, string>): Promise<J> {
+export async function get(host: string, path: string, params: Record<string, string>): Promise<J> {
   const q = new URLSearchParams({ ...params, access_token: (process.env.IG_INSIGHTS_TOKEN || "").trim() })
   try {
     const r = await fetch(`https://${host}/${V}/${path}?${q}`, { cache: "no-store", signal: AbortSignal.timeout(30000) })
@@ -28,7 +28,7 @@ async function get(host: string, path: string, params: Record<string, string>): 
 }
 
 // Prueba primero Instagram Login (graph.instagram.com) y después Facebook Login (graph.facebook.com).
-async function resolverCuenta() {
+export async function resolverCuenta() {
   const yo = await get("graph.instagram.com", "me", { fields: "user_id,username,followers_count" })
   if (!yo.error && yo.user_id) return { host: "graph.instagram.com", id: String(yo.user_id), usuario: String(yo.username || ""), seguidores: Number(yo.followers_count) || null }
   const fijo = (process.env.IG_USER_ID || "").trim()

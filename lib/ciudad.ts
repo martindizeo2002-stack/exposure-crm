@@ -35,7 +35,9 @@ export type Isla = {
   // embudo de la pieza (etiqueta de ManyChat cruzada con agendas y pagos); null = la pieza no tiene etiqueta y no se puede atribuir
   leads: number | null; nuevos: number | null; agendas: number | null; presentadas: number | null; cierres: number | null; cash: number | null
   hoy: number | null; semana: number | null
-  preview: { url: string | null; imagen: string | null; tipo: string | null; views: number | null; likes: number | null; comentarios: number | null; vinculo: string } | null
+  preview: { url: string | null; imagen: string | null; tipo: string | null; views: number | null; likes: number | null; comentarios: number | null; vinculo: string; radar_id?: string } | null
+  // métricas reales del post (Graph API de Instagram, radar_piezas_metricas)
+  ig?: { alcance: number | null; vistas: number | null; guardados: number | null; compartidos: number | null; seguidores: number | null; tiempo_promedio_ms: number | null } | null
 }
 
 export type CiudadDatos = Awaited<ReturnType<typeof leerCiudad>>
@@ -84,7 +86,7 @@ export async function leerCiudad(sb: SupabaseClient, opciones: { dia?: string; d
     .select("id,url,tipo_media,fecha,thumb_path,thumb_remota,caption,views,likes,comentarios")
     .eq("cuenta", "alexmcarrera").gte("fecha", inicioDia(desdeContenido)).order("fecha", { ascending: false })
   type RadarFila = NonNullable<typeof radar>[number]
-  const previa = (r: RadarFila, vinculo: string) => ({ url: r.url, imagen: urlPublica(r.thumb_path) || r.thumb_remota || null, tipo: r.tipo_media, views: r.views, likes: r.likes, comentarios: r.comentarios, vinculo })
+  const previa = (r: RadarFila, vinculo: string) => ({ url: r.url, imagen: urlPublica(r.thumb_path) || r.thumb_remota || null, tipo: r.tipo_media, views: r.views, likes: r.likes, comentarios: r.comentarios, vinculo, radar_id: String(r.id) })
   // vínculo pieza → post: cruce de comentaristas (lib/ciudad-vinculos.ts, se actualiza todos los días)
   // se compara por el nombre normalizado de la pieza: la misma pieza puede tener variantes de etiqueta en ManyChat
   // (un emoji con o sin selector invisible) y la isla toma una sola
@@ -128,13 +130,22 @@ export async function leerCiudad(sb: SupabaseClient, opciones: { dia?: string; d
       id: `rd-${r.id}`, nombre: String(r.caption || "").split("\n")[0].slice(0, 70) || `${r.tipo_media} del ${diaArt(new Date(r.fecha))}`, formato: r.tipo_media, categoria: r.tipo_media === "carrusel" ? "Carrusel" : "Reel",
       angulo: null, fecha: diaArt(new Date(r.fecha)), etiqueta: null,
       leads: null, nuevos: null, agendas: null, presentadas: null, cierres: null, cash: null, hoy: null, semana: null,
-      preview: { url: r.url, imagen: urlPublica(r.thumb_path) || r.thumb_remota || null, tipo: r.tipo_media, views: r.views, likes: r.likes, comentarios: r.comentarios, vinculo: "pieza del radar sin etiqueta de ManyChat" },
+      preview: previa(r, "pieza del radar sin etiqueta de ManyChat"),
     })
   }
   // una isla por pieza publicada en la ventana; las etiquetas viejas (piezas de meses anteriores que siguen sumando contactos) no se dibujan
   const fueraDeVentana = islas.filter((i) => !i.fecha || i.fecha < desdeContenido).length
   islas.splice(0, islas.length, ...islas.filter((i) => i.fecha && i.fecha >= desdeContenido))
   islas.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")) || (b.leads || 0) - (a.leads || 0))
+  const conRadar = islas.map((i) => i.preview?.radar_id).filter(Boolean) as string[]
+  if (conRadar.length) {
+    const { data: mets } = await sb.from("radar_piezas_metricas").select("pieza_id,alcance,vistas,guardados,compartidos,seguidores,tiempo_promedio_ms").in("pieza_id", conRadar)
+    const porPost = new Map((mets || []).map((m) => [String(m.pieza_id), m]))
+    for (const i of islas) {
+      const m = i.preview?.radar_id ? porPost.get(i.preview.radar_id) : undefined
+      i.ig = m ? { alcance: m.alcance, vistas: m.vistas, guardados: m.guardados, compartidos: m.compartidos, seguidores: m.seguidores, tiempo_promedio_ms: m.tiempo_promedio_ms } : null
+    }
+  }
   const islaDeEtiqueta = new Map(islas.filter((i) => i.etiqueta).map((i) => [i.etiqueta as string, i]))
 
   // ── captación: contactos nuevos de ManyChat de los últimos 7 días ──────────────────────────────────────────
@@ -314,6 +325,7 @@ export const DICCIONARIO = [
   { id: "isla.leads", nombre: "Leads de una pieza", formula: "Contactos de ManyChat con la etiqueta de la pieza (p. ej. «Comparación - 🟣VOLUMEN/TOFU - 21/9/2026»)", fuente: "ManyChat → crm_integration_assets", estado: "real", nota: "Atribución por etiqueta del flujo (último toque que etiquetó ManyChat). Las piezas sin etiqueta muestran N/D." },
   { id: "isla.agendas", nombre: "Agendas / presentadas / cierres / cash de una pieza", formula: "Agendas de las personas que tienen la etiqueta, en la ventana; el cash se cuenta una sola vez por persona", fuente: "rpc crm_angulos_manychat (el mismo cálculo que Marketing → Ángulos)", estado: "real", nota: "Una persona con varias etiquetas suma en cada pieza: es atribución multi-toque, no se suman entre islas." },
   { id: "isla.flujo", nombre: "Contactos que bajan por la cinta", formula: "Contactos nuevos (hoy / 7 días) cuya primera etiqueta de pieza es esa isla", fuente: "ManyChat", estado: "real", nota: "ManyChat no guarda el orden de las etiquetas: si un contacto tiene dos piezas, se toma la primera de la lista." },
+  { id: "isla.instagram", nombre: "Alcance, vistas, guardados y compartidos de una pieza", formula: "Métricas de por vida del post según Instagram; leads c/1.000 alcanzados = leads de la pieza ÷ alcance × 1.000", fuente: "Graph API de Instagram (radar_piezas_metricas), se relee cada 6 horas", estado: "real", nota: "Solo para piezas con su post identificado. Instagram informa seguidores ganados en carruseles y posts, no en reels." },
   { id: "isla.preview", nombre: "Vista previa", formula: "La miniatura del post de Instagram de esa pieza. El post se identifica cruzando quién lo comentó (muestra de hasta 30 comentarios por post, Apify) con los contactos que tienen la etiqueta de la pieza en ManyChat: gana la etiqueta con más comentaristas en común (al menos 2, y 5 o más o un cuarto de la muestra) y a no más de 7 días. Si todavía no hay comentarios bajados, se usa el único post del mismo día y tipo, avisando que no está confirmado", fuente: "radar_piezas (cuenta alexmcarrera) + radar_comentarios_crudos + crm_piezas_instagram", estado: "real", nota: "El vínculo se actualiza todos los días (cron del radar, paso «vincular»). Una pieza sin post identificado muestra la placa «sin vista previa»." },
   { id: "captacion.hoy", nombre: "Captación hoy", formula: "Contactos de ManyChat cuya fecha de suscripción (hora Argentina) es hoy", fuente: "ManyChat (tarea cada 3 h)", estado: "real", nota: "Corte = última corrida de la tarea de ManyChat; puede atrasar hasta 3 horas." },
   { id: "espera", nombre: "Sala de espera", formula: "Contactos de los últimos 7 días sin la etiqueta ASIGNADO y sin agenda", fuente: "ManyChat + crm_identities + agendas", estado: "real", nota: "No distingue a quien solo pidió un recurso de quien quiere hablar: ManyChat no lo marca." },

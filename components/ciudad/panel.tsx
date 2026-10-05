@@ -10,7 +10,7 @@ import { COLOR_ANGULO, COLOR_ESTADO, ZONAS, fechaCorta, horaArt, nombreVisible, 
 // devuelve la API (hasta 200 por grupo) y marca el que se tocó en la escena.
 
 const DIC: Record<Zona, string[]> = {
-  contenido: ["isla.leads", "isla.agendas", "isla.flujo", "isla.preview"],
+  contenido: ["isla.leads", "isla.agendas", "isla.flujo", "isla.instagram", "isla.preview"],
   captacion: ["captacion.hoy"],
   espera: ["espera"],
   setters: ["setters.conversando", "setters.conversaciones_mes", "setters.agendas"],
@@ -104,7 +104,13 @@ export function DetalleZona({ datos, zona, idSel, nombres, onSeleccion }: { dato
                 ))}
               </div>
               {i.etiqueta ? <div className="mt-1 truncate text-[10px] text-muted-foreground">Etiqueta: {i.etiqueta}</div> : <div className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">Sin etiqueta de ManyChat: leads y agendas N/D.</div>}
-              {i.preview ? <div className="text-[10px] text-muted-foreground">Vista previa: {i.preview.vinculo}{i.preview.views !== null ? ` · ${numero(i.preview.views)} views` : ""}</div> : null}
+              {i.ig?.alcance ? (
+                <div className="mt-1.5 rounded bg-violet-500/10 px-2 py-1 text-[11px]">
+                  <span className="font-semibold">Instagram:</span> {numero(i.ig.alcance)} alcanzados · {numero(i.ig.vistas)} vistas · {numero(i.ig.guardados)} guardados · {numero(i.ig.compartidos)} compartidos{i.ig.seguidores !== null ? ` · ${numero(i.ig.seguidores)} seguidores` : ""}
+                  {i.leads !== null ? <span className="block font-semibold text-violet-700 dark:text-violet-300">{((i.leads / i.ig.alcance) * 1000).toLocaleString("es-AR", { maximumFractionDigits: 1 })} leads cada 1.000 alcanzados</span> : null}
+                </div>
+              ) : null}
+              {i.preview ? <div className="text-[10px] text-muted-foreground">Post: {i.preview.vinculo}</div> : null}
             </Fila>
           ))}
         </Lista>

@@ -10,6 +10,8 @@
 //   vincular                                      qué post de Instagram es cada pieza de ManyChat (Ciudad): pide los
 //                                                 reels propios recientes y los comentarios que falten, y cruza
 //                                                 comentaristas con etiquetas (dos veces por día)
+//   metricas                                      publicaciones propias y sus métricas reales por la Graph API
+//                                                 (alcance, vistas, guardados, compartidos, seguidores), gratis
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { analizarPendientes, leerHistoriasPendientes, minarSemana } from "./analisis"
@@ -21,8 +23,9 @@ import { local } from "./metricas"
 import { transcribirPendientes } from "./transcribir"
 import { fotoSeguidores } from "../seguidores"
 import { vincularPiezas } from "../ciudad-vinculos"
+import { sincronizarMediaPropia } from "./media-propia"
 
-export const PASOS = ["piezas", "perfiles", "historias", "comentarios", "propias", "ciclo", "minar", "podar", "seguidores", "vincular"] as const
+export const PASOS = ["piezas", "perfiles", "historias", "comentarios", "propias", "ciclo", "minar", "podar", "seguidores", "vincular", "metricas"] as const
 export type Paso = (typeof PASOS)[number]
 
 const SIN_APIFY = { ok: false, motivo: "falta APIFY_TOKEN: conectá Apify para que el Radar pueda leer Instagram" }
@@ -64,12 +67,14 @@ export async function correrPaso(db: SupabaseClient, paso: Paso, o: { pedidaPor?
     case "minar": return minarSemana(db)
     case "podar": return podarMedios(db)
     case "seguidores": return apifyListo() ? fotoSeguidores(db) : SIN_APIFY
+    case "metricas": return sincronizarMediaPropia(db, { hasta })
     case "vincular": {
       // 1) pide los reels propios de los últimos días (los recoge el ciclo), 2) pide comentarios de los posts que no
       // los tienen y 3) rehace el vínculo pieza ↔ post con lo que ya hay
       const p = apifyListo() ? await presupuesto() : null
       const leer = apifyListo() && !p?.agotado
-      const reels = leer ? await lanzarReelsPropios(db, { pedidaPor }) : null
+      // con la Graph API las publicaciones propias llegan gratis por el paso «metricas»; Apify solo si no hay token
+      const reels = leer && !graphListo() ? await lanzarReelsPropios(db, { pedidaPor }) : null
       return { reels, ...(await vincularPiezas(db, { lanzar: leer, pedidaPor })) }
     }
     case "ciclo": {

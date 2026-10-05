@@ -201,7 +201,7 @@ function IslaContenido({ isla, x, z, lado, sel, onSeleccion, gente, nombres, idS
   const titulo = String(isla.formato || isla.categoria || isla.nombre || "Pieza").slice(0, 22)
   const formato = isla.categoria === "Carrusel" ? "Carrusel" : isla.categoria === "Historia" ? "Historia" : "Reel"
   const abrir = () => onSeleccion({ zona: "contenido", id: isla.id })
-  const tip = `${isla.nombre} · ${isla.leads === null ? "leads N/D" : `${numero(isla.leads)} leads`}${isla.semana ? ` · ${numero(isla.semana)} en 7 días` : ""}`
+  const tip = `${isla.nombre} · ${isla.ig?.alcance ? `${numero(isla.ig.alcance)} alcanzados · ` : ""}${isla.leads === null ? "leads N/D" : `${numero(isla.leads)} leads`}${isla.semana ? ` · ${numero(isla.semana)} en 7 días` : ""}`
   // la cinta de la isla sale hacia la cinta principal
   const x0 = x - lado * (ISLA_W / 2 - 0.2), x1 = hastaX
   return (

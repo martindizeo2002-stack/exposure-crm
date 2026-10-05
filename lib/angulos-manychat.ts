@@ -11,7 +11,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 type Tag = { tag: string; leads: number; nuevos: number }
 type Agenda = { id: string; person_id: string; nombre: string; fecha: string; show: boolean | null; cerro: boolean | null; calificacion: string | null; fuente: string | null; recurso: string | null; tags: string[]; cash: number }
 type Clase = { tipo: "angulo" | "subangulo" | "pieza" | "formato" | "categoria" | "historia" | "otro"; nombre: string; angulo?: string; formato?: string; fecha?: string; categoria?: string }
-export type Fila = { nombre: string; tag?: string; angulo?: string; formato?: string; categoria?: string; fecha?: string | null; leads: number; nuevos: number; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number; ultima: string | null }
+// Métricas reales de Instagram del post de una pieza (radar_piezas_metricas, Graph API). El post se identifica por el
+// cruce de comentaristas (lib/ciudad-vinculos.ts).
+export type IgPieza = { url: string | null; producto: string | null; alcance: number | null; vistas: number | null; guardados: number | null; compartidos: number | null; interacciones: number | null; seguidores: number | null; visitas_perfil: number | null; tiempo_promedio_ms: number | null; leido_at: string; vinculo: string }
+// Suma por ángulo, solo de las piezas que tienen métricas: numerador y denominador salen de las mismas piezas.
+export type IgAngulo = { piezas: number; piezas_total: number; alcance: number; vistas: number; guardados: number; compartidos: number; seguidores: number; leads: number; agendas: number; cierres: number; cash: number }
+export type Fila = { nombre: string; tag?: string; angulo?: string; formato?: string; categoria?: string; fecha?: string | null; leads: number; nuevos: number; agendas: number; presentadas: number; calificadas: number; cierres: number; cash: number; ultima: string | null; ig?: IgPieza | null; igAngulo?: IgAngulo | null }
 
 const CALIF = new Set(["lead a", "lead b", "lead c", "a", "b", "c", "s"])
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "setiembre", "octubre", "noviembre", "diciembre"]
@@ -71,7 +76,9 @@ const filaVacia = (nombre: string, extra: Partial<Fila> = {}): Fila => ({ nombre
 // Medición de ángulos, piezas, formatos e historias en una ventana de días. La usan /api/angulos-manychat y la ciudad.
 export async function medirAngulos(sb: SupabaseClient, dias: number) {
   const desde = new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10)
-  const { data, error } = await sb.rpc("crm_angulos_manychat", { p_desde: desde })
+  // la consulta es pesada y en frío a veces corta por tiempo: un reintento antes de fallar
+  let { data, error } = await sb.rpc("crm_angulos_manychat", { p_desde: desde })
+  if (error && /timeout/i.test(error.message)) ({ data, error } = await sb.rpc("crm_angulos_manychat", { p_desde: desde }))
   if (error) throw new Error(error.message)
   const tags: Tag[] = data?.tags || []
   const agendas: Agenda[] = data?.agendas || []
@@ -128,6 +135,41 @@ export async function medirAngulos(sb: SupabaseClient, dias: number) {
       sumar(grupos.angulo.get(ang), a)
     }
   }
+  // métricas reales de Instagram de cada pieza y su suma por ángulo
+  const { data: vinc } = await sb.from("crm_piezas_instagram").select("etiqueta,radar_pieza_id,coincidencias,comentaristas")
+  const vinculo = new Map<string, { radar_pieza_id: string; coincidencias: number; comentaristas: number }>()
+  for (const v of vinc || []) {
+    const nombre = clasificar(v.etiqueta)?.nombre
+    const ya = nombre ? vinculo.get(nombre) : undefined
+    if (nombre && (!ya || v.coincidencias > ya.coincidencias)) vinculo.set(nombre, v)
+  }
+  const ids = [...new Set([...vinculo.values()].map((v) => v.radar_pieza_id))]
+  const metricas = new Map<string, Record<string, unknown>>()
+  for (let i = 0; i < ids.length; i += 200) {
+    const [{ data: ms }, { data: ps }] = await Promise.all([
+      sb.from("radar_piezas_metricas").select("pieza_id,producto,alcance,vistas,guardados,compartidos,interacciones,seguidores,visitas_perfil,tiempo_promedio_ms,leido_at").in("pieza_id", ids.slice(i, i + 200)),
+      sb.from("radar_piezas").select("id,url").in("id", ids.slice(i, i + 200)),
+    ])
+    const url = new Map((ps || []).map((p) => [String(p.id), p.url as string]))
+    for (const m of ms || []) metricas.set(String(m.pieza_id), { ...m, url: url.get(String(m.pieza_id)) || null })
+  }
+  for (const f of grupos.pieza.values()) {
+    const v = vinculo.get(f.nombre)
+    const m = v ? metricas.get(v.radar_pieza_id) : undefined
+    f.ig = m && v ? { ...(m as unknown as Omit<IgPieza, "vinculo">), vinculo: `${v.coincidencias} de ${v.comentaristas} comentaristas` } : null
+  }
+  for (const a of grupos.angulo.values()) {
+    const suyas = [...grupos.pieza.values()].filter((f) => f.angulo === a.nombre)
+    const con = suyas.filter((f) => f.ig?.alcance)
+    const suma = (k: (f: Fila) => number) => con.reduce((t, f) => t + k(f), 0)
+    a.igAngulo = {
+      piezas: con.length, piezas_total: suyas.length,
+      alcance: suma((f) => f.ig?.alcance || 0), vistas: suma((f) => f.ig?.vistas || 0), guardados: suma((f) => f.ig?.guardados || 0),
+      compartidos: suma((f) => f.ig?.compartidos || 0), seguidores: suma((f) => f.ig?.seguidores || 0),
+      leads: suma((f) => f.leads), agendas: suma((f) => f.agendas), cierres: suma((f) => f.cierres), cash: suma((f) => f.cash),
+    }
+  }
+
   const orden = (a: Fila, b: Fila) => b.cash - a.cash || b.cierres - a.cierres || b.agendas - a.agendas || b.leads - a.leads
   const lista = (g: Map<string, Fila>, min = 0) => [...g.values()].filter((f) => f.leads + f.agendas >= min).sort(orden)
   return {
