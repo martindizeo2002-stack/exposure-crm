@@ -34,6 +34,9 @@ export function PanelNegocio({ pagina }: { pagina: PaginaPanel }) {
       if (e.origin !== window.location.origin) return
       const d = (e.data || {}) as { tipo?: string; pagina?: string }
       if (d.tipo === "panel:listo") setListo(true)
+      // «El equipo» del panel ahora son las tareas: los atajos del panel que iban a las métricas del
+      // equipo llevan al Leaderboard, que es donde están esos números en el CRM.
+      if (d.tipo === "panel:pagina" && d.pagina === "equipo") { router.push("/equipo"); return }
       if (d.tipo === "panel:pagina" && d.pagina && d.pagina !== actual.current) {
         actual.current = d.pagina
         router.replace(`/panel/${d.pagina}`)

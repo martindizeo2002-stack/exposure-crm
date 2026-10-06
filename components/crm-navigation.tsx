@@ -64,7 +64,7 @@ export const modules: NavItem[] = [
   { label: "El embudo", href: "/panel/embudo", icon: Target, match: ["/panel/embudo"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
   { label: "Pipeline", href: "/panel/pipeline", icon: Kanban, match: ["/panel/pipeline"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
   { label: "Cómo viene el año", href: "/panel/anio", icon: CalendarRange, match: ["/panel/anio"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
-  { label: "El equipo", href: "/panel/equipo", icon: Users, match: ["/panel/equipo"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
+  { label: "El equipo", href: "/panel/equipo", icon: ListChecks, match: ["/panel/equipo"], ramp: ramps.panel, group: "Panel del negocio" },   // tareas: lo ve todo el equipo
   { label: "Últimas llamadas", href: "/panel/llamadas", icon: PhoneCall, match: ["/panel/llamadas"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
   { label: "De dónde salen", href: "/panel/fuentes", icon: Compass, match: ["/panel/fuentes"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },
   { label: "El contenido", href: "/panel/contenido", icon: Clapperboard, match: ["/panel/contenido"], ramp: ramps.panel, group: "Panel del negocio", roles: PANEL_ROLES },

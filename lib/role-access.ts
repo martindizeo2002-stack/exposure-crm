@@ -21,6 +21,7 @@ const SALES_OPERATIONS = ["CEO", "Sales Manager", "Manager MKT", "Setter", "Clos
 
 const pageRules: Array<[string, CRMRole[]]> = [
   ["/sistema", CRM_ROLES as unknown as CRMRole[]],
+  ["/panel/equipo", CRM_ROLES as unknown as CRMRole[]],   // tareas del equipo: cada uno ve las suyas (filtra /api/tareas)
   ["/panel", [...OPERATIONS, "Contaduria"]],   // Panel del negocio (páginas y su index.html)
   ["/sales-game-preview", ["CEO"]],
   ["/accesos", ["CEO"]],
@@ -69,6 +70,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
 
 const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/panel", [...OPERATIONS, "Contaduria"]],  // datos del Panel del negocio
+  ["/api/tareas", CRM_ROLES as unknown as CRMRole[]],  // tareas del equipo: el filtro por persona y los permisos de CEO están en la ruta
   ["/api/formatos", OPERATIONS],                 // rendimiento por pieza: tiene cash y cierres, no es para el editor
   ["/api/angulos", [...OPERATIONS, "Editor"]],    // banco de ángulos editable
   ["/api/youtube", [...OPERATIONS, "Editor"]],   // videos de YouTube y sus clips
@@ -148,6 +150,7 @@ export function canAccessApi(pathname: string, role: string | null | undefined, 
     if (pathname === "/api/pagos" || pathname === "/api/pagos/vinculo") return ["GET", "POST"].includes(verb)
     if (pathname === "/api/upload-comprobante") return ["GET", "POST"].includes(verb)
     if (pathname === "/api/cobranza" || pathname === "/api/cobranza/resolver") return verb === "POST"
+    if (pathname === "/api/tareas") return ["GET", "PATCH"].includes(verb)   // sus tareas: verlas y tildarlas
     return false
   }
   // Borrados permanentes y administración de identidad quedan reservados al

@@ -25,10 +25,12 @@ const nextConfig = {
         { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
       ],
     }, {
-      // El Panel del negocio (public/panel) se muestra adentro de un iframe
-      // del propio CRM: solo acá se permite el embebido, y solo desde el
-      // mismo origen. El micrófono es para el Service JARVIS.
-      source: "/panel/:path*",
+      // El Panel del negocio (public/panel/index.html) se muestra adentro de un
+      // iframe del propio CRM: solo acá se permite el embebido, y solo desde el
+      // mismo origen. El micrófono es para el Service JARVIS. Solo ese archivo:
+      // las páginas /panel/<página> de Next siguen con la política general (si
+      // no, connect-src 'self' les bloquea Supabase y, por ejemplo, «Salir»).
+      source: "/panel/index.html",
       headers: [
         { key: "Content-Security-Policy", value: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; media-src 'self' blob:" },
         { key: "X-Frame-Options", value: "SAMEORIGIN" },
