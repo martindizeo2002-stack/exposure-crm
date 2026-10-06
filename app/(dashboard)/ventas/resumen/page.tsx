@@ -644,7 +644,7 @@ export default function ResumenVentasPage() {
                             className="flex cursor-pointer items-center justify-between"
                             onClick={() => setCallExpandida(expandida ? null : c.agenda_id || c.nombre)}
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span className="font-bold text-white text-sm">{c.nombre}</span>
                               {c.hora && <span className="text-xs text-muted-foreground">({c.hora})</span>}
                               <Badge
@@ -659,6 +659,21 @@ export default function ResumenVentasPage() {
                               >
                                 {c.resultado}
                               </Badge>
+
+                              {/* Botón visible de edición en la cabecera cerca de nombre / estado */}
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-6 px-2.5 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-all"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  abrirEdicionLead(c)
+                                }}
+                              >
+                                <Pencil className="mr-1 h-3 w-3" />
+                                Editar lead
+                              </Button>
+
                               {/* Lead Score */}
                               <Badge variant="secondary" className="text-[10px]">
                                 {c.lead_score}
@@ -676,26 +691,11 @@ export default function ResumenVentasPage() {
                                 {c.es_calificado ? "Calificada" : "No calificada"}
                               </Badge>
                             </div>
-                            <div className="flex items-center gap-2 text-xs">
+                            <div className="flex items-center gap-2 text-xs shrink-0">
                               {esCierre && (
                                 <span className="font-black text-emerald-400">${c.cash_d1} USD D1</span>
                               )}
-                              
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-6 px-2 text-[11px] border-white/10 hover:bg-white/10 text-zinc-300 font-normal"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  abrirEdicionLead(c)
-                                }}
-                              >
-                                <Pencil className="mr-1 h-3 w-3 text-zinc-400" />
-                                Editar lead
-                              </Button>
-
-                              {expandida ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              {expandida ? <ChevronUp className="h-4 w-4 text-zinc-400" /> : <ChevronDown className="h-4 w-4 text-zinc-400" />}
                             </div>
                           </div>
 
@@ -712,6 +712,21 @@ export default function ResumenVentasPage() {
                           {/* Detalle Expandido */}
                           {expandida && (
                             <div className="mt-3 space-y-2 border-t border-white/10 pt-3 text-xs">
+                              <div className="flex items-center justify-between pb-1">
+                                <span className="font-bold text-zinc-400 text-[11px] uppercase tracking-wider">Detalle de la agenda</span>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-6 px-2.5 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    abrirEdicionLead(c)
+                                  }}
+                                >
+                                  <Pencil className="mr-1 h-3 w-3" />
+                                  Editar lead
+                                </Button>
+                              </div>
                               {/* Grid de Atribución Separada de ESA Agenda */}
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded bg-zinc-950/60 p-2.5 border border-white/5">
                                 <div>
