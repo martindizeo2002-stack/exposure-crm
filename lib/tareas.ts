@@ -11,6 +11,10 @@ export const ETIQUETA_FRECUENCIA: Record<Frecuencia, string> = {
   semanal: "Todas las semanas",
 }
 
+export const ESTADOS = ["pendiente", "en_progreso", "hecha"] as const
+export type Estado = (typeof ESTADOS)[number]
+export const esEstado = (v: unknown): v is Estado => (ESTADOS as readonly string[]).includes(String(v))
+
 export type TareaFila = {
   id: string
   miembro_id: number
@@ -22,6 +26,7 @@ export type TareaFila = {
   origen_url: string | null
   hecha_at: string | null
   hecha_por: string | null
+  en_progreso_desde: string | null
   orden: number
   creada_por: string | null
   created_at: string
@@ -30,8 +35,9 @@ export type TareaFila = {
 // hecha: null = la tarea todavía no existía ese día o esa semana (no cuenta).
 export type MarcaHistorial = { clave: string; etiqueta: string; hecha: boolean | null }
 
-export type Tarea = Omit<TareaFila, "creada_por" | "hecha_por"> & {
+export type Tarea = Omit<TareaFila, "creada_por" | "hecha_por" | "en_progreso_desde"> & {
   hecha_por?: string | null   // solo le llega a un CEO
+  estado: Estado
   hecha: boolean
   vencida: boolean
   historial: MarcaHistorial[]   // últimos 7 días (diaria) o últimas 4 semanas (semanal); vacío en las de una vez
@@ -39,11 +45,14 @@ export type Tarea = Omit<TareaFila, "creada_por" | "hecha_por"> & {
 
 export type MiembroTareas = { id: number; nombre: string; rol: string }
 
+export type Prioridad = { texto: string; por: string | null; at: string }
+
 export type RespuestaTareas = {
   yo: MiembroTareas & { admin: boolean }
   hoy: string
   miembros: MiembroTareas[]
   tareas: Tarea[]
+  prioridad: Prioridad | null
 }
 
 export const esAdminTareas = (rol: string | null | undefined) => rol === "CEO"
@@ -101,11 +110,17 @@ export function estadoTarea(fila: TareaFila, marcas: string[], hoy: string, conA
       return { clave: desde, etiqueta: `semana del ${etiquetaDia(desde).split(" ")[1]}`, hecha: sumarDias(desde, 6) < alta ? null : semanaHecha(desde) }
     })
   }
-  const { creada_por: _c, hecha_por, ...resto } = fila
+  const { creada_por: _c, hecha_por, en_progreso_desde, ...resto } = fila
   void _c
+  // «En progreso» vale para el período en curso (hoy, esta semana o hasta terminarla).
+  const enProgreso = !hecha && Boolean(en_progreso_desde) && (
+    fila.frecuencia === "una_vez"
+    || (fila.frecuencia === "diaria" && en_progreso_desde === hoy)
+    || (fila.frecuencia === "semanal" && String(en_progreso_desde) >= lunesDe(hoy)))
   return {
     ...resto,
     ...(conAutor ? { hecha_por } : {}),
+    estado: hecha ? "hecha" : enProgreso ? "en_progreso" : "pendiente",
     hecha,
     vencida: fila.frecuencia === "una_vez" && !hecha && Boolean(fila.vence) && String(fila.vence) < hoy,
     historial,

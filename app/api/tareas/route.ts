@@ -4,8 +4,8 @@ import { createSupabaseServer } from "@/lib/supabase-server"
 import { effectiveCRMRole } from "@/lib/role-access"
 import { enviarPush } from "@/lib/push"
 import {
-  esAdminTareas, esFrecuencia, estadoTarea, hoyArgentina, lunesDe, ordenarTareas, sumarDias,
-  type MiembroTareas, type RespuestaTareas, type TareaFila,
+  esAdminTareas, esEstado, esFrecuencia, estadoTarea, hoyArgentina, lunesDe, ordenarTareas, sumarDias,
+  type Estado, type MiembroTareas, type Prioridad, type RespuestaTareas, type TareaFila,
 } from "@/lib/tareas"
 
 export const dynamic = "force-dynamic"
@@ -13,12 +13,13 @@ export const dynamic = "force-dynamic"
 // Tareas pendientes del equipo (Panel del negocio → El equipo).
 //   GET                                          → las tareas que puede ver quien pide: las suyas, o las de todos si es CEO
 //   POST   { miembro_id, titulo, ... }           → crea una tarea (solo CEO)
-//   PATCH  { id, hecha }                         → tilda o destilda (la persona a la que está asignada, o un CEO)
+//   POST   { prioridad }                         → fija la prioridad del día (solo CEO)
+//   PATCH  { id, estado | hecha }                → pendiente / en progreso / hecha (la persona a la que está asignada, o un CEO)
 //   PATCH  { id, titulo?, detalle?, frecuencia?, vence?, miembro_id?, orden? } → edita (solo CEO)
 //   DELETE { id }                                → archiva (solo CEO; el middleware ya limita DELETE a CEO)
 // El filtro por persona se hace acá, en el servidor: la pantalla nunca recibe tareas ajenas si no es CEO.
 
-const COLUMNAS = "id,miembro_id,titulo,detalle,frecuencia,vence,origen,origen_url,hecha_at,hecha_por,orden,creada_por,created_at"
+const COLUMNAS = "id,miembro_id,titulo,detalle,frecuencia,vence,origen,origen_url,hecha_at,hecha_por,en_progreso_desde,orden,creada_por,created_at"
 
 const texto = (v: unknown, max: number) => { const t = String(v ?? "").replace(/\s+/g, " ").trim(); return t ? t.slice(0, max) : "" }
 const textoLargo = (v: unknown, max: number) => { const t = String(v ?? "").trim(); return t ? t.slice(0, max) : "" }
@@ -94,7 +95,14 @@ async function respuesta(sb: ReturnType<typeof createSupabaseAdmin>, yo: Yo): Pr
     }
   }
   const tareas = ordenarTareas(lista.map((f) => estadoTarea(f, marcas.get(f.id) || [], hoy, yo.admin)))
-  return { yo: { id: yo.id, nombre: yo.nombre, rol: yo.rol, admin: yo.admin }, hoy, miembros, tareas }
+  // La prioridad del día: la última que escribió un CEO. La ve todo el equipo.
+  let prioridad: Prioridad | null = null
+  const { data: p } = await sb.from("crm_equipo_prioridad").select("texto,definida_por,created_at").order("created_at", { ascending: false }).limit(1).maybeSingle()
+  if (p) {
+    const { data: quien } = p.definida_por ? await sb.from("team_members").select("nombre").eq("email", p.definida_por).maybeSingle() : { data: null }
+    prioridad = { texto: String(p.texto), por: quien?.nombre ? String(quien.nombre) : null, at: String(p.created_at) }
+  }
+  return { yo: { id: yo.id, nombre: yo.nombre, rol: yo.rol, admin: yo.admin }, hoy, miembros, tareas, prioridad }
 }
 
 export async function GET() {
@@ -115,6 +123,13 @@ export async function POST(request: Request) {
     if (!yo) return error("Tu cuenta no figura en el equipo", 403)
     if (!yo.admin) return error("Solo un CEO puede asignar tareas", 403)
     const b = await request.json().catch(() => ({}))
+    if ("prioridad" in b) {
+      const texto2 = texto(b.prioridad, 500)
+      if (!texto2) return error("Escribí la prioridad del día", 400)
+      const { error: ep } = await sb.from("crm_equipo_prioridad").insert({ texto: texto2, definida_por: yo.email })
+      if (ep) throw new Error(ep.message)
+      return NextResponse.json({ ok: true, ...(await respuesta(sb, yo)) }, { status: 201 })
+    }
     const titulo = texto(b.titulo, 300)
     if (!titulo) return error("Escribí la tarea", 400)
     const miembroId = Number(b.miembro_id)
@@ -156,13 +171,16 @@ export async function PATCH(request: Request) {
     const esMia = tarea.miembro_id === yo.id
     if (!esMia && !yo.admin) return error("Esa tarea no es tuya", 403)
 
-    // Tildar o destildar.
-    if (typeof b.hecha === "boolean") {
+    // Cambiar de estado: pendiente, en progreso o hecha (o tildar/destildar con { hecha }).
+    let objetivo: Estado | null = null
+    if (typeof b.hecha === "boolean") objetivo = b.hecha ? "hecha" : "pendiente"
+    if (esEstado(b.estado)) objetivo = b.estado
+    if (objetivo) {
       const hoy = hoyArgentina()
       // Quien no es CEO solo escribe si la tarea sigue siendo suya en el momento de escribir.
       const dueno = yo.admin ? null : yo.id
-      if (b.hecha) {
-        let tildar = sb.from("crm_tareas").update({ hecha_at: new Date().toISOString(), hecha_por: yo.email, updated_at: new Date().toISOString() }).eq("id", tarea.id)
+      if (objetivo === "hecha") {
+        let tildar = sb.from("crm_tareas").update({ hecha_at: new Date().toISOString(), hecha_por: yo.email, en_progreso_desde: null, en_progreso_por: null, updated_at: new Date().toISOString() }).eq("id", tarea.id)
         if (dueno !== null) tildar = tildar.eq("miembro_id", dueno)
         const { data: tocada, error: e2 } = await tildar.select("id")
         if (e2) throw new Error(e2.message)
@@ -180,6 +198,8 @@ export async function PATCH(request: Request) {
         let destildar = sb.from("crm_tareas").update({
           hecha_at: tarea.frecuencia === "una_vez" ? null : (ultima?.created_at ?? null),
           hecha_por: tarea.frecuencia === "una_vez" ? null : (ultima?.marcada_por ?? null),
+          en_progreso_desde: objetivo === "en_progreso" ? hoy : null,
+          en_progreso_por: objetivo === "en_progreso" ? yo.email : null,
           updated_at: new Date().toISOString(),
         }).eq("id", tarea.id)
         if (dueno !== null) destildar = destildar.eq("miembro_id", dueno)
@@ -210,6 +230,8 @@ export async function PATCH(request: Request) {
     if (cambiaFrecuencia) {
       cambios.hecha_at = null
       cambios.hecha_por = null
+      cambios.en_progreso_desde = null
+      cambios.en_progreso_por = null
       const { error: e0 } = await sb.from("crm_tareas_marcas").delete().eq("tarea_id", tarea.id)
       if (e0) throw new Error(e0.message)
     }
