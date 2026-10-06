@@ -77,7 +77,7 @@ En **Ventas → Embudos** (debajo de las campañas de Meta Ads) y en **Operacion
 
 ## Tareas del equipo (06/10)
 
-**Panel del negocio → El equipo** es ahora la lista de tareas de cada uno. Entrá y vas a ver las tuyas: tildá cada una cuando la terminás. Las de **todos los días** y **todas las semanas** se destildan solas al día o a la semana siguiente (hora argentina), y los puntitos muestran si las hiciste en los últimos 7 días o las últimas 4 semanas. Las de **una vez** pasan a «Hechas» cuando recargás la página. Cada tarea trae el link al minuto de la reunión donde se pidió. Solo un CEO ve las tareas de todos y puede asignarlas, editarlas, pasarlas a otra persona o borrarlas; el resto ve únicamente las suyas. Las métricas que antes estaban en esa página están en **Leaderboard**.
+**Panel del negocio → El equipo** es ahora la lista de tareas de cada uno, con la misma pantalla que «Tareas»: arriba cuántas hay para hoy, en progreso y completadas, y abajo las tres columnas. Tocá el círculo de una tarea para pasarla a **En progreso** y otra vez para marcarla **Completada** (un tercer toque la vuelve a Hoy). Las de **todos los días** y **todas las semanas** vuelven solas a Hoy al día o a la semana siguiente (hora argentina), y los puntitos muestran si las hiciste en los últimos 7 días o las últimas 4 semanas. Cada tarea trae el link al minuto de la reunión donde se pidió. Abajo está la **prioridad del día**, que escribe un CEO. Solo un CEO ve las tareas de todos (con filtro por persona y el reparto del trabajo) y puede asignarlas, editarlas, pasarlas a otra persona o borrarlas; el resto ve únicamente las suyas. Las métricas que antes estaban en esa página están en **Leaderboard**.
 
 ## Ángulos con métricas de Instagram (05/10)
 
