@@ -14,6 +14,7 @@ import {
   type FathomDiagnostico,
   type ArquetiposMetricas,
 } from "@/lib/closing-whatsapp-formatter"
+import { extractBookingContentOrigin } from "@/lib/chat-summary-attribution"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -38,7 +39,7 @@ function parseFathomText(summary?: string | null, transcript?: string | null): F
     diag.contenido_recuerda = "Caso Fran Puleo"
   }
 
-  // Citas textuales o insights aproximados si el summary los trae
+  // Citas textuales o insights si el summary / ia_analisis los trae
   if (summary) {
     const lines = summary.split("\n")
     for (const l of lines) {
@@ -51,6 +52,9 @@ function parseFathomText(summary?: string | null, transcript?: string | null): F
       }
       if (lLow.includes("objeci") || lLow.includes("freno")) {
         diag.oferta_interes = l.replace(/^[-*•#\s]+/, "").slice(0, 200)
+      }
+      if (lLow.includes("urgencia")) {
+        diag.urgencia = l.replace(/^[-*•#\s]+/, "").slice(0, 200)
       }
     }
   }
@@ -129,11 +133,11 @@ export async function GET(request: NextRequest) {
       fechaHasta = `${mes}-31`
     }
 
-    // Consultamos agendas reales del CRM por fecha_closer (incluyendo fuente y medio_de_pago)
+    // Consultamos agendas reales del CRM por fecha_closer
     let query = sb
       .from("agendas")
       .select(
-        "id, nombre, email, telefono, instagram, fecha_closer, fecha_agenda, closer, setter, show, cerro, estado, calificacion, lead_score, lead_score_grade, lead_score_detalle, calificaba_realmente, ocupacion, angulo_entrada, recurso, fuente, medio_de_pago, motivo_no_cierre, plan_de_pago, cc_dia_1, person_id, problema_actual, motivo_urgencia, ingresos, inversion, link_fathom"
+        "id, nombre, email, telefono, instagram, fecha_closer, fecha_agenda, closer, setter, show, cerro, estado, calificacion, lead_score, lead_score_grade, lead_score_detalle, calificaba_realmente, ocupacion, angulo_entrada, recurso, manychat, fuente, medio_de_pago, motivo_no_cierre, plan_de_pago, cc_dia_1, person_id, problema_actual, motivo_urgencia, ingresos, inversion, link_fathom, ia_analisis, resumen_chat"
       )
       .gte("fecha_closer", `${fechaDesde}T00:00:00`)
       .lte("fecha_closer", `${fechaHasta}T23:59:59`)
@@ -312,9 +316,26 @@ export async function GET(request: NextRequest) {
         angulosCalificados[angKey] = (angulosCalificados[angKey] || 0) + 1
       }
 
-      // Diagnóstico Fathom
+      // Diagnóstico Fathom: cruza crm_call_records o a.ia_analisis directamente
       const fathomData = callRecords[a.id]
-      const fDiag = parseFathomText(fathomData?.summary, fathomData?.transcript)
+      const fDiag = parseFathomText(fathomData?.summary || a.ia_analisis, fathomData?.transcript)
+
+      // Atribución de ESA agenda limpia y separada:
+      // 1. Origen: canal base (limpiando si viniera con comas o concatenaciones)
+      const origenLimpio = (a.fuente || "Instagram").split(",")[0].trim()
+
+      // 2. Pieza de entrada específica
+      const piezaEntradaLimpia = (a.recurso || "").trim()
+
+      // 3. Keyword / Manychat de ESA agenda
+      const keywordLimpia = (a.manychat || "").trim()
+
+      // 4. Ángulo de adquisición: si angulo_entrada está vacío, intentar extraerlo del gatillo del chat
+      let anguloLimpio = (a.angulo_entrada || "").trim()
+      if (!anguloLimpio && a.resumen_chat) {
+        const gatillo = extractBookingContentOrigin(a.resumen_chat)
+        if (gatillo) anguloLimpio = gatillo
+      }
 
       return {
         agenda_id: a.id,
@@ -328,9 +349,10 @@ export async function GET(request: NextRequest) {
         es_calificado: esCalif,
         calificaba_realmente: a.calificaba_realmente || null,
         ingresos_declarados: a.ingresos || "",
-        origen: a.fuente || "Instagram",
-        pieza_entrada: a.recurso || "",
-        angulo_adquisicion: a.angulo_entrada || "",
+        origen: origenLimpio,
+        pieza_entrada: piezaEntradaLimpia,
+        keyword: keywordLimpia,
+        angulo_adquisicion: anguloLimpio,
         porque_agendo: a.problema_actual || a.motivo_urgencia || "",
         resultado: resComercial,
         cash_d1: cashLead,

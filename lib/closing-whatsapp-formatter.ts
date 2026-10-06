@@ -136,7 +136,7 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
         lines.push(`\nCALL ${idx + 1} — ${c.nombre.toUpperCase()} ${c.hora ? "(" + c.hora + ")" : ""}`)
         lines.push(`Closer: ${c.closer}`)
         
-        // Macro y subarquetipo leídos estrictamente del CRM
+        // Macro y subarquetipo
         if (c.arquetipo_macro === "SIN CLASIFICAR") {
           lines.push(`Macro: SIN CLASIFICAR`)
         } else {
@@ -146,7 +146,7 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
           lines.push(`Subarquetipo: ${c.subarquetipo}`)
         }
 
-        // Lead Scoring y Calificación leídos del CRM
+        // Lead Scoring y Calificación
         const califLabel = c.es_calificado ? "CALIFICADO" : "NO CALIFICADO"
         lines.push(`Lead Scoring: ${c.lead_score} · ${califLabel}`)
         if (c.calificaba_realmente) {
@@ -156,12 +156,19 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
         if (c.ingresos_declarados) {
           lines.push(`Ingresos declarados: ${c.ingresos_declarados}`)
         }
-        if (c.origen || c.pieza_entrada) {
-          lines.push(`Origen: ${[c.origen, c.pieza_entrada, c.keyword].filter(Boolean).join(" · ")}`)
+
+        // Atribución de agenda por separado (sin concatenar todo el historial)
+        lines.push(`Origen: ${c.origen || "Instagram"}`)
+        if (c.pieza_entrada) {
+          lines.push(`Pieza de entrada: ${c.pieza_entrada}`)
+        }
+        if (c.keyword) {
+          lines.push(`Keyword: ${c.keyword}`)
         }
         if (c.angulo_adquisicion) {
           lines.push(`Ángulo de adquisición: ${c.angulo_adquisicion}`)
         }
+
         if (c.porque_agendo) {
           lines.push(`Agendó porque: ${c.porque_agendo}`)
         }

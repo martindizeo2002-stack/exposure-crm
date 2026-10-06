@@ -542,7 +542,7 @@ export default function ResumenVentasPage() {
                               >
                                 {c.resultado}
                               </Badge>
-                              {/* Lead Score fiel al CRM */}
+                              {/* Lead Score */}
                               <Badge variant="secondary" className="text-[10px]">
                                 {c.lead_score}
                               </Badge>
@@ -580,10 +580,26 @@ export default function ResumenVentasPage() {
                           {/* Detalle Expandido */}
                           {expandida && (
                             <div className="mt-3 space-y-2 border-t border-white/10 pt-3 text-xs">
-                              <div>
-                                <span className="font-semibold text-zinc-400">Origen & Ángulo: </span>
-                                <span>{c.origen} {c.angulo_adquisicion && `— ${c.angulo_adquisicion}`}</span>
+                              {/* Grid de Atribución Separada de ESA Agenda */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded bg-zinc-950/60 p-2.5 border border-white/5">
+                                <div>
+                                  <span className="font-semibold text-zinc-400 block text-[11px]">Origen</span>
+                                  <span className="text-zinc-200">{c.origen || "—"}</span>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-zinc-400 block text-[11px]">Pieza de entrada</span>
+                                  <span className="text-zinc-200">{c.pieza_entrada || "—"}</span>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-zinc-400 block text-[11px]">Keyword</span>
+                                  <span className="text-zinc-200">{c.keyword || "—"}</span>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-zinc-400 block text-[11px]">Ángulo de adquisición</span>
+                                  <span className="text-zinc-200">{c.angulo_adquisicion || "—"}</span>
+                                </div>
                               </div>
+
                               {c.porque_agendo && (
                                 <div>
                                   <span className="font-semibold text-zinc-400">Por qué agendó: </span>
@@ -608,6 +624,18 @@ export default function ResumenVentasPage() {
                                 <div>
                                   <span className="font-semibold text-zinc-400">Siguiente paso: </span>
                                   <span>{c.siguiente_paso}</span>
+                                </div>
+                              )}
+                              {c.fathom?.dolor_principal && (
+                                <div>
+                                  <span className="font-semibold text-purple-400">Fathom · Dolor: </span>
+                                  <span>{c.fathom.dolor_principal}</span>
+                                </div>
+                              )}
+                              {c.fathom?.deseo_principal && (
+                                <div>
+                                  <span className="font-semibold text-purple-400">Fathom · Deseo: </span>
+                                  <span>{c.fathom.deseo_principal}</span>
                                 </div>
                               )}
                               {c.fathom?.mencion_alex && (
