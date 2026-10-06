@@ -76,6 +76,7 @@ export const modules: NavItem[] = [
   { label: "Seguimientos", href: "/seguimientos", icon: BellRing, match: ["/seguimientos"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer"] },
   { label: "Embudos", href: "/embudos", icon: Filter, match: ["/embudos"], ramp: ramps.metricas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Contaduria"] },
   { label: "Resumen de setting", href: "/setting-resumen", icon: NotebookPen, match: ["/setting-resumen"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter"] },
+  { label: "Resumen de ventas", href: "/ventas/resumen", icon: PhoneCall, match: ["/ventas/resumen"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Closer", "Setter"] },
   { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle, match: ["/whatsapp"], ramp: ramps.agendas, group: "Ventas", roles: ["CEO", "Sales Manager"] },
   { label: "Pagos", href: "/pagos", icon: CircleDollarSign, match: ["/pagos", "/carga-pagos", "/todos-pagos"], ramp: ramps.pagos, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Contaduria", "CSM"] },
   { label: "Cobros y cuotas", href: "/recordatorios", icon: BellRing, match: ["/cobros", "/recordatorios", "/cuotas", "/planes-pago"], ramp: ramps.cuotas, group: "Ventas", roles: ["CEO", "Sales Manager", "Manager MKT", "Setter", "Closer", "Cobranzas", "Contaduria"] },

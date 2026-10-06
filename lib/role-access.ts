@@ -80,6 +80,7 @@ const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/angulos-manychat", OPERATIONS],
   ["/api/ciudad", OPERATIONS],
   ["/api/setting-resumen", SALES_OPERATIONS],
+  ["/api/ventas/resumen", SALES_OPERATIONS],
   ["/api/whatsapp", OPERATIONS],
   ["/api/security/activity", CRM_ROLES as unknown as CRMRole[]],
   ["/api/push", CRM_ROLES as unknown as CRMRole[]],   // suscripción a avisos push de este dispositivo (quién recibe qué se decide en lib/push.ts)
