@@ -529,6 +529,69 @@ function DetailField({ label, value, icon: Icon, wide = false }: { label: string
   )
 }
 
+function EditableDetailField({
+  label,
+  value,
+  editValue,
+  onChange,
+  icon: Icon,
+  wide = false,
+  multiline = false,
+  placeholder,
+  editMode,
+}: {
+  label: string
+  value: React.ReactNode
+  editValue: string | null | undefined
+  onChange: (val: string | null) => void
+  icon?: React.ComponentType<{ className?: string }>
+  wide?: boolean
+  multiline?: boolean
+  placeholder?: string
+  editMode: boolean
+}) {
+  if (!editMode && (value === null || value === undefined || value === "")) return null
+  return (
+    <div
+      className={cn(
+        "group rounded-2xl border border-white/70 bg-white/65 p-3.5 shadow-[0_8px_30px_rgba(15,23,42,.04)] backdrop-blur transition duration-300 hover:border-violet-200 dark:border-white/10 dark:bg-white/[.045]",
+        wide && "sm:col-span-2",
+        editMode && "border-violet-300/80 bg-violet-500/[.03] ring-1 ring-violet-400/20 dark:border-violet-500/30"
+      )}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        {Icon && (
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-violet-500/15 to-fuchsia-400/10 text-violet-600 dark:text-violet-300">
+            <Icon className="h-3.5 w-3.5" />
+          </span>
+        )}
+        <p className="text-[9px] font-black uppercase tracking-[.16em] text-muted-foreground">{label}</p>
+      </div>
+      {editMode ? (
+        multiline ? (
+          <textarea
+            rows={2}
+            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-[13px] font-semibold leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+            value={editValue || ""}
+            onChange={(e) => onChange(e.target.value || null)}
+            placeholder={placeholder}
+          />
+        ) : (
+          <input
+            type="text"
+            className="h-9 w-full rounded-xl border border-border bg-background px-3 text-[13px] font-semibold text-foreground placeholder:text-muted-foreground/60 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+            value={editValue || ""}
+            onChange={(e) => onChange(e.target.value || null)}
+            placeholder={placeholder}
+          />
+        )
+      ) : (
+        <div className="break-words text-[13px] font-semibold leading-relaxed text-foreground">{value}</div>
+      )}
+    </div>
+  )
+}
+
 function DetailSection({ icon: Icon, title, children }: { icon: React.ComponentType<{ className?: string }>; title: string; children: React.ReactNode }) {
   return (
     <section>
@@ -686,12 +749,60 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
               <div className="grid gap-3 sm:grid-cols-2">
                 <DetailField icon={MessageSquareText} label="Problema actual" value={agenda.problema_actual} wide />
                 <DetailField icon={Clock3} label="Hace cuánto arrastra el problema" value={agenda.tiempo_problema} wide />
-                <DetailField icon={MessageSquareText} label="Intentos previos" value={agenda.intentos_previos} wide />
-                <DetailField icon={Target} label="Motivo de urgencia" value={agenda.motivo_urgencia} wide />
+                <EditableDetailField
+                  icon={MessageSquareText}
+                  label={editMode ? "Intentos previos / ¿Intentó vender IA antes?" : "Intentos previos"}
+                  value={agenda.intentos_previos}
+                  editValue={editForm.intentos_previos}
+                  onChange={v => ef("intentos_previos", v)}
+                  multiline
+                  placeholder="Ej: Ya intentó vender automatizaciones pero no consiguió clientes"
+                  editMode={editMode}
+                  wide
+                />
+                <EditableDetailField
+                  icon={Target}
+                  label={editMode ? "Motivo de urgencia / Urgencia" : "Motivo de urgencia"}
+                  value={agenda.motivo_urgencia}
+                  editValue={editForm.motivo_urgencia}
+                  onChange={v => ef("motivo_urgencia", v)}
+                  multiline
+                  placeholder="Ej: Quiere resolverlo este mes"
+                  editMode={editMode}
+                  wide
+                />
                 <DetailField icon={BriefcaseBusiness} label="Ocupación" value={agenda.ocupacion} />
-                <DetailField icon={WalletCards} label="Ingresos" value={agenda.ingresos} />
-                <DetailField icon={WalletCards} label="Capacidad de inversión" value={agenda.inversion} wide />
+                <EditableDetailField
+                  icon={WalletCards}
+                  label="Ingreso mensual"
+                  value={agenda.ingresos}
+                  editValue={editForm.ingresos}
+                  onChange={v => ef("ingresos", v)}
+                  placeholder="Ej: Factura aproximadamente USD 4.500/mes"
+                  editMode={editMode}
+                />
+                <EditableDetailField
+                  icon={WalletCards}
+                  label={editMode ? "Capacidad de inversión / Inversión disponible" : "Capacidad de inversión"}
+                  value={agenda.inversion}
+                  editValue={editForm.inversion}
+                  onChange={v => ef("inversion", v)}
+                  placeholder="Ej: Puede invertir USD 2.000 ahora"
+                  editMode={editMode}
+                  wide
+                />
               </div>
+              {editMode && (
+                <div className="mt-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setEditMode(false)} className="rounded-xl border border-border px-4 py-2 text-xs font-bold">
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={saveDirect} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-black text-white hover:bg-violet-700 disabled:opacity-50">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Guardar cambios
+                  </button>
+                </div>
+              )}
               </DetailSection>
               {(agenda.motivo_no_cierre || agenda.motivo_inclusion || agenda.resumen_chat) && <DetailSection icon={MessageSquareText} title="Resultado y notas">
               <div className="grid gap-3 sm:grid-cols-2">
