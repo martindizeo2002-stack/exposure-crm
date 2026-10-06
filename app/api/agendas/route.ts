@@ -39,6 +39,7 @@ const ALLOWED_UPDATE = new Set([
   "operacion", "plan_de_pago", "tipo_cierre", "medio_de_pago", "comprobante",
   "cc_dia_1", "fecha_tc", "fecha_baja", "link_fathom", "ia_analisis",
   "rescatado", "motivo_inclusion", "calificacion_crm_original",
+  "lead_score_grade", "lead_score", "calificacion_real", "motivo_calificacion_real",
 ])
 
 export async function GET(request: Request) {

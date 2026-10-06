@@ -18,8 +18,13 @@ import {
   History,
   RefreshCw,
   Award,
+  Pencil,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -28,6 +33,19 @@ import { toast } from "sonner"
 import { CLOSERS_ACTIVOS } from "@/lib/equipo"
 import type { ResumenPayload, CallDetalle } from "@/lib/closing-whatsapp-formatter"
 import { cn } from "@/lib/utils"
+
+
+const MOTIVOS_NO_CIERRE_CRM = [
+  "Le parecia caro",
+  "No llego al PIF",
+  "No llegaba a la Cuota 1",
+  "Lo tenia que pensar",
+  "Desconfianza",
+  "Miedo",
+  "Metodo de pago",
+  "No Califica",
+  "Era desempleado"
+]
 
 function hoyIso() {
   const d = new Date()
@@ -43,6 +61,105 @@ export default function ResumenVentasPage() {
   const [loading, setLoading] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [copiado, setCopiado] = useState(false)
+
+  // Estado para el modal de edición de lead comercial
+  const [modalLeadAbierto, setModalLeadAbierto] = useState(false)
+  const [leadEditando, setLeadEditando] = useState<CallDetalle | null>(null)
+  const [formEdit, setFormEdit] = useState<{
+    lead_scoring: string
+    macro_arquetipo: string
+    subarquetipo: string
+    calificaba_realmente: string
+    objecion: string
+    motivo_no_cierre: string
+    siguiente_paso: string
+  }>({
+    lead_scoring: "LEAD D",
+    macro_arquetipo: "SIN CLASIFICAR",
+    subarquetipo: "",
+    calificaba_realmente: "Sin definir",
+    objecion: "",
+    motivo_no_cierre: "",
+    siguiente_paso: "Seguimiento",
+  })
+  const [guardandoLead, setGuardandoLead] = useState(false)
+
+  const abrirEdicionLead = (c: CallDetalle) => {
+    let scoringBase = "LEAD D"
+    const scoreUpper = (c.lead_score || "").toUpperCase()
+    if (scoreUpper.includes("LEAD S")) scoringBase = "LEAD S"
+    else if (scoreUpper.includes("LEAD A")) scoringBase = "LEAD A"
+    else if (scoreUpper.includes("LEAD B")) scoringBase = "LEAD B"
+    else if (scoreUpper.includes("LEAD C")) scoringBase = "LEAD C"
+    else if (scoreUpper.includes("LEAD D")) scoringBase = "LEAD D"
+
+    const macroBase = c.arquetipo_macro || "SIN CLASIFICAR"
+    const objBase = c.objecion_principal && c.objecion_principal !== "Sin motivo cargado" ? c.objecion_principal : ""
+
+    setLeadEditando(c)
+    setFormEdit({
+      lead_scoring: scoringBase,
+      macro_arquetipo: macroBase,
+      subarquetipo: c.subarquetipo || "",
+      calificaba_realmente: c.calificaba_realmente || "Sin definir",
+      objecion: objBase,
+      motivo_no_cierre: c.motivo_real && c.motivo_real !== "Propuesta y claridad en el modelo" ? c.motivo_real : "",
+      siguiente_paso: c.siguiente_paso || "Seguimiento",
+    })
+    setModalLeadAbierto(true)
+  }
+
+  const guardarEdicionLead = async () => {
+    if (!leadEditando?.agenda_id) {
+      toast.error("No se encontró el ID de la agenda para guardar")
+      return
+    }
+    setGuardandoLead(true)
+    try {
+      let ocupacionFinal: string | null = null
+      if (formEdit.macro_arquetipo === "DUEÑO DE NEGOCIO") {
+        ocupacionFinal = formEdit.subarquetipo.trim() ? `Negocio - ${formEdit.subarquetipo.trim()}` : "Negocio"
+      } else if (formEdit.macro_arquetipo === "EMPLEADO") {
+        ocupacionFinal = formEdit.subarquetipo.trim() ? `Empleado - ${formEdit.subarquetipo.trim()}` : "Empleado"
+      } else if (formEdit.macro_arquetipo === "ESTUDIANTE") {
+        ocupacionFinal = formEdit.subarquetipo.trim() ? `Estudiante - ${formEdit.subarquetipo.trim()}` : "Estudiante"
+      } else if (formEdit.subarquetipo.trim()) {
+        ocupacionFinal = formEdit.subarquetipo.trim()
+      }
+
+      const updates: any = {
+        id: leadEditando.agenda_id,
+        calificacion: formEdit.lead_scoring,
+        lead_score_grade: formEdit.lead_scoring,
+        ocupacion: ocupacionFinal,
+        calificaba_realmente: formEdit.calificaba_realmente === "Sin definir" ? null : formEdit.calificaba_realmente,
+        motivo_no_cierre: formEdit.motivo_no_cierre || (formEdit.objecion && formEdit.objecion !== "none" ? formEdit.objecion : null),
+        estado: formEdit.siguiente_paso === "Onboarding" ? "Cierre" : formEdit.siguiente_paso,
+      }
+
+      const res = await fetch("/api/agendas", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      })
+
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || "Error al actualizar la agenda en Exposure OS")
+      }
+
+      toast.success("Lead actualizado exitosamente en Agendas de Exposure OS")
+      setModalLeadAbierto(false)
+      setLeadEditando(null)
+      // Refresco inmediato de datos, métricas y texto WhatsApp
+      await cargarResumen()
+    } catch (err: any) {
+      toast.error(err.message || "Error al guardar cambios")
+    } finally {
+      setGuardandoLead(false)
+    }
+  }
+
 
   const [datos, setDatos] = useState<ResumenPayload | null>(null)
   const [textoWhatsapp, setTextoWhatsapp] = useState<string>("")
@@ -563,6 +680,21 @@ export default function ResumenVentasPage() {
                               {esCierre && (
                                 <span className="font-black text-emerald-400">${c.cash_d1} USD D1</span>
                               )}
+                              
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-[11px] border-white/10 hover:bg-white/10 text-zinc-300 font-normal"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  abrirEdicionLead(c)
+                                }}
+                              >
+                                <Pencil className="mr-1 h-3 w-3 text-zinc-400" />
+                                Editar lead
+                              </Button>
+
                               {expandida ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             </div>
                           </div>
@@ -776,6 +908,167 @@ export default function ResumenVentasPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Modal / Dialog de Edición de Lead en Agendas */}
+      <Dialog open={modalLeadAbierto} onOpenChange={setModalLeadAbierto}>
+        <DialogContent className="sm:max-w-[540px] bg-zinc-950 border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-white">
+              <Pencil className="h-4 w-4 text-emerald-400" />
+              Editar Lead Comercial: {leadEditando?.nombre}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Modificá los datos comerciales del lead. Al guardar se actualiza directamente el registro real de <span className="text-zinc-200 font-medium">agendas</span> en Exposure OS.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 py-2 text-xs">
+            {/* Lead Scoring y Calificación */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-zinc-300 text-xs">Lead Scoring</Label>
+                <Select
+                  value={formEdit.lead_scoring}
+                  onValueChange={(v) => setFormEdit((prev) => ({ ...prev, lead_scoring: v }))}
+                >
+                  <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                    <SelectItem value="LEAD S">LEAD S (Calificado)</SelectItem>
+                    <SelectItem value="LEAD A">LEAD A (Calificado)</SelectItem>
+                    <SelectItem value="LEAD B">LEAD B (Calificado)</SelectItem>
+                    <SelectItem value="LEAD C">LEAD C (Calificado)</SelectItem>
+                    <SelectItem value="LEAD D">LEAD D (No calificado)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-zinc-300 text-xs">Calificaba realmente (post-call)</Label>
+                <Select
+                  value={formEdit.calificaba_realmente}
+                  onValueChange={(v) => setFormEdit((prev) => ({ ...prev, calificaba_realmente: v }))}
+                >
+                  <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                    <SelectItem value="Sin definir">Sin definir</SelectItem>
+                    <SelectItem value="Si">Si</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Macro Arquetipo y Subarquetipo */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-zinc-300 text-xs">Macro Arquetipo</Label>
+                <Select
+                  value={formEdit.macro_arquetipo}
+                  onValueChange={(v) => setFormEdit((prev) => ({ ...prev, macro_arquetipo: v }))}
+                >
+                  <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                    <SelectItem value="DUEÑO DE NEGOCIO">DUEÑO DE NEGOCIO</SelectItem>
+                    <SelectItem value="EMPLEADO">EMPLEADO</SelectItem>
+                    <SelectItem value="ESTUDIANTE">ESTUDIANTE</SelectItem>
+                    <SelectItem value="SIN CLASIFICAR">SIN CLASIFICAR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-zinc-300 text-xs">Subarquetipo</Label>
+                <Input
+                  className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs placeholder:text-zinc-500"
+                  placeholder="Ej. Ingeniero, Dev freelance, Editor..."
+                  value={formEdit.subarquetipo}
+                  onChange={(e) => setFormEdit((prev) => ({ ...prev, subarquetipo: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Objeción principal */}
+            <div>
+              <Label className="text-zinc-300 text-xs">Objeción</Label>
+              <Select
+                value={formEdit.objecion || "none"}
+                onValueChange={(v) => setFormEdit((prev) => ({ ...prev, objecion: v === "none" ? "" : v }))}
+              >
+                <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs">
+                  <SelectValue placeholder="Seleccionar objeción cargada..." />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                  <SelectItem value="none">Sin objeción cargada</SelectItem>
+                  {MOTIVOS_NO_CIERRE_CRM.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Motivo de no cierre detallado */}
+            <div>
+              <Label className="text-zinc-300 text-xs">Motivo de no cierre (detalle)</Label>
+              <Input
+                className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs placeholder:text-zinc-500"
+                placeholder="Explicación detallada o notas del motivo"
+                value={formEdit.motivo_no_cierre}
+                onChange={(e) => setFormEdit((prev) => ({ ...prev, motivo_no_cierre: e.target.value }))}
+              />
+            </div>
+
+            {/* Siguiente paso */}
+            <div>
+              <Label className="text-zinc-300 text-xs">Siguiente paso</Label>
+              <Select
+                value={formEdit.siguiente_paso}
+                onValueChange={(v) => setFormEdit((prev) => ({ ...prev, siguiente_paso: v }))}
+              >
+                <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                  <SelectItem value="Seguimiento">Seguimiento</SelectItem>
+                  <SelectItem value="Onboarding">Onboarding</SelectItem>
+                  <SelectItem value="Volver a llamar">Volver a llamar</SelectItem>
+                  <SelectItem value="Descartado">Descartado</SelectItem>
+                  <SelectItem value="Esperando pago">Esperando pago</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-white/5">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-white/10 hover:bg-white/10 text-xs"
+              onClick={() => setModalLeadAbierto(false)}
+              disabled={guardandoLead}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium"
+              onClick={guardarEdicionLead}
+              disabled={guardandoLead}
+            >
+              {guardandoLead && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              {guardandoLead ? "Guardando en Agendas..." : "Guardar cambios"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }

@@ -37,28 +37,45 @@ export function leerArquetipoCrm(
   let macro: MacroArquetipo = "SIN CLASIFICAR"
   let subarquetipo: string | null = subarquetipoDirecto ? String(subarquetipoDirecto).trim() : null
 
-  // 1. Verificar si tiene cargado un macro arquetipo canónico en el CRM
-  if (
-    arqRaw === "DUEÑO DE NEGOCIO" ||
-    arqRaw === "DUENO DE NEGOCIO" ||
-    arqRaw === "NEGOCIO" ||
-    ocuUpper === "NEGOCIO" ||
-    ocuUpper === "DUEÑO DE NEGOCIO" ||
-    ocuUpper === "DUENO DE NEGOCIO"
-  ) {
-    macro = "DUEÑO DE NEGOCIO"
-  } else if (arqRaw === "EMPLEADO" || ocuUpper === "EMPLEADO") {
-    macro = "EMPLEADO"
-  } else if (arqRaw === "ESTUDIANTE" || ocuUpper === "ESTUDIANTE") {
-    macro = "ESTUDIANTE"
-  }
+  // Si ocuRaw tiene separador " - " o ": " (ej: "Empleado - Ingeniero" o "Negocio: Ecommerce")
+  if (ocuRaw.includes(" - ") || ocuRaw.includes(": ")) {
+    const separator = ocuRaw.includes(" - ") ? " - " : ": "
+    const parts = ocuRaw.split(separator)
+    const firstUpper = parts[0].trim().toUpperCase()
+    if (firstUpper.includes("NEGOCIO") || firstUpper.includes("DUEÑO") || firstUpper.includes("DUENO")) {
+      macro = "DUEÑO DE NEGOCIO"
+    } else if (firstUpper.includes("EMPLEADO")) {
+      macro = "EMPLEADO"
+    } else if (firstUpper.includes("ESTUDIANTE")) {
+      macro = "ESTUDIANTE"
+    }
+    if (!subarquetipo && parts[1]?.trim()) {
+      subarquetipo = parts[1].trim()
+    }
+  } else {
+    // 1. Verificar si tiene cargado un macro arquetipo canónico en el CRM
+    if (
+      arqRaw === "DUEÑO DE NEGOCIO" ||
+      arqRaw === "DUENO DE NEGOCIO" ||
+      arqRaw === "NEGOCIO" ||
+      ocuUpper === "NEGOCIO" ||
+      ocuUpper === "DUEÑO DE NEGOCIO" ||
+      ocuUpper === "DUENO DE NEGOCIO"
+    ) {
+      macro = "DUEÑO DE NEGOCIO"
+    } else if (arqRaw === "EMPLEADO" || ocuUpper === "EMPLEADO") {
+      macro = "EMPLEADO"
+    } else if (arqRaw === "ESTUDIANTE" || ocuUpper === "ESTUDIANTE") {
+      macro = "ESTUDIANTE"
+    }
 
-  // 2. Subarquetipo real:
-  // Si no se pasó un subarquetipo directo pero el CRM tiene guardado un valor de ocupación
-  // que no es el selector genérico ("Negocio", "Empleado", "Estudiante", "No se le envió"),
-  // se conserva fielmente ese texto como subarquetipo guardado.
-  if (!subarquetipo && ocuRaw && !["Negocio", "Empleado", "Estudiante", "No se le envió"].includes(ocuRaw)) {
-    subarquetipo = ocuRaw
+    // 2. Subarquetipo real:
+    // Si no se pasó un subarquetipo directo pero el CRM tiene guardado un valor de ocupación
+    // que no es el selector genérico ("Negocio", "Empleado", "Estudiante", "No se le envió"),
+    // se conserva fielmente ese texto como subarquetipo guardado.
+    if (!subarquetipo && ocuRaw && !["Negocio", "Empleado", "Estudiante", "No se le envió"].includes(ocuRaw)) {
+      subarquetipo = ocuRaw
+    }
   }
 
   return {

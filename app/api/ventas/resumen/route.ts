@@ -360,7 +360,7 @@ export async function GET(request: NextRequest) {
         forma_pago: formaPagoLead,
         objecion_principal: a.motivo_no_cierre || (resComercial === "NO CIERRE" ? "Sin motivo cargado" : ""),
         motivo_real: a.motivo_no_cierre || (resComercial === "CIERRE" ? "Propuesta y claridad en el modelo" : ""),
-        siguiente_paso: resComercial === "CIERRE" ? "Onboarding" : "Seguimiento",
+        siguiente_paso: resComercial === "CIERRE" ? "Onboarding" : (a.estado || "Seguimiento"),
         fathom: fDiag,
       }
     })
