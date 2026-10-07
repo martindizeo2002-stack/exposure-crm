@@ -49,7 +49,7 @@ function filterToParams(filter: string): string {
 // No Cerrados -> Fees -> Cerrados -> Archivados. Los leads que todavía no
 // confirmaron la llamada no tienen columna propia (getStage devuelve null y
 // quedan afuera del pipeline; se gestionan desde Centro de Agendas).
-type Stage = "confirmado" | "no_show" | "presentado" | "no_cerrado" | "fee" | "cerrado" | "archivado"
+type Stage = "confirmado" | "grupo_precall" | "no_show" | "reprogramado" | "presentado" | "no_cerrado" | "fee" | "cerrado" | "archivado"
 
 // Strip accents for comparison (handles "Si, confirmada" vs "Sí, confirmada" etc.)
 function norm(s: string) {
@@ -165,6 +165,11 @@ function getStage(a: Agenda, pays: Pays): Stage | null {
   // Se presentó y no cerró: cae en No Cerrados si tiene motivo cargado
   if (a.show && a.motivo_no_cierre) return "no_cerrado"
   if (a.show) return "presentado"
+
+  const st = norm(a.estado || "")
+  if (st === "reprogramo" || st === "reprogramado") return "reprogramado"
+  if (st === "grupo precall creado" || norm(a.call_confirmer || "") === "grupo precall creado") return "grupo_precall"
+
   // Centro de Agendas guarda el no-show como show=false. `estado=No Show`
   // refuerza el dato nuevo, pero los registros ya cargados deben sincronizar
   // igual aunque todavía no tengan ese segundo campo. Solo se interpreta como
@@ -186,38 +191,47 @@ function getStage(a: Agenda, pays: Pays): Stage | null {
 // Valores que se escriben en "agendas" al soltar una tarjeta en cada columna
 // simple (una sola drop-zone). Las columnas con sub-secciones (No Cerrados,
 // Cerrados, Archivados) se manejan aparte en handleDragEnd.
-const STAGE_UPDATES: Record<"confirmado" | "no_show" | "presentado" | "fee", Partial<Agenda>> = {
-  confirmado: { estado: null, cerro: false, call_confirmer: "Confirmada", show: false, motivo_no_cierre: null, tipo_cierre: null },
-  no_show:    { estado: "No Show", cerro: false, show: false, motivo_no_cierre: null, tipo_cierre: null },
-  presentado: { estado: null, cerro: false, show: true, motivo_no_cierre: null, tipo_cierre: null },
-  fee:        { estado: "Fee", cerro: false, motivo_no_cierre: null, tipo_cierre: null },
+const STAGE_UPDATES: Record<"confirmado" | "grupo_precall" | "no_show" | "reprogramado" | "presentado" | "fee", Partial<Agenda>> = {
+  confirmado:    { estado: null, cerro: false, call_confirmer: "Confirmada", show: false, motivo_no_cierre: null, tipo_cierre: null },
+  grupo_precall: { estado: "Grupo Precall Creado", cerro: false, show: false, motivo_no_cierre: null, tipo_cierre: null },
+  no_show:       { estado: "No Show", cerro: false, show: false, motivo_no_cierre: null, tipo_cierre: null },
+  reprogramado:  { estado: "Reprogramó", cerro: false, show: false, motivo_no_cierre: null, tipo_cierre: null },
+  presentado:    { estado: null, cerro: false, show: true, motivo_no_cierre: null, tipo_cierre: null },
+  fee:           { estado: "Fee", cerro: false, motivo_no_cierre: null, tipo_cierre: null },
 }
 
 // ── Column config ─────────────────────────────────────────────────────────────
 const COLUMNS: { id: Stage; label: string; color: string; headerBg: string; dot: string }[] = [
-  { id: "confirmado",  label: "Agenda Confirmada", color: "border-t-blue-500",    headerBg: "bg-blue-500/10",    dot: "bg-blue-500"    },
-  { id: "no_show",     label: "No se Presentó",    color: "border-t-slate-400",  headerBg: "bg-slate-500/10",   dot: "bg-slate-400"   },
-  { id: "presentado",  label: "Falta Resultado",   color: "border-t-red-500",    headerBg: "bg-red-500/10",     dot: "bg-red-500"     },
-  { id: "no_cerrado",  label: "No Cerrados",       color: "border-t-orange-500", headerBg: "bg-orange-500/10",  dot: "bg-orange-500"  },
-  { id: "fee",         label: "Fees",              color: "border-t-amber-500",  headerBg: "bg-amber-500/10",   dot: "bg-amber-500"   },
-  { id: "cerrado",     label: "Cerrados",          color: "border-t-emerald-500",headerBg: "bg-emerald-500/10", dot: "bg-emerald-500" },
-  { id: "archivado",   label: "Archivados",        color: "border-t-slate-300",  headerBg: "bg-muted/40",       dot: "bg-slate-300"   },
+  { id: "confirmado",    label: "Agenda Confirmada",    color: "border-t-blue-500",    headerBg: "bg-blue-500/10",    dot: "bg-blue-500"    },
+  { id: "grupo_precall", label: "Grupo Precall Creado", color: "border-t-cyan-500",    headerBg: "bg-cyan-500/10",    dot: "bg-cyan-500"    },
+  { id: "no_show",       label: "No se Presentó",       color: "border-t-slate-400",   headerBg: "bg-slate-500/10",   dot: "bg-slate-400"   },
+  { id: "reprogramado",  label: "Reprogramó",           color: "border-t-purple-500",  headerBg: "bg-purple-500/10",  dot: "bg-purple-500"  },
+  { id: "presentado",    label: "Falta Resultado",      color: "border-t-red-500",     headerBg: "bg-red-500/10",     dot: "bg-red-500"     },
+  { id: "no_cerrado",    label: "No Cerrados",          color: "border-t-orange-500",  headerBg: "bg-orange-500/10",  dot: "bg-orange-500"  },
+  { id: "fee",           label: "Fees",                 color: "border-t-amber-500",   headerBg: "bg-amber-500/10",   dot: "bg-amber-500"   },
+  { id: "cerrado",       label: "Cerrados",             color: "border-t-emerald-500", headerBg: "bg-emerald-500/10", dot: "bg-emerald-500" },
+  { id: "archivado",     label: "Archivados",           color: "border-t-slate-300",   headerBg: "bg-muted/40",       dot: "bg-slate-300"   },
 ]
 type ColumnDef = (typeof COLUMNS)[number]
 
 const STAGE_BADGE: Record<Stage, string> = {
-  confirmado:  "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  no_show:     "bg-slate-500/10 text-slate-600 border-slate-500/20",
-  presentado:  "bg-red-500/10 text-red-600 border-red-500/20",
-  no_cerrado:  "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  fee:         "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  cerrado:     "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  archivado:   "bg-slate-200/60 text-slate-500 border-slate-300/40",
+  confirmado:    "bg-blue-500/10 text-blue-600 border-blue-500/20",
+  grupo_precall: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
+  no_show:       "bg-slate-500/10 text-slate-600 border-slate-500/20",
+  reprogramado:  "bg-purple-500/10 text-purple-600 border-purple-500/20",
+  presentado:    "bg-red-500/10 text-red-600 border-red-500/20",
+  no_cerrado:    "bg-orange-500/10 text-orange-600 border-orange-500/20",
+  fee:           "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  cerrado:       "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  archivado:     "bg-slate-200/60 text-slate-500 border-slate-300/40",
 }
 
 // Checklist operativo del closer. El pipeline no debe limitarse a ubicar la
 // tarjeta: también tiene que decir, sin abrirla, qué falta completar.
 function pipelineMissing(a: Agenda, stage: Stage): string[] {
+  if (stage === "reprogramado") {
+    return [!a.fecha_closer && "nueva fecha de llamada"].filter(Boolean) as string[]
+  }
   if (stage === "presentado") {
     return [!a.link_fathom && "Fathom", "resultado de la call"].filter(Boolean) as string[]
   }
@@ -305,6 +319,12 @@ function LeadCardContent({ agenda, stage, pays }: { agenda: Agenda; stage: Stage
       </div>
       {stage === "fee" && (
         <p className="text-xs text-amber-600 font-medium">Fee pagado — pendiente conversión</p>
+      )}
+      {stage === "reprogramado" && (
+        <p className="text-xs text-purple-600 font-medium">Reprogramó llamada</p>
+      )}
+      {stage === "grupo_precall" && (
+        <p className="text-xs text-cyan-600 font-medium">Grupo Precall creado</p>
       )}
       {cierre && (
         <Badge variant="outline" className={cn("text-xs font-semibold", CIERRE_BADGE[cierre])}>{CIERRE_LABEL[cierre]}</Badge>
@@ -617,8 +637,13 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
     if (!agenda?.id) return
     setSaving(true)
     const updates = { ...editForm }
-    if (updates.show === false) Object.assign(updates, { estado: "No Show", cerro: false, motivo_no_cierre: null })
+    if (updates.show === false && updates.estado !== "Reprogramó" && updates.estado !== "Grupo Precall Creado") {
+      Object.assign(updates, { estado: "No Show", cerro: false, motivo_no_cierre: null })
+    }
     if (updates.show === true && updates.estado === "No Show") updates.estado = null
+    if (updates.fecha_closer && updates.fecha_closer !== agenda.fecha_closer) {
+      updates.fecha_agenda = updates.fecha_closer
+    }
     const { id: _id, ...body } = updates
     const response = await fetch("/api/agendas", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: agenda.id, ...body }) })
     setSaving(false)
@@ -665,12 +690,26 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
                 <div className="rounded-3xl border border-violet-500/20 bg-violet-500/[.055] p-5">
                   <div className="mb-4"><p className="text-sm font-black">Completar sin salir del Pipeline</p><p className="mt-1 text-xs text-muted-foreground">Solo datos manuales del resultado y la operación.</p></div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="sm:col-span-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      <button type="button" onClick={() => { ef("show", null); ef("call_confirmer", null); if (editForm.estado === "No Show") ef("estado", null) }} className={cn("rounded-xl border py-2 text-xs font-bold", editForm.show == null && !editIsTriageCancelled ? "border-amber-500 bg-amber-500/10 text-amber-700" : "border-border")}>Pendiente</button>
-                      <button type="button" onClick={() => { ef("show", true); ef("call_confirmer", null) }} className={cn("rounded-xl border py-2 text-xs font-bold", editForm.show === true && !editIsTriageCancelled ? "border-emerald-500 bg-emerald-500/10 text-emerald-700" : "border-border")}>Se presentó</button>
-                      <button type="button" onClick={() => { ef("show", false); ef("cerro", false); ef("call_confirmer", null) }} className={cn("rounded-xl border py-2 text-xs font-bold", editForm.show === false && !editIsTriageCancelled ? "border-red-500 bg-red-500/10 text-red-600" : "border-border")}>No se presentó</button>
-                      <button type="button" onClick={() => { ef("show", null); ef("cerro", false); ef("estado", null); ef("motivo_no_cierre", null); ef("call_confirmer", "Cancelada por Triage") }} className={cn("rounded-xl border px-2 py-2 text-xs font-bold", editIsTriageCancelled ? "border-slate-500 bg-slate-500/10 text-slate-700" : "border-border")}>Cancelado por Triage</button>
+                    <div className="sm:col-span-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                      <button type="button" onClick={() => { ef("show", null); ef("call_confirmer", null); if (editForm.estado === "No Show" || editForm.estado === "Reprogramó" || editForm.estado === "Grupo Precall Creado") ef("estado", null) }} className={cn("rounded-xl border py-2 text-xs font-bold", editForm.show == null && !editIsTriageCancelled && editForm.estado !== "Reprogramó" && editForm.estado !== "Grupo Precall Creado" ? "border-amber-500 bg-amber-500/10 text-amber-700" : "border-border")}>Pendiente</button>
+                      <button type="button" onClick={() => { ef("show", false); ef("cerro", false); ef("call_confirmer", null); ef("estado", "Grupo Precall Creado") }} className={cn("rounded-xl border py-2 text-xs font-bold", editForm.estado === "Grupo Precall Creado" ? "border-cyan-500 bg-cyan-500/10 text-cyan-700" : "border-border")}>Grupo Precall</button>
+                      <button type="button" onClick={() => { ef("show", true); ef("call_confirmer", null); if (editForm.estado === "No Show" || editForm.estado === "Reprogramó" || editForm.estado === "Grupo Precall Creado") ef("estado", null) }} className={cn("rounded-xl border py-2 text-xs font-bold", editForm.show === true && !editIsTriageCancelled ? "border-emerald-500 bg-emerald-500/10 text-emerald-700" : "border-border")}>Se presentó</button>
+                      <button type="button" onClick={() => { ef("show", false); ef("cerro", false); ef("call_confirmer", null); ef("estado", "No Show") }} className={cn("rounded-xl border py-2 text-xs font-bold", editForm.show === false && editForm.estado === "No Show" && !editIsTriageCancelled ? "border-red-500 bg-red-500/10 text-red-600" : "border-border")}>No se presentó</button>
+                      <button type="button" onClick={() => { ef("show", false); ef("cerro", false); ef("call_confirmer", null); ef("estado", "Reprogramó") }} className={cn("rounded-xl border py-2 text-xs font-bold", editForm.estado === "Reprogramó" ? "border-purple-500 bg-purple-500/10 text-purple-700" : "border-border")}>Reprogramó</button>
                     </div>
+                    {editForm.estado === "Reprogramó" && (
+                      <div className="sm:col-span-2 rounded-2xl border border-purple-500/20 bg-purple-500/5 p-3">
+                        <label className="mb-1 block text-xs font-bold text-purple-700 dark:text-purple-300">
+                          Nueva fecha y hora de llamada
+                        </label>
+                        <input
+                          type="datetime-local"
+                          className={inputClass}
+                          value={editForm.fecha_closer ? editForm.fecha_closer.slice(0, 16) : (agenda.fecha_closer ? agenda.fecha_closer.slice(0, 16) : "")}
+                          onChange={e => ef("fecha_closer", e.target.value ? `${e.target.value}:00` : null)}
+                        />
+                      </div>
+                    )}
                     {editForm.show === true && <>
                       <select className={inputClass} value={editForm.cerro ? "si" : "no"} onChange={e => ef("cerro", e.target.value === "si")}><option value="no">No cerró</option><option value="si">Cerró</option></select>
                       <input className={inputClass} value={editForm.link_fathom || ""} onChange={e => ef("link_fathom", e.target.value)} placeholder="Link Fathom" />
@@ -729,7 +768,24 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
               <DetailSection icon={CalendarDays} title="Agenda y llamada">
               <div className="grid gap-3 sm:grid-cols-2">
                 <DetailField icon={CalendarDays} label="Agendó" value={formatDateTime(agenda.fecha_agenda)} />
-                <DetailField icon={Clock3} label="Fecha de llamada" value={formatDateTime(agenda.fecha_closer)} />
+                {editMode ? (
+                  <div className="group rounded-2xl border border-violet-300/80 bg-violet-500/[.03] p-3.5 shadow-[0_8px_30px_rgba(15,23,42,.04)] ring-1 ring-violet-400/20 backdrop-blur dark:border-violet-500/30">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-violet-500/15 to-fuchsia-400/10 text-violet-600 dark:text-violet-300">
+                        <Clock3 className="h-3.5 w-3.5" />
+                      </span>
+                      <p className="text-[9px] font-black uppercase tracking-[.16em] text-muted-foreground">Fecha y hora de llamada {stage === "reprogramado" || editForm.estado === "Reprogramó" ? "(Reprogramar)" : ""}</p>
+                    </div>
+                    <input
+                      type="datetime-local"
+                      className="h-9 w-full rounded-xl border border-border bg-background px-3 text-[13px] font-semibold text-foreground focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      value={editForm.fecha_closer ? editForm.fecha_closer.slice(0, 16) : (agenda.fecha_closer ? agenda.fecha_closer.slice(0, 16) : "")}
+                      onChange={(e) => ef("fecha_closer", e.target.value ? `${e.target.value}:00` : null)}
+                    />
+                  </div>
+                ) : (
+                  <DetailField icon={Clock3} label="Fecha de llamada" value={formatDateTime(agenda.fecha_closer || agenda.fecha_agenda)} />
+                )}
                 <DetailField icon={Radio} label="Fuente" value={agenda.fuente} />
                 <DetailField
                   icon={Link2}
@@ -909,7 +965,7 @@ export default function PipelinePage() {
 
   const grouped = useMemo(() => {
     const result: Record<Stage, Agenda[]> = {
-      confirmado: [], no_show: [], presentado: [], no_cerrado: [], fee: [], cerrado: [], archivado: [],
+      confirmado: [], grupo_precall: [], no_show: [], reprogramado: [], presentado: [], no_cerrado: [], fee: [], cerrado: [], archivado: [],
     }
     if (!agendas) return result
     for (const a of agendas) {
@@ -1000,10 +1056,14 @@ export default function PipelinePage() {
       return
     }
 
-    // Columnas simples: Agenda Confirmada, No se Presentó, Se Presentó, Fees
-    if (overId === "confirmado" || overId === "no_show" || overId === "presentado" || overId === "fee") {
+    // Columnas simples: Agenda Confirmada, Grupo Precall Creado, No se Presentó, Reprogramó, Se Presentó, Fees
+    if (overId === "confirmado" || overId === "grupo_precall" || overId === "no_show" || overId === "reprogramado" || overId === "presentado" || overId === "fee") {
       if (currentStage === overId) return
       await applyStageUpdate(agendaId, STAGE_UPDATES[overId])
+      if (overId === "reprogramado") {
+        setDetailAgenda({ ...agenda, ...STAGE_UPDATES[overId] })
+      }
+      return
     }
   }
 
