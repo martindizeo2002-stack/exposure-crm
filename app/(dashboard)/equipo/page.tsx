@@ -10,13 +10,54 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { Trophy, Medal, Award, AlertTriangle, TrendingUp, Users, Loader2, BadgeDollarSign, Target, Coins, Star, Sparkles } from "lucide-react"
+import { Trophy, Medal, Award, AlertTriangle, TrendingUp, Users, Loader2, BadgeDollarSign, Target, Coins, Star, Sparkles, Search, ExternalLink, CheckCircle2, XCircle, PhoneCall, DollarSign } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import type { Strike } from "@/lib/supabase"
 import { CrmPageIntro, CrmStat } from "@/components/crm-ui"
 import { useSession } from "@/components/session-provider"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const CALIFS_AB_SET = new Set(["S", "A", "B", "C", "LEAD A", "LEAD B", "LEAD C"])
+
+export type DetallePago = {
+  id?: string | number
+  cliente: string
+  monto: number
+  tipo: string
+  operacion?: string | null
+  fecha: string | null
+  closer?: string | null
+  setter?: string | null
+  cohort?: string | null
+  comisionable?: number
+  en_ventana?: boolean
+  es_unidad?: boolean
+}
+
+export type DetalleLlamada = {
+  id?: string | number
+  nombre: string
+  fecha_agenda: string | null
+  show: boolean
+  cerro: boolean
+  calificacion?: string | null
+  estado?: string | null
+  closer?: string | null
+  setter?: string | null
+}
+
+export type DetalleModalData = {
+  titulo: string
+  subtitulo: string
+  tipo: "pagos" | "llamadas"
+  pagos?: DetallePago[]
+  llamadas?: DetalleLlamada[]
+  persona: string
+  rol: "Closer" | "Setter"
+  metrica: string
+}
 
 type CloserData = {
   nombre: string; initials: string
@@ -25,6 +66,8 @@ type CloserData = {
   feccu: number; feccpp: number; commissionable_cc: number
   nivel: 1 | 2 | 3; rate: number; unlocked_rate: number; strikes: number; comisiones: number
   is_top: boolean; next_target: number; next_rate: number; personal_goal: number | null
+  detalles_pagos?: DetallePago[]
+  detalles_llamadas?: DetalleLlamada[]
 }
 type SetterData = {
   nombre: string; initials: string
@@ -33,6 +76,8 @@ type SetterData = {
   feccu: number; feccpp: number; feccpp_excluido: number; commissionable_cc: number
   nivel: 1 | 2 | 3; rate: number; unlocked_rate: number; strikes: number; comisiones: number
   is_top: boolean; next_target: number; next_rate: number; personal_goal: number | null
+  detalles_pagos?: DetallePago[]
+  detalles_agendas?: DetalleLlamada[]
 }
 type LeaderboardData = {
   closers: CloserData[]; setters: SetterData[]; csm_nombres?: string[]; csm_cc: number; csm_comision: number
@@ -168,7 +213,236 @@ function SetterCommissionTrack({ rate }: { rate: number }) {
   )
 }
 
-function CloserGameCard({ closer, index, businessGoal }: { closer: CloserData; index: number; businessGoal: number }) {
+
+function ModalDetalleMetrica({
+  data,
+  onClose,
+}: {
+  data: DetalleModalData | null
+  onClose: () => void
+}) {
+  const [busqueda, setBusqueda] = useState("")
+
+  if (!data) return null
+
+  const itemsPagos = (data.pagos || []).filter((p) => {
+    if (!busqueda.trim()) return true
+    const q = busqueda.toLowerCase()
+    return (
+      p.cliente.toLowerCase().includes(q) ||
+      p.tipo.toLowerCase().includes(q) ||
+      (p.setter || "").toLowerCase().includes(q) ||
+      (p.closer || "").toLowerCase().includes(q)
+    )
+  })
+
+  const totalMontoPagos = itemsPagos.reduce((s, p) => s + (p.monto || 0), 0)
+
+  const itemsLlamadas = (data.llamadas || []).filter((l) => {
+    if (!busqueda.trim()) return true
+    const q = busqueda.toLowerCase()
+    return (
+      l.nombre.toLowerCase().includes(q) ||
+      (l.calificacion || "").toLowerCase().includes(q) ||
+      (l.setter || "").toLowerCase().includes(q) ||
+      (l.closer || "").toLowerCase().includes(q) ||
+      (l.estado || "").toLowerCase().includes(q)
+    )
+  })
+
+  const totalPresentadas = itemsLlamadas.filter((l) => l.show).length
+  const totalCerradas = itemsLlamadas.filter((l) => l.show && l.cerro).length
+
+  return (
+    <Dialog open={Boolean(data)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[88vh] flex flex-col p-0 overflow-hidden bg-zinc-950 border-white/10 text-white shadow-2xl">
+        <DialogHeader className="p-6 pb-4 border-b border-white/10 bg-zinc-900/60">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <Badge className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 text-xs font-semibold">
+                  {data.rol} · {data.persona}
+                </Badge>
+                <Badge className="bg-white/10 text-white/80 border-white/15 text-xs font-semibold">
+                  {data.metrica}
+                </Badge>
+              </div>
+              <DialogTitle className="text-xl font-black text-white sm:text-2xl">
+                {data.titulo}
+              </DialogTitle>
+              <DialogDescription className="text-sm text-zinc-400 mt-1">
+                {data.subtitulo}
+              </DialogDescription>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
+              <Input
+                placeholder="Buscar por cliente, tipo, responsable..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="pl-9 bg-zinc-900 border-white/10 text-white placeholder:text-zinc-500 h-9 text-xs focus-visible:ring-cyan-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-300 w-full sm:w-auto justify-end">
+              {data.tipo === "pagos" ? (
+                <>
+                  <span className="rounded-lg bg-zinc-900 px-3 py-1.5 border border-white/10">
+                    {itemsPagos.length} {itemsPagos.length === 1 ? "registro" : "registros"}
+                  </span>
+                  <span className="rounded-lg bg-emerald-500/10 px-3 py-1.5 border border-emerald-500/20 text-emerald-400 font-black">
+                    Total: {fUSD(totalMontoPagos)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="rounded-lg bg-zinc-900 px-3 py-1.5 border border-white/10">
+                    {itemsLlamadas.length} {itemsLlamadas.length === 1 ? "llamada" : "llamadas"}
+                  </span>
+                  <span className="rounded-lg bg-blue-500/10 px-3 py-1.5 border border-blue-500/20 text-blue-400">
+                    {totalPresentadas} presentadas
+                  </span>
+                  <span className="rounded-lg bg-emerald-500/10 px-3 py-1.5 border border-emerald-500/20 text-emerald-400">
+                    {totalCerradas} cerradas
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-2">
+          {data.tipo === "pagos" ? (
+            itemsPagos.length === 0 ? (
+              <div className="text-center py-16 text-zinc-500">
+                <DollarSign className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="font-semibold text-zinc-400">No hay registros de pagos para mostrar</p>
+                <p className="text-xs text-zinc-600 mt-1">Verificá los filtros de búsqueda o el período seleccionado</p>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-900/40">
+                <Table>
+                  <TableHeader className="bg-zinc-900/80">
+                    <TableRow className="border-white/10 hover:bg-transparent">
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Fecha</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Cliente</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Tipo</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Responsable</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400 text-right">Monto</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {itemsPagos.map((p, idx) => (
+                      <TableRow key={p.id || idx} className="border-white/5 hover:bg-white/[.04]">
+                        <TableCell className="text-xs text-zinc-400 font-mono whitespace-nowrap">
+                          {p.fecha ? p.fecha.slice(0, 10) : "—"}
+                        </TableCell>
+                        <TableCell className="font-bold text-white text-sm">
+                          {p.cliente}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[11px] font-medium border-white/10 bg-white/[.03] text-zinc-300">
+                            {p.tipo}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-zinc-400">
+                          {data.rol === "Closer" ? (
+                            p.setter ? <span className="text-cyan-400">Setter: {p.setter}</span> : <span className="text-zinc-500">—</span>
+                          ) : (
+                            p.closer ? <span className="text-amber-400">Closer: {p.closer}</span> : <span className="text-zinc-500">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-black text-emerald-400 text-sm whitespace-nowrap font-mono">
+                          {fUSD(p.monto)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          ) : (
+            itemsLlamadas.length === 0 ? (
+              <div className="text-center py-16 text-zinc-500">
+                <PhoneCall className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="font-semibold text-zinc-400">No hay llamadas para mostrar</p>
+                <p className="text-xs text-zinc-600 mt-1">Verificá los filtros de búsqueda o el período seleccionado</p>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-900/40">
+                <Table>
+                  <TableHeader className="bg-zinc-900/80">
+                    <TableRow className="border-white/10 hover:bg-transparent">
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Fecha Agenda</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Lead / Prospecto</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400 text-center">Score</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400 text-center">Asistencia</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400 text-center">Cierre</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Responsable</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {itemsLlamadas.map((l, idx) => (
+                      <TableRow key={l.id || idx} className="border-white/5 hover:bg-white/[.04]">
+                        <TableCell className="text-xs text-zinc-400 font-mono whitespace-nowrap">
+                          {l.fecha_agenda ? l.fecha_agenda.replace("T", " ").slice(0, 16) : "—"}
+                        </TableCell>
+                        <TableCell className="font-bold text-white text-sm">
+                          {l.nombre}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {l.calificacion ? (
+                            <Badge className="text-[10px] font-black uppercase px-2 py-0.5 bg-violet-500/15 text-violet-300 border-violet-500/30">
+                              {l.calificacion}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-zinc-600">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {l.show ? (
+                            <Badge className="text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                              Se presentó
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] font-medium border-red-500/20 text-red-400 bg-red-500/10">
+                              No show
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {l.cerro ? (
+                            <Badge className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                              ✓ Cerró
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-zinc-500">No cerró</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs text-zinc-400">
+                          {data.rol === "Closer" ? (
+                            l.setter ? <span className="text-cyan-400">Setter: {l.setter}</span> : <span className="text-zinc-500">—</span>
+                          ) : (
+                            l.closer ? <span className="text-amber-400">Closer: {l.closer}</span> : <span className="text-zinc-500">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function CloserGameCard({ closer, index, businessGoal, onOpenDetalle }: { closer: CloserData; index: number; businessGoal: number; onOpenDetalle: (data: DetalleModalData) => void }) {
   const uses2026Scheme = businessGoal === 100000
   const commissionCc = uses2026Scheme ? closer.cc_total : closer.cc_ponderado
   const nextCash = closer.personal_goal || (uses2026Scheme ? closer.next_target : businessGoal)
@@ -186,10 +460,26 @@ function CloserGameCard({ closer, index, businessGoal }: { closer: CloserData; i
           </Avatar>
           <div><h3 className="text-xl font-black text-white sm:text-2xl">{closer.nombre}</h3><p className="text-xs font-bold uppercase tracking-[.16em] text-white/40">Closer · Nivel {closer.nivel}</p></div>
         </div>
-        <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 text-right"><p className="text-[10px] font-black uppercase text-emerald-200/60">Comisión</p><p className="text-lg font-black text-emerald-300">{fUSD(closer.comisiones)}</p><p className="text-[9px] font-bold text-emerald-100/45">Base neta {fUSD(closer.commissionable_cc)}</p></div>
+        <div onClick={() => onOpenDetalle({
+          titulo: `Comisión · ${closer.nombre}`,
+          subtitulo: `Tasa aplicada: ${closer.rate}% · Base neta comisionable: ${fUSD(closer.commissionable_cc)} · Total: ${fUSD(closer.comisiones)}`,
+          tipo: "pagos",
+          pagos: (closer.detalles_pagos || []).filter(p => (p.comisionable ?? 0) > 0),
+          persona: closer.nombre,
+          rol: "Closer",
+          metrica: "Comisión"
+        })} className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 text-right cursor-pointer transition hover:scale-105 hover:border-emerald-300/50 hover:bg-emerald-400/20 active:scale-95 group/comm" title="Click para ver desglose de comisiones"><div className="flex items-center justify-end gap-1"><p className="text-[10px] font-black uppercase text-emerald-200/60">Comisión</p><span className="text-[9px] text-emerald-300/60 opacity-0 group-hover/comm:opacity-100 transition">↗</span></div><p className="text-lg font-black text-emerald-300">{fUSD(closer.comisiones)}</p><p className="text-[9px] font-bold text-emerald-100/45">Base neta {fUSD(closer.commissionable_cc)}</p></div>
       </div>
       <div className="relative mt-5 grid grid-cols-1 gap-2 text-center">
-        <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/[.07] p-3"><p className="text-[10px] font-black uppercase text-white/35">CC Total</p><p className="text-lg font-black text-emerald-300">{fUSD(closer.cc_total)}</p></div>
+        <div onClick={() => onOpenDetalle({
+          titulo: `Cash Collected Total · ${closer.nombre}`,
+          subtitulo: `Total comisionable recaudado: ${fUSD(closer.cc_total)}`,
+          tipo: "pagos",
+          pagos: (closer.detalles_pagos || []).filter(p => (p.comisionable ?? 0) > 0),
+          persona: closer.nombre,
+          rol: "Closer",
+          metrica: "CC Total"
+        })} className="rounded-2xl border border-emerald-300/15 bg-emerald-400/[.07] p-3 cursor-pointer transition hover:scale-[1.02] hover:border-emerald-300/40 hover:bg-emerald-400/15 active:scale-95 group/cct" title="Click para ver todas las ventas"><div className="flex items-center justify-center gap-1"><p className="text-[10px] font-black uppercase text-white/35">CC Total</p><span className="text-[9px] text-emerald-300/60 opacity-0 group-hover/cct:opacity-100 transition">ver ventas ↗</span></div><p className="text-lg font-black text-emerald-300">{fUSD(closer.cc_total)}</p></div>
       </div>
       <div className="relative mt-6"><CommissionTrack rate={closer.rate ?? (closer.nivel === 3 ? 10 : closer.nivel === 2 ? 9 : 8)} /></div>
       <div className="relative mt-6 rounded-2xl border border-white/[.07] bg-white/[.035] p-4">
@@ -207,7 +497,7 @@ function CloserGameCard({ closer, index, businessGoal }: { closer: CloserData; i
   )
 }
 
-function SetterGameCard({ setter, index, businessGoal }: { setter: SetterData; index: number; businessGoal: number }) {
+function SetterGameCard({ setter, index, businessGoal, onOpenDetalle }: { setter: SetterData; index: number; businessGoal: number; onOpenDetalle: (data: DetalleModalData) => void }) {
   const target = setter.personal_goal || setter.next_target || 30000
   const cashProgress = Math.min(100, (setter.cc_total / target) * 100)
   const rate = setter.rate ?? (setter.nivel === 3 ? 5 : setter.nivel === 2 ? 4.5 : 4)
@@ -231,7 +521,21 @@ function SetterGameCard({ setter, index, businessGoal }: { setter: SetterData; i
         </div>
       </div>
       <div className="relative mt-5 grid grid-cols-1 gap-2 text-center">
-        <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/[.07] p-3"><p className="text-[10px] font-black uppercase text-white/35">CC Total</p><p className="text-lg font-black text-emerald-300">{fUSD(setter.cc_total)}</p></div>
+        <div onClick={() => onOpenDetalle({
+          titulo: `Cash Collected Total (≤30d) · ${setter.nombre}`,
+          subtitulo: `Total comisionable recaudado en ventana de 30 días: ${fUSD(setter.cc_total)}`,
+          tipo: "pagos",
+          pagos: (setter.detalles_pagos || []).filter(p => (p.comisionable ?? 0) > 0),
+          persona: setter.nombre,
+          rol: "Setter",
+          metrica: "CC Total"
+        })} className="rounded-2xl border border-emerald-300/15 bg-emerald-400/[.07] p-3 cursor-pointer transition hover:scale-[1.02] hover:border-emerald-300/40 hover:bg-emerald-400/15 active:scale-95 group/scc" title="Click para ver ventas asociadas">
+          <div className="flex items-center justify-center gap-1">
+            <p className="text-[10px] font-black uppercase text-white/35">CC Total</p>
+            <span className="text-[9px] text-emerald-300/60 opacity-0 group-hover/scc:opacity-100 transition">ver ventas ↗</span>
+          </div>
+          <p className="text-lg font-black text-emerald-300">{fUSD(setter.cc_total)}</p>
+        </div>
       </div>
       <div className="relative mt-6"><SetterCommissionTrack rate={rate} /></div>
       <div className="relative mt-6 rounded-2xl border border-white/[.07] bg-white/[.035] p-4">
@@ -294,6 +598,7 @@ export default function EquipoPage() {
   // en Equipo); el sonido de logro queda activo siempre, sin control visible.
   const soundEnabled = true
   const [unlock, setUnlock] = useState<{ nombre: string; rate: number } | null>(null)
+  const [detalleModal, setDetalleModal] = useState<DetalleModalData | null>(null)
 
   const monthLabel = useMemo(() => monthList.find(m => m.value === selectedMonth)?.label ?? selectedMonth, [monthList, selectedMonth])
   const businessGoal = selectedMonth >= "2026-08" ? 100000 : 50000
@@ -391,6 +696,7 @@ export default function EquipoPage() {
         </>}
       />
 
+      <ModalDetalleMetrica data={detalleModal} onClose={() => setDetalleModal(null)} />
       {unlock && (
         <div className="fixed inset-x-4 top-24 z-[100] mx-auto max-w-xl animate-in slide-in-from-top-6 fade-in duration-500">
           <div className="rounded-[28px] border border-amber-200/40 bg-gradient-to-br from-amber-300 via-yellow-500 to-violet-700 p-[1px] shadow-[0_24px_90px_rgba(251,191,36,.4)]">
@@ -449,7 +755,7 @@ export default function EquipoPage() {
             ) : (
               <>
                 <div className="grid gap-5 xl:grid-cols-2">
-                  {closers.map((closer, index) => <CloserGameCard key={closer.nombre} closer={closer} index={index} businessGoal={businessGoal} />)}
+                  {closers.map((closer, index) => <CloserGameCard key={closer.nombre} closer={closer} index={index} businessGoal={businessGoal} onOpenDetalle={setDetalleModal} />)}
                 </div>
                 <div className="hidden">
                 <div className="crm-mobile-stack">
@@ -533,7 +839,7 @@ export default function EquipoPage() {
             ) : (
               <>
                 <div className="grid gap-5 xl:grid-cols-2">
-                  {setters.map((setter, index) => <SetterGameCard key={setter.nombre} setter={setter} index={index} businessGoal={businessGoal} />)}
+                  {setters.map((setter, index) => <SetterGameCard key={setter.nombre} setter={setter} index={index} businessGoal={businessGoal} onOpenDetalle={setDetalleModal} />)}
                 </div>
                 <Card className="hidden">
                   <CardContent className="pt-4">

@@ -142,8 +142,8 @@ export async function GET(request: Request) {
 
     // es_reactivacion es una columna nueva — si todavia no se corrio la
     // migracion, se reintenta sin ella para no romper el leaderboard entero.
-    const paymentFields = "monto,tipo,operacion,closer,setter,es_reactivacion,fecha,person_id,telefono,cliente"
-    const paymentFallbackFields = "monto,tipo,operacion,closer,setter,fecha,person_id,telefono,cliente"
+    const paymentFields = "id,monto,tipo,operacion,closer,setter,es_reactivacion,fecha,person_id,telefono,cliente"
+    const paymentFallbackFields = "id,monto,tipo,operacion,closer,setter,fecha,person_id,telefono,cliente"
     const pagosConReactivacion = await sb.from("pagos").select(paymentFields).eq("record_status", "active").gte("fecha", start).lte("fecha", end)
     const pagosRes = pagosConReactivacion.error?.code === "42703"
       ? await sb.from("pagos").select(paymentFallbackFields).eq("record_status", "active").gte("fecha", start).lte("fecha", end)
@@ -153,7 +153,7 @@ export async function GET(request: Request) {
       { data: strikesData },
       { data: csmMembers },
     ] = await Promise.all([
-      sb.from("agendas").select("closer,setter,show,cerro,calificacion,estado").or("estado.is.null,estado.neq.Archivada manualmente").gte("fecha_agenda", start).lte("fecha_agenda", end),
+      sb.from("agendas").select("id,nombre,closer,setter,show,cerro,calificacion,estado,fecha_agenda").or("estado.is.null,estado.neq.Archivada manualmente").gte("fecha_agenda", start).lte("fecha_agenda", end),
       sb.from("strikes").select("nombre,count,updated_at"),
       // El CSM sale de team_members (rol "CSM"): su cash cuenta como Back-End
       // con comisión flat, no entra al ranking de closers.
@@ -221,13 +221,64 @@ export async function GET(request: Request) {
     // cc_ponderado es igual a cc_total: EXPOSURE opera una sola cuenta
     // (@alexmcarrera) y no pondera el cash por cuenta de negocio. Se conserva
     // el campo porque el esquema legacy de niveles (pre agosto 2026) lo lee.
+    type DetallePagoCloser = {
+      id?: string | number
+      cliente: string
+      monto: number
+      tipo: string
+      operacion?: string | null
+      fecha: string | null
+      setter?: string | null
+      cohort?: string | null
+      comisionable: number
+      es_unidad: boolean
+    }
+    type DetalleLlamadaCloser = {
+      id?: string | number
+      nombre: string
+      fecha_agenda: string | null
+      show: boolean
+      cerro: boolean
+      calificacion?: string | null
+      estado?: string | null
+      setter?: string | null
+    }
+
+    type DetallePagoSetter = {
+      id?: string | number
+      cliente: string
+      monto: number
+      tipo: string
+      operacion?: string | null
+      fecha: string | null
+      closer?: string | null
+      cohort?: string | null
+      comisionable: number
+      en_ventana: boolean
+      es_unidad: boolean
+    }
+    type DetalleAgendaSetter = {
+      id?: string | number
+      nombre: string
+      fecha_agenda: string | null
+      show: boolean
+      cerro: boolean
+      calificacion?: string | null
+      estado?: string | null
+      closer?: string | null
+    }
+
     type CM = {
       cc_nuevo: number; cc_total: number; commission_base: number; cc_ponderado: number; feccu: number; feccpp: number; unidades: number; fees: number
       llamadas: number; cerradas: number; total_ag: number; pres_ab: number; cerr_ab: number
+      detalles_pagos: DetallePagoCloser[]
+      detalles_llamadas: DetalleLlamadaCloser[]
     }
     type SM = {
       cc_nuevo: number; cc_total: number; cc_ponderado: number; feccu: number; feccpp: number; feccpp_excluido: number; unidades: number; fees: number
       agendas: number; agendas_ab: number; shows: number
+      detalles_pagos: DetallePagoSetter[]
+      detalles_agendas: DetalleAgendaSetter[]
     }
 
     const closerMap = new Map<string, CM>()
@@ -240,7 +291,7 @@ export async function GET(request: Request) {
     // El CEO también cierra. Debe permanecer visible en el ranking aun cuando
     // en el mes seleccionado todavía no tenga pagos o llamadas. El resto del
     // equipo aparece solo con actividad real en el mes (ver filtros abajo).
-    closerMap.set(CEO, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
+    closerMap.set(CEO, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0, detalles_pagos: [], detalles_llamadas: [] })
 
     for (const pago of pagos || []) {
       const closer = canonical(pago.closer || "")
@@ -265,7 +316,7 @@ export async function GET(request: Request) {
       if (CSM_NOMBRES.has(closer)) { csmCc += monto; continue }
 
       if (isRealMember(closer)) {
-        if (!closerMap.has(closer)) closerMap.set(closer, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
+        if (!closerMap.has(closer)) closerMap.set(closer, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0, detalles_pagos: [], detalles_llamadas: [] })
         const c = closerMap.get(closer)!
         c.cc_total += closerCommissionableCc
         c.commission_base += closerNetCommissionBase(closerCommissionableCc, pago.operacion, uses2026Scheme)
@@ -278,7 +329,7 @@ export async function GET(request: Request) {
       }
 
       if (isRealMember(setter)) {
-        if (!setterMap.has(setter)) setterMap.set(setter, { cc_nuevo: 0, cc_total: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0 })
+        if (!setterMap.has(setter)) setterMap.set(setter, { cc_nuevo: 0, cc_total: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0, detalles_pagos: [], detalles_agendas: [] })
         const s = setterMap.get(setter)!
         s.cc_total += setterCommissionableCc
         s.cc_ponderado += setterCommissionableCc
@@ -298,7 +349,7 @@ export async function GET(request: Request) {
       const setter = canonical(ag.setter || "")
 
       if (isRealMember(closerNorm)) {
-        if (!closerMap.has(closerNorm)) closerMap.set(closerNorm, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0 })
+        if (!closerMap.has(closerNorm)) closerMap.set(closerNorm, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0, detalles_pagos: [], detalles_llamadas: [] })
         const c = closerMap.get(closerNorm)!
         c.total_ag++
         if (ag.show) {
@@ -312,7 +363,7 @@ export async function GET(request: Request) {
       }
 
       if (isRealMember(setter)) {
-        if (!setterMap.has(setter)) setterMap.set(setter, { cc_nuevo: 0, cc_total: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0 })
+        if (!setterMap.has(setter)) setterMap.set(setter, { cc_nuevo: 0, cc_total: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0, detalles_pagos: [], detalles_agendas: [] })
         const s = setterMap.get(setter)!
         s.agendas++
         if (ag.show) {
