@@ -22,6 +22,7 @@ import type { Agenda } from "@/lib/supabase"
 import { useSession } from "@/components/session-provider"
 import { HelpHint } from "@/components/help-hint"
 import { FEE_TIPOS } from "@/lib/cash-collected"
+import { CLOSERS_ACTIVOS } from "@/lib/equipo"
 
 const fetcher = (url: string) => fetch(url, { cache: "no-store" }).then((r) => r.json())
 
@@ -162,13 +163,14 @@ function getStage(a: Agenda, pays: Pays): Stage | null {
   const confirmer = norm(a.call_confirmer || "")
   // Archivado: cancelado en triage, o confirmo en algun momento pero nunca respondio despues
   if (CANCELADO_VALUES.has(confirmer) || NO_RESPONDIO_VALUES.has(confirmer)) return "archivado"
-  // Se presentó y no cerró: cae en No Cerrados si tiene motivo cargado
-  if (a.show && a.motivo_no_cierre) return "no_cerrado"
-  if (a.show) return "presentado"
 
   const st = norm(a.estado || "")
   if (st === "reprogramo" || st === "reprogramado") return "reprogramado"
   if (st === "grupo precall creado" || norm(a.call_confirmer || "") === "grupo precall creado") return "grupo_precall"
+
+  // Se presentó y no cerró: cae en No Cerrados si tiene motivo cargado
+  if (a.show && a.motivo_no_cierre) return "no_cerrado"
+  if (a.show) return "presentado"
 
   // Centro de Agendas guarda el no-show como show=false. `estado=No Show`
   // refuerza el dato nuevo, pero los registros ya cargados deben sincronizar
@@ -632,6 +634,14 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
   const [saving, setSaving] = useState(false)
   const editIsTriageCancelled = CANCELADO_VALUES.has(norm(editForm.call_confirmer || ""))
   useEffect(() => { setEditForm(agenda ? { ...agenda } : {}); setEditMode(false) }, [agenda])
+  const closerOptions = useMemo(() => {
+    const list = [...CLOSERS_ACTIVOS, "Libre / Recontacto"]
+    const cur = (agenda?.closer || "").trim()
+    if (cur && !list.includes(cur) && cur !== "Sin Closer") {
+      return [...list, cur]
+    }
+    return list
+  }, [agenda?.closer])
   const ef = (key: keyof Agenda, value: unknown) => setEditForm(prev => ({ ...prev, [key]: value }))
   const saveDirect = async () => {
     if (!agenda?.id) return
@@ -697,6 +707,21 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
                       <button type="button" onClick={() => { ef("show", false); ef("cerro", false); ef("call_confirmer", null); ef("estado", "No Show") }} className={cn("rounded-xl border py-2 text-xs font-bold", editForm.show === false && editForm.estado === "No Show" && !editIsTriageCancelled ? "border-red-500 bg-red-500/10 text-red-600" : "border-border")}>No se presentó</button>
                       <button type="button" onClick={() => { ef("show", false); ef("cerro", false); ef("call_confirmer", null); ef("estado", "Reprogramó") }} className={cn("rounded-xl border py-2 text-xs font-bold", editForm.estado === "Reprogramó" ? "border-purple-500 bg-purple-500/10 text-purple-700" : "border-border")}>Reprogramó</button>
                     </div>
+                    <div className="sm:col-span-2 rounded-2xl border border-violet-500/20 bg-violet-500/5 p-3">
+                      <label className="mb-1 block text-xs font-bold text-violet-700 dark:text-violet-300">
+                        Closer que tomó la llamada
+                      </label>
+                      <select
+                        className={inputClass}
+                        value={editForm.closer || ""}
+                        onChange={e => ef("closer", e.target.value || null)}
+                      >
+                        <option value="">Sin Closer</option>
+                        {closerOptions.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
                     {editForm.estado === "Reprogramó" && (
                       <div className="sm:col-span-2 rounded-2xl border border-purple-500/20 bg-purple-500/5 p-3">
                         <label className="mb-1 block text-xs font-bold text-purple-700 dark:text-purple-300">
@@ -758,7 +783,28 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
                 <DetailField icon={Phone} label="WhatsApp" value={agenda.telefono} />
                 <DetailField icon={Mail} label="Email" value={agenda.email} />
                 <DetailField icon={Instagram} label="Instagram" value={agenda.instagram} />
-                <DetailField icon={UserRoundCheck} label="Closer" value={agenda.closer} />
+                {editMode ? (
+                  <div className="group rounded-2xl border border-violet-300/80 bg-violet-500/[.03] p-3.5 shadow-[0_8px_30px_rgba(15,23,42,.04)] ring-1 ring-violet-400/20 backdrop-blur dark:border-violet-500/30">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-violet-500/15 to-fuchsia-400/10 text-violet-600 dark:text-violet-300">
+                        <UserRoundCheck className="h-3.5 w-3.5" />
+                      </span>
+                      <p className="text-[9px] font-black uppercase tracking-[.16em] text-muted-foreground">Closer asignado</p>
+                    </div>
+                    <select
+                      className={inputClass}
+                      value={editForm.closer || ""}
+                      onChange={e => ef("closer", e.target.value || null)}
+                    >
+                      <option value="">Sin Closer</option>
+                      {closerOptions.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <DetailField icon={UserRoundCheck} label="Closer" value={agenda.closer} />
+                )}
                 <DetailField icon={Sparkles} label="Setter" value={agenda.setter} />
               </div>
               </DetailSection>

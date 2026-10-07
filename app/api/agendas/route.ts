@@ -209,7 +209,9 @@ export async function PATCH(request: Request) {
     // Nunca dejamos un `show=true` etiquetado a la vez como No Show.
     if (updates.show === false) {
       updates.cerro = false
-      updates.estado = "No Show"
+      if (updates.estado !== "Reprogramó" && updates.estado !== "Grupo Precall Creado") {
+        updates.estado = "No Show"
+      }
       updates.motivo_no_cierre = null
     } else if (updates.show === true && updates.estado === "No Show") {
       updates.estado = null
