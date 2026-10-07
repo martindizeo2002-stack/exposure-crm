@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  Calendar as CalendarIcon,
+import { Calendar as CalendarIcon,
   PhoneCall,
   CheckCircle2,
   Copy,
@@ -19,8 +18,7 @@ import {
   RefreshCw,
   Award,
   Pencil,
-  Loader2,
-} from "lucide-react"
+  Loader2, ArrowUpRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -30,8 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
-import { CLOSERS_ACTIVOS } from "@/lib/equipo"
-import { LeadDetailDialog } from "@/components/lead-detail-dialog"
+import { CLOSERS_ACTIVOS, SETTERS_TODOS } from "@/lib/equipo"
 import type { Agenda } from "@/lib/supabase"
 import type { ResumenPayload, CallDetalle } from "@/lib/closing-whatsapp-formatter"
 import { cn } from "@/lib/utils"
@@ -64,9 +61,57 @@ export default function ResumenVentasPage() {
   const [guardando, setGuardando] = useState(false)
   const [copiado, setCopiado] = useState(false)
 
-  // Estado para la ficha del lead (mismo LeadDetailDialog de Agendas / Pipeline)
-  const [agendaEditando, setAgendaEditando] = useState<Agenda | null>(null)
+  // Estado para el modal de edición de lead comercial enriquecido
+  const [modalLeadAbierto, setModalLeadAbierto] = useState(false)
+  const [leadEditando, setLeadEditando] = useState<CallDetalle | null>(null)
   const [cargandoAgendaId, setCargandoAgendaId] = useState<string | number | null>(null)
+  const [tabModal, setTabModal] = useState<"comercial" | "contacto" | "llamada" | "contexto">("comercial")
+  const [formEdit, setFormEdit] = useState<{
+    lead_scoring: string
+    macro_arquetipo: string
+    subarquetipo: string
+    calificaba_realmente: string
+    objecion: string
+    motivo_no_cierre: string
+    siguiente_paso: string
+    closer: string
+    setter: string
+    telefono: string
+    email: string
+    instagram: string
+    fecha_closer: string
+    estado: string
+    link_fathom: string
+    problema_actual: string
+    tiempo_problema: string
+    intentos_previos: string
+    motivo_urgencia: string
+    ingresos: string
+    inversion: string
+  }>({
+    lead_scoring: "LEAD D",
+    macro_arquetipo: "SIN CLASIFICAR",
+    subarquetipo: "",
+    calificaba_realmente: "Sin definir",
+    objecion: "",
+    motivo_no_cierre: "",
+    siguiente_paso: "Seguimiento",
+    closer: "Cristian",
+    setter: "",
+    telefono: "",
+    email: "",
+    instagram: "",
+    fecha_closer: "",
+    estado: "",
+    link_fathom: "",
+    problema_actual: "",
+    tiempo_problema: "",
+    intentos_previos: "",
+    motivo_urgencia: "",
+    ingresos: "",
+    inversion: "",
+  })
+  const [guardandoLead, setGuardandoLead] = useState(false)
 
   const abrirEdicionLead = async (c: CallDetalle) => {
     if (!c.agenda_id) {
@@ -74,15 +119,162 @@ export default function ResumenVentasPage() {
       return
     }
     setCargandoAgendaId(c.agenda_id)
+    setLeadEditando(c)
+    setTabModal("comercial")
+    setModalLeadAbierto(true)
+
+    let scoringBase = "LEAD D"
+    const scoreUpper = (c.lead_score || "").toUpperCase()
+    if (scoreUpper.includes("LEAD S")) scoringBase = "LEAD S"
+    else if (scoreUpper.includes("LEAD A")) scoringBase = "LEAD A"
+    else if (scoreUpper.includes("LEAD B")) scoringBase = "LEAD B"
+    else if (scoreUpper.includes("LEAD C")) scoringBase = "LEAD C"
+    else if (scoreUpper.includes("LEAD D")) scoringBase = "LEAD D"
+
+    const macroBase = c.arquetipo_macro || "SIN CLASIFICAR"
+    const objBase = c.objecion_principal && c.objecion_principal !== "Sin motivo cargado" ? c.objecion_principal : ""
+
+    const initial = {
+      lead_scoring: scoringBase,
+      macro_arquetipo: macroBase,
+      subarquetipo: c.subarquetipo || "",
+      calificaba_realmente: c.calificaba_realmente || "Sin definir",
+      objecion: objBase,
+      motivo_no_cierre: c.motivo_real && c.motivo_real !== "Propuesta y claridad en el modelo" ? c.motivo_real : "",
+      siguiente_paso: c.siguiente_paso || "Seguimiento",
+      closer: c.closer || "Cristian",
+      setter: "",
+      telefono: "",
+      email: "",
+      instagram: "",
+      fecha_closer: "",
+      estado: c.resultado === "CANCELADA" ? "Cancelado" : (c.resultado === "NO SHOW" ? "No se presentó" : ""),
+      link_fathom: "",
+      problema_actual: c.porque_agendo || "",
+      tiempo_problema: "",
+      intentos_previos: "",
+      motivo_urgencia: "",
+      ingresos: c.ingresos_declarados || "",
+      inversion: "",
+    }
+    setFormEdit(initial)
+
     try {
       const res = await fetch(`/api/agendas?id=${c.agenda_id}`)
-      const data = await res.json()
-      if (!res.ok || !data) throw new Error(data?.error || "Error al consultar la agenda")
-      setAgendaEditando(data)
-    } catch (err: any) {
-      toast.error(err.message || "Error al abrir la ficha del lead")
+      if (res.ok) {
+        const data: Agenda = await res.json()
+        if (data) {
+          setFormEdit(prev => ({
+            ...prev,
+            closer: data.closer || prev.closer,
+            setter: data.setter || prev.setter,
+            telefono: data.telefono || prev.telefono,
+            email: data.email || (data as any)?.crm_people?.primary_email || prev.email,
+            instagram: data.instagram || prev.instagram,
+            fecha_closer: data.fecha_closer ? data.fecha_closer.slice(0, 16) : prev.fecha_closer,
+            estado: data.estado || prev.estado,
+            link_fathom: data.link_fathom || prev.link_fathom,
+            problema_actual: data.problema_actual || prev.problema_actual,
+            tiempo_problema: data.tiempo_problema || prev.tiempo_problema,
+            intentos_previos: data.intentos_previos || prev.intentos_previos,
+            motivo_urgencia: data.motivo_urgencia || prev.motivo_urgencia,
+            ingresos: data.ingresos || prev.ingresos,
+            inversion: data.inversion || prev.inversion,
+            lead_scoring: data.calificacion || prev.lead_scoring,
+            calificaba_realmente: data.calificaba_realmente || prev.calificaba_realmente,
+          }))
+        }
+      }
+    } catch (err) {
+      console.warn("No se pudo precargar agenda completa:", err)
     } finally {
       setCargandoAgendaId(null)
+    }
+  }
+
+  const guardarEdicionLead = async () => {
+    if (!leadEditando?.agenda_id) {
+      toast.error("No se encontró el ID de la agenda para guardar")
+      return
+    }
+    setGuardandoLead(true)
+    try {
+      let ocupacionFinal: string | null = null
+      if (formEdit.macro_arquetipo === "DUEÑO DE NEGOCIO") {
+        ocupacionFinal = formEdit.subarquetipo.trim() ? `Negocio - ${formEdit.subarquetipo.trim()}` : "Negocio"
+      } else if (formEdit.macro_arquetipo === "EMPLEADO") {
+        ocupacionFinal = formEdit.subarquetipo.trim() ? `Empleado - ${formEdit.subarquetipo.trim()}` : "Empleado"
+      } else if (formEdit.macro_arquetipo === "ESTUDIANTE") {
+        ocupacionFinal = formEdit.subarquetipo.trim() ? `Estudiante - ${formEdit.subarquetipo.trim()}` : "Estudiante"
+      } else if (formEdit.subarquetipo.trim()) {
+        ocupacionFinal = formEdit.subarquetipo.trim()
+      }
+
+      let estadoFinal = formEdit.estado || formEdit.siguiente_paso
+      if (formEdit.estado === "Reprogramó") {
+        estadoFinal = "Reprogramó"
+      } else if (formEdit.siguiente_paso === "Onboarding") {
+        estadoFinal = "Cierre"
+      }
+
+      const updates: any = {
+        id: leadEditando.agenda_id,
+        closer: formEdit.closer || null,
+        setter: formEdit.setter || null,
+        telefono: formEdit.telefono || null,
+        email: formEdit.email || null,
+        instagram: formEdit.instagram || null,
+        fecha_closer: formEdit.fecha_closer ? `${formEdit.fecha_closer}:00` : null,
+        link_fathom: formEdit.link_fathom || null,
+        problema_actual: formEdit.problema_actual || null,
+        tiempo_problema: formEdit.tiempo_problema || null,
+        intentos_previos: formEdit.intentos_previos || null,
+        motivo_urgencia: formEdit.motivo_urgencia || null,
+        ingresos: formEdit.ingresos || null,
+        inversion: formEdit.inversion || null,
+        calificacion: formEdit.lead_scoring,
+        lead_score_grade: formEdit.lead_scoring,
+        ocupacion: ocupacionFinal,
+        calificaba_realmente: formEdit.calificaba_realmente === "Sin definir" ? null : formEdit.calificaba_realmente,
+        motivo_no_cierre: formEdit.motivo_no_cierre || (formEdit.objecion && formEdit.objecion !== "none" ? formEdit.objecion : null),
+        estado: estadoFinal,
+      }
+
+      if (updates.fecha_closer) {
+        updates.fecha_agenda = updates.fecha_closer
+      }
+
+      if (formEdit.estado === "Reprogramó") {
+        updates.show = false
+        updates.cerro = false
+        updates.estado = "Reprogramó"
+      } else if (formEdit.estado === "No se presentó") {
+        updates.show = false
+        updates.cerro = false
+        updates.estado = "No Show"
+      } else if (formEdit.estado === "Se presentó") {
+        updates.show = true
+      }
+
+      const res = await fetch("/api/agendas", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      })
+
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || "Error al actualizar la agenda en Exposure OS")
+      }
+
+      toast.success("Lead actualizado exitosamente en Agendas de Exposure OS")
+      setModalLeadAbierto(false)
+      setLeadEditando(null)
+      await cargarResumen()
+    } catch (err: any) {
+      toast.error(err.message || "Error al guardar cambios")
+    } finally {
+      setGuardandoLead(false)
     }
   }
 
@@ -850,16 +1042,382 @@ export default function ResumenVentasPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Ficha oficial completa del Lead (idéntica a Agendas / Pipeline) */}
-      <LeadDetailDialog
-        agenda={agendaEditando}
-        onClose={() => setAgendaEditando(null)}
-        onSaved={async () => {
-          setAgendaEditando(null)
-          toast.success("Lead actualizado exitosamente en Agendas")
-          await cargarResumen()
-        }}
-      />
+      {/* Modal / Dialog Completo de Edición de Lead */}
+      <Dialog open={modalLeadAbierto} onOpenChange={setModalLeadAbierto}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col bg-zinc-950 border-white/10 text-white p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-lg font-bold flex items-center gap-2 text-white">
+                  <Pencil className="h-4 w-4 text-emerald-400" />
+                  Editar Lead: {leadEditando?.nombre}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-zinc-400 mt-1">
+                  Modificá los datos comerciales, asignación de closer, llamada y contexto del lead en Agendas.
+                </DialogDescription>
+              </div>
+            </div>
+
+            {/* Pestañas de navegación rápida dentro de la ficha */}
+            <div className="flex gap-2 pt-3">
+              <button
+                type="button"
+                onClick={() => setTabModal("comercial")}
+                className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition", tabModal === "comercial" ? "bg-emerald-600 text-white" : "bg-white/5 text-zinc-400 hover:text-white")}
+              >
+                Comercial y Cierre
+              </button>
+              <button
+                type="button"
+                onClick={() => setTabModal("contacto")}
+                className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition", tabModal === "contacto" ? "bg-emerald-600 text-white" : "bg-white/5 text-zinc-400 hover:text-white")}
+              >
+                Contacto y Responsables
+              </button>
+              <button
+                type="button"
+                onClick={() => setTabModal("llamada")}
+                className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition", tabModal === "llamada" ? "bg-emerald-600 text-white" : "bg-white/5 text-zinc-400 hover:text-white")}
+              >
+                Agenda y Llamada
+              </button>
+              <button
+                type="button"
+                onClick={() => setTabModal("contexto")}
+                className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition", tabModal === "contexto" ? "bg-emerald-600 text-white" : "bg-white/5 text-zinc-400 hover:text-white")}
+              >
+                Contexto del Lead
+              </button>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 text-xs">
+            {/* PESTAÑA 1: COMERCIAL Y CIERRE */}
+            {tabModal === "comercial" && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Lead Scoring</Label>
+                    <Select value={formEdit.lead_scoring} onValueChange={v => setFormEdit(prev => ({ ...prev, lead_scoring: v }))}>
+                      <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                        <SelectItem value="LEAD S">LEAD S (Calificado)</SelectItem>
+                        <SelectItem value="LEAD A">LEAD A (Calificado)</SelectItem>
+                        <SelectItem value="LEAD B">LEAD B (Calificado)</SelectItem>
+                        <SelectItem value="LEAD C">LEAD C (Calificado)</SelectItem>
+                        <SelectItem value="LEAD D">LEAD D (No calificado)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Calificaba realmente (post-call)</Label>
+                    <Select value={formEdit.calificaba_realmente} onValueChange={v => setFormEdit(prev => ({ ...prev, calificaba_realmente: v }))}>
+                      <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                        <SelectItem value="Sin definir">Sin definir</SelectItem>
+                        <SelectItem value="Si">Si</SelectItem>
+                        <SelectItem value="No">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Macro Arquetipo</Label>
+                    <Select value={formEdit.macro_arquetipo} onValueChange={v => setFormEdit(prev => ({ ...prev, macro_arquetipo: v }))}>
+                      <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                        <SelectItem value="DUEÑO DE NEGOCIO">DUEÑO DE NEGOCIO</SelectItem>
+                        <SelectItem value="EMPLEADO">EMPLEADO</SelectItem>
+                        <SelectItem value="ESTUDIANTE">ESTUDIANTE</SelectItem>
+                        <SelectItem value="SIN CLASIFICAR">SIN CLASIFICAR</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Subarquetipo</Label>
+                    <Input
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs placeholder:text-zinc-500 text-white"
+                      placeholder="Ej. Ingeniero, Dev freelance, Editor..."
+                      value={formEdit.subarquetipo}
+                      onChange={e => setFormEdit(prev => ({ ...prev, subarquetipo: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Objeción</Label>
+                    <Select value={formEdit.objecion || "none"} onValueChange={v => setFormEdit(prev => ({ ...prev, objecion: v === "none" ? "" : v }))}>
+                      <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white">
+                        <SelectValue placeholder="Seleccionar objeción..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                        <SelectItem value="none">Sin objeción cargada</SelectItem>
+                        {MOTIVOS_NO_CIERRE_CRM.map(m => (
+                          <SelectItem key={m} value={m}>{m}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Siguiente paso</Label>
+                    <Select value={formEdit.siguiente_paso} onValueChange={v => setFormEdit(prev => ({ ...prev, siguiente_paso: v }))}>
+                      <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                        <SelectItem value="Seguimiento">Seguimiento</SelectItem>
+                        <SelectItem value="Onboarding">Onboarding</SelectItem>
+                        <SelectItem value="Volver a llamar">Volver a llamar</SelectItem>
+                        <SelectItem value="Descartado">Descartado</SelectItem>
+                        <SelectItem value="Esperando pago">Esperando pago</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-zinc-300 text-xs">Motivo de no cierre (detalle)</Label>
+                  <Input
+                    className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs placeholder:text-zinc-500 text-white"
+                    placeholder="Explicación detallada o notas del motivo"
+                    value={formEdit.motivo_no_cierre}
+                    onChange={e => setFormEdit(prev => ({ ...prev, motivo_no_cierre: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* PESTAÑA 2: CONTACTO Y RESPONSABLES */}
+            {tabModal === "contacto" && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-emerald-400 font-bold text-xs flex items-center gap-1">
+                      Closer que tomó la llamada
+                    </Label>
+                    <Select value={formEdit.closer} onValueChange={v => setFormEdit(prev => ({ ...prev, closer: v }))}>
+                      <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-emerald-500/30 text-xs font-semibold text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                        {["Nahuel", "Cristian", "Alex", "Tobias", "Bener", "Libre / Recontacto", "Sin Closer"].map(c => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Setter asignado</Label>
+                    <Select value={formEdit.setter || "none"} onValueChange={v => setFormEdit(prev => ({ ...prev, setter: v === "none" ? "" : v }))}>
+                      <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white">
+                        <SelectValue placeholder="Sin setter" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                        <SelectItem value="none">Sin Setter</SelectItem>
+                        {["Maximo", "Andres", "Santi", "Cesar", "Lukas"].map(s => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-zinc-300 text-xs">WhatsApp / Teléfono</Label>
+                    <Input
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"
+                      value={formEdit.telefono}
+                      onChange={e => setFormEdit(prev => ({ ...prev, telefono: e.target.value }))}
+                      placeholder="+54 9 11..."
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Email</Label>
+                    <Input
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"
+                      value={formEdit.email}
+                      onChange={e => setFormEdit(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="email@..."
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Instagram</Label>
+                    <Input
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"
+                      value={formEdit.instagram}
+                      onChange={e => setFormEdit(prev => ({ ...prev, instagram: e.target.value }))}
+                      placeholder="@usuario"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PESTAÑA 3: AGENDA Y LLAMADA */}
+            {tabModal === "llamada" && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-purple-300 font-bold text-xs">
+                      Estado de la llamada
+                    </Label>
+                    <Select value={formEdit.estado || "none"} onValueChange={v => setFormEdit(prev => ({ ...prev, estado: v === "none" ? "" : v }))}>
+                      <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-purple-500/30 text-xs font-semibold text-white">
+                        <SelectValue placeholder="Seleccionar estado..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                        <SelectItem value="Reprogramó">🟣 Reprogramó</SelectItem>
+                        <SelectItem value="Se presentó">🟢 Se presentó</SelectItem>
+                        <SelectItem value="No se presentó">🔴 No se presentó (No Show)</SelectItem>
+                        <SelectItem value="Adentro en Call">🏆 Adentro en Call (Cierre)</SelectItem>
+                        <SelectItem value="Adentro en FUP">🔄 Adentro en FUP</SelectItem>
+                        <SelectItem value="Fee">💳 Fee pagado</SelectItem>
+                        <SelectItem value="Grupo Precall Creado">🔷 Grupo Precall Creado</SelectItem>
+                        <SelectItem value="Pendiente">⏳ Pendiente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Fecha y hora de llamada {formEdit.estado === "Reprogramó" ? "(Reprogramar)" : ""}</Label>
+                    <Input
+                      type="datetime-local"
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"
+                      value={formEdit.fecha_closer}
+                      onChange={e => setFormEdit(prev => ({ ...prev, fecha_closer: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-zinc-300 text-xs">Link grabación Fathom</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      className="h-8 bg-zinc-900 border-white/10 text-xs text-white flex-1"
+                      placeholder="https://fathom.video/..."
+                      value={formEdit.link_fathom}
+                      onChange={e => setFormEdit(prev => ({ ...prev, link_fathom: e.target.value }))}
+                    />
+                    {formEdit.link_fathom && (
+                      <a href={formEdit.link_fathom} target="_blank" rel="noopener noreferrer" className="px-3 py-1 bg-violet-600 hover:bg-violet-500 text-white rounded text-xs flex items-center gap-1 font-semibold">
+                        Ver <ArrowUpRight className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PESTAÑA 4: CONTEXTO DEL LEAD */}
+            {tabModal === "contexto" && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Problema actual</Label>
+                    <Input
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"
+                      value={formEdit.problema_actual}
+                      onChange={e => setFormEdit(prev => ({ ...prev, problema_actual: e.target.value }))}
+                      placeholder="Ej: No sé cómo vender IA"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Hace cuánto arrastra el problema</Label>
+                    <Input
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"
+                      value={formEdit.tiempo_problema}
+                      onChange={e => setFormEdit(prev => ({ ...prev, tiempo_problema: e.target.value }))}
+                      placeholder="Ej: Hace meses"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Intentos previos</Label>
+                    <Input
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"
+                      value={formEdit.intentos_previos}
+                      onChange={e => setFormEdit(prev => ({ ...prev, intentos_previos: e.target.value }))}
+                      placeholder="Ej: Intentó vender de forma autodidacta"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Motivo de urgencia</Label>
+                    <Input
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"
+                      value={formEdit.motivo_urgencia}
+                      onChange={e => setFormEdit(prev => ({ ...prev, motivo_urgencia: e.target.value }))}
+                      placeholder="Ej: Quiere ganar más / aprovechar IA"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Ingreso mensual</Label>
+                    <Input
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"
+                      value={formEdit.ingresos}
+                      onChange={e => setFormEdit(prev => ({ ...prev, ingresos: e.target.value }))}
+                      placeholder="Ej: +$3.000 /MES"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-300 text-xs">Capacidad de inversión</Label>
+                    <Input
+                      className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"
+                      value={formEdit.inversion}
+                      onChange={e => setFormEdit(prev => ({ ...prev, inversion: e.target.value }))}
+                      placeholder="Ej: +$500 / -$500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="px-6 py-4 border-t border-white/10 flex justify-between items-center bg-zinc-950">
+            <span className="text-[11px] text-zinc-500">
+              Al guardar se actualiza agendas y se sincroniza la atribución al closer real.
+            </span>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-white/10 hover:bg-white/10 text-xs text-white"
+                onClick={() => setModalLeadAbierto(false)}
+                disabled={guardandoLead}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
+                onClick={guardarEdicionLead}
+                disabled={guardandoLead}
+              >
+                {guardandoLead && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                {guardandoLead ? "Guardando en Agendas..." : "Guardar cambios"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   )
