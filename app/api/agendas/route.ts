@@ -236,10 +236,10 @@ export async function PATCH(request: Request) {
 
     const updateResult = Object.keys(updates).length
       ? await sb.from("agendas").update(updates).eq("id", id)
-        .select("id,person_id,fecha_agenda,fecha_closer,created_at,resumen_chat,telefono,instagram,calificacion,show,estado,call_confirmer")
+        .select("id,person_id,nombre,closer,fecha_agenda,fecha_closer,created_at,resumen_chat,telefono,instagram,calificacion,show,estado,call_confirmer")
         .maybeSingle()
       : await sb.from("agendas")
-        .select("id,person_id,fecha_agenda,fecha_closer,created_at,resumen_chat,telefono,instagram,calificacion,show,estado,call_confirmer")
+        .select("id,person_id,nombre,closer,fecha_agenda,fecha_closer,created_at,resumen_chat,telefono,instagram,calificacion,show,estado,call_confirmer")
         .eq("id", id)
         .maybeSingle()
     const { data: updated, error } = updateResult
@@ -248,6 +248,15 @@ export async function PATCH(request: Request) {
       await persistChatSummaryAttribution(sb, [updated])
     }
     if (email && updated) await attachEmailToPerson(sb, updated.person_id, email, "crm_agenda")
+    if ("closer" in updates && updates.closer && updated) {
+      const nuevoCloser = String(updates.closer).trim()
+      if (updated.person_id) {
+        await sb.from("pagos").update({ closer: nuevoCloser }).eq("person_id", updated.person_id)
+      }
+      if (updated.nombre) {
+        await sb.from("pagos").update({ closer: nuevoCloser }).ilike("cliente", updated.nombre)
+      }
+    }
     if (updated) {
       const { data: person } = await sb.from("crm_people").select("primary_email").eq("id", updated.person_id).maybeSingle()
       const target = shouldRemainInHammerAudience({ ...updated, ...updates }) ? "add" : "remove"

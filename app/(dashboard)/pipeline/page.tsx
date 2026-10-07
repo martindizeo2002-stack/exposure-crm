@@ -22,7 +22,7 @@ import type { Agenda } from "@/lib/supabase"
 import { useSession } from "@/components/session-provider"
 import { HelpHint } from "@/components/help-hint"
 import { FEE_TIPOS } from "@/lib/cash-collected"
-import { CLOSERS_ACTIVOS } from "@/lib/equipo"
+import { CLOSERS_ACTIVOS, SETTERS_TODOS } from "@/lib/equipo"
 
 const fetcher = (url: string) => fetch(url, { cache: "no-store" }).then((r) => r.json())
 
@@ -642,6 +642,14 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
     }
     return list
   }, [agenda?.closer])
+  const setterOptions = useMemo(() => {
+    const list = [...SETTERS_TODOS, "Sin Setter"]
+    const cur = (agenda?.setter || "").trim()
+    if (cur && !list.includes(cur) && cur !== "Sin Setter") {
+      return [...list, cur]
+    }
+    return list
+  }, [agenda?.setter])
   const ef = (key: keyof Agenda, value: unknown) => setEditForm(prev => ({ ...prev, [key]: value }))
   const saveDirect = async () => {
     if (!agenda?.id) return
@@ -679,9 +687,21 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
                   <p className="mb-1 text-[10px] font-black uppercase tracking-[.2em] text-violet-600/80 dark:text-violet-300">Ficha del lead</p>
                   <DialogTitle className="truncate text-2xl font-black tracking-tight sm:text-3xl">{agenda.nombre}</DialogTitle>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className={cn("rounded-full px-3 py-1 text-xs font-black shadow-sm", calColors[calKey(agenda.calificacion)] || calColors.C)}>
-                  {calKey(agenda.calificacion)}
-                </Badge>
+                {editMode ? (
+                  <select
+                    className="h-7 rounded-full border border-violet-400 bg-background px-2.5 text-xs font-black shadow-sm focus:outline-none"
+                    value={editForm.calificacion || "LEAD C"}
+                    onChange={e => ef("calificacion", e.target.value)}
+                  >
+                    {["LEAD S", "LEAD A", "LEAD B", "LEAD C", "LEAD D"].map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Badge variant="outline" className={cn("rounded-full px-3 py-1 text-xs font-black shadow-sm", calColors[calKey(agenda.calificacion)] || calColors.C)}>
+                    {calKey(agenda.calificacion)}
+                  </Badge>
+                )}
                 {stage && <Badge variant="outline" className={cn("rounded-full px-3 py-1 text-xs font-bold shadow-sm", STAGE_BADGE[stage])}>{COLUMNS.find(c => c.id === stage)?.label}</Badge>}
                 {agenda.rescatado && (
                   <Badge variant="outline" className="rounded-full border-fuchsia-500/20 bg-fuchsia-500/10 px-3 py-1 text-xs font-bold text-fuchsia-600 shadow-sm">
@@ -780,9 +800,33 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
               )}
               <DetailSection icon={User} title="Contacto y responsables">
               <div className="grid gap-3 sm:grid-cols-2">
-                <DetailField icon={Phone} label="WhatsApp" value={agenda.telefono} />
-                <DetailField icon={Mail} label="Email" value={agenda.email} />
-                <DetailField icon={Instagram} label="Instagram" value={agenda.instagram} />
+                <EditableDetailField
+                  icon={Phone}
+                  label="WhatsApp / Teléfono"
+                  value={agenda.telefono}
+                  editValue={editForm.telefono}
+                  onChange={v => ef("telefono", v)}
+                  placeholder="+54 9 11 ..."
+                  editMode={editMode}
+                />
+                <EditableDetailField
+                  icon={Mail}
+                  label="Email"
+                  value={agenda.email}
+                  editValue={editForm.email}
+                  onChange={v => ef("email", v)}
+                  placeholder="lead@email.com"
+                  editMode={editMode}
+                />
+                <EditableDetailField
+                  icon={Instagram}
+                  label="Instagram"
+                  value={agenda.instagram}
+                  editValue={editForm.instagram}
+                  onChange={v => ef("instagram", v)}
+                  placeholder="@usuario"
+                  editMode={editMode}
+                />
                 {editMode ? (
                   <div className="group rounded-2xl border border-violet-300/80 bg-violet-500/[.03] p-3.5 shadow-[0_8px_30px_rgba(15,23,42,.04)] ring-1 ring-violet-400/20 backdrop-blur dark:border-violet-500/30">
                     <div className="mb-2 flex items-center gap-2">
@@ -805,7 +849,28 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
                 ) : (
                   <DetailField icon={UserRoundCheck} label="Closer" value={agenda.closer} />
                 )}
-                <DetailField icon={Sparkles} label="Setter" value={agenda.setter} />
+                {editMode ? (
+                  <div className="group rounded-2xl border border-violet-300/80 bg-violet-500/[.03] p-3.5 shadow-[0_8px_30px_rgba(15,23,42,.04)] ring-1 ring-violet-400/20 backdrop-blur dark:border-violet-500/30">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-violet-500/15 to-fuchsia-400/10 text-violet-600 dark:text-violet-300">
+                        <Sparkles className="h-3.5 w-3.5" />
+                      </span>
+                      <p className="text-[9px] font-black uppercase tracking-[.16em] text-muted-foreground">Setter asignado</p>
+                    </div>
+                    <select
+                      className={inputClass}
+                      value={editForm.setter || ""}
+                      onChange={e => ef("setter", e.target.value || null)}
+                    >
+                      <option value="">Sin Setter</option>
+                      {setterOptions.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <DetailField icon={Sparkles} label="Setter" value={agenda.setter} />
+                )}
               </div>
               </DetailSection>
               {agenda.calificacion_crm_original && agenda.calificacion_crm_original !== agenda.calificacion && (
@@ -849,8 +914,26 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
               </DetailSection>
               <DetailSection icon={Target} title="Contexto del lead">
               <div className="grid gap-3 sm:grid-cols-2">
-                <DetailField icon={MessageSquareText} label="Problema actual" value={agenda.problema_actual} wide />
-                <DetailField icon={Clock3} label="Hace cuánto arrastra el problema" value={agenda.tiempo_problema} wide />
+                <EditableDetailField
+                  icon={MessageSquareText}
+                  label="Problema actual"
+                  value={agenda.problema_actual}
+                  editValue={editForm.problema_actual}
+                  onChange={v => ef("problema_actual", v)}
+                  placeholder="Ej: No sé cómo vender IA"
+                  editMode={editMode}
+                  wide
+                />
+                <EditableDetailField
+                  icon={Clock3}
+                  label="Hace cuánto arrastra el problema"
+                  value={agenda.tiempo_problema}
+                  editValue={editForm.tiempo_problema}
+                  onChange={v => ef("tiempo_problema", v)}
+                  placeholder="Ej: Hace meses"
+                  editMode={editMode}
+                  wide
+                />
                 <EditableDetailField
                   icon={MessageSquareText}
                   label={editMode ? "Intentos previos / ¿Intentó vender IA antes?" : "Intentos previos"}
@@ -873,7 +956,15 @@ function LeadDetailDialog({ agenda, stage, pays, onClose, onSaved }: { agenda: A
                   editMode={editMode}
                   wide
                 />
-                <DetailField icon={BriefcaseBusiness} label="Ocupación" value={agenda.ocupacion} />
+                <EditableDetailField
+                  icon={BriefcaseBusiness}
+                  label="Ocupación"
+                  value={agenda.ocupacion}
+                  editValue={editForm.ocupacion}
+                  onChange={v => ef("ocupacion", v)}
+                  placeholder="Ej: Dueño de negocio / Empleado"
+                  editMode={editMode}
+                />
                 <EditableDetailField
                   icon={WalletCards}
                   label="Ingreso mensual"
