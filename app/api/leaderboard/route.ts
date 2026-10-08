@@ -294,7 +294,8 @@ export async function GET(request: Request) {
     closerMap.set(CEO, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0, detalles_pagos: [], detalles_llamadas: [] })
 
     for (const pago of pagos || []) {
-      const closer = canonical(pago.closer || "")
+      let closer = canonical(pago.closer || "")
+      if (closer.toLowerCase() === "exposure") closer = "Nahuel"
       const setter = canonical(pago.setter || "")
       const monto = pago.monto || 0
       const tipo = pago.tipo || ""
@@ -370,7 +371,8 @@ export async function GET(request: Request) {
     const CALIFS_AB = new Set(["S", "A", "B", "C", "LEAD A", "LEAD B", "LEAD C"])  // EXPOSURE: A, B y C califican; D no
 
     for (const ag of agendas || []) {
-      const closerNorm = canonical(ag.closer || "")
+      let closerNorm = canonical(ag.closer || "")
+      if (closerNorm.toLowerCase() === "exposure") closerNorm = "Nahuel"
       const setter = canonical(ag.setter || "")
 
       if (isRealMember(closerNorm)) {
@@ -450,7 +452,7 @@ export async function GET(request: Request) {
           detalles_llamadas: d.detalles_llamadas.sort((a, b) => (b.fecha_agenda || "").localeCompare(a.fecha_agenda || "")),
         }
       })
-      .filter(c => isRealMember(c.nombre) && (c.nombre === CEO || c.personal_goal || c.cc_total > 0 || c.llamadas > 0) && !(month >= CLOSERS_FUERA_DESDE && CLOSERS_FUERA.has(c.nombre)))
+      .filter(c => isRealMember(c.nombre) && c.nombre !== "Exposure" && (c.nombre === CEO || c.personal_goal || c.cc_total > 0 || c.llamadas > 0) && !(month >= CLOSERS_FUERA_DESDE && CLOSERS_FUERA.has(c.nombre)))
       .sort((a, b) => b.cc_total - a.cc_total || Number(Boolean(b.personal_goal)) - Number(Boolean(a.personal_goal)) || b.feccu - a.feccu)
 
     const setters = Array.from(setterMap.entries())
