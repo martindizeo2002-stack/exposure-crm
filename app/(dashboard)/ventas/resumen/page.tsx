@@ -22,7 +22,10 @@ import { Calendar as CalendarIcon,
   Loader2, ArrowUpRight,
   Search,
   X,
-  CalendarDays } from "lucide-react"
+  CalendarDays,
+  Info,
+  Sparkles,
+  HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -123,6 +126,9 @@ export default function ResumenVentasPage() {
   const [resultadosBusqueda, setResultadosBusqueda] = useState<any[]>([])
   const [buscandoLead, setBuscandoLead] = useState(false)
   const [moviendoLeadId, setMoviendoLeadId] = useState<string | number | null>(null)
+
+  // Auditoría interactiva de métricas
+  const [metricaAuditoriaKey, setMetricaAuditoriaKey] = useState<string | null>(null)
 
   const abrirEdicionLead = async (c: any) => {
     const agendaId = c.agenda_id || c.id
@@ -671,72 +677,143 @@ export default function ResumenVentasPage() {
             </div>
           </Card>
 
-          {/* Scorecards Principales */}
+          {/* Scorecards Principales (Interactivos para auditar fórmula y leads) */}
           {metricas && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-              {/* Calls Programadas */}
-              <Card className="border-white/10 bg-zinc-900/40 p-4">
-                <span className="text-xs font-medium text-muted-foreground">Programadas</span>
-                <div className="mt-2 text-2xl font-black text-white">{metricas.programadas}</div>
-                <span className="text-[11px] text-zinc-400">
-                  {metricas.calificadas_programadas} calificadas
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] text-zinc-400 font-medium flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+                  Métricas Operativas del Período
                 </span>
-              </Card>
-
-              {/* Presentadas (Show Rate) */}
-              <Card className="border-white/10 bg-zinc-900/40 p-4">
-                <span className="text-xs font-medium text-muted-foreground">Presentadas</span>
-                <div className="mt-2 text-2xl font-black text-white">{metricas.presentadas}</div>
-                <span className="text-[11px] text-emerald-400">
-                  {metricas.show_rate_pct.toFixed(1).replace(".", ",")} % show rate
+                <span className="text-[10px] text-emerald-400/90 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 font-medium">
+                  💡 Hacé clic en cualquier métrica para auditar su fórmula y ver los leads que la componen
                 </span>
-              </Card>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+                {/* Calls Programadas */}
+                <Card
+                  onClick={() => setMetricaAuditoriaKey("programadas")}
+                  role="button"
+                  tabIndex={0}
+                  className="border-white/10 bg-zinc-900/40 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm"
+                  title="Clic para auditar Llamadas Programadas"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground group-hover:text-white transition-colors">Programadas</span>
+                    <Info className="h-3.5 w-3.5 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-white">{metricas.programadas}</div>
+                  <span className="text-[11px] text-zinc-400">
+                    {metricas.calificadas_programadas} calificadas
+                  </span>
+                </Card>
 
-              {/* Calificadas Presentadas */}
-              <Card className="border-white/10 bg-zinc-900/40 p-4">
-                <span className="text-xs font-medium text-muted-foreground">Calif. Presentadas</span>
-                <div className="mt-2 text-2xl font-black text-blue-400">{metricas.calificadas_presentadas}</div>
-                <span className="text-[11px] text-zinc-400">
-                  {metricas.show_rate_calificados_pct.toFixed(1).replace(".", ",")} % show calif
-                </span>
-              </Card>
+                {/* Presentadas (Show Rate) */}
+                <Card
+                  onClick={() => setMetricaAuditoriaKey("presentadas")}
+                  role="button"
+                  tabIndex={0}
+                  className="border-white/10 bg-zinc-900/40 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm"
+                  title="Clic para auditar Llamadas Presentadas"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground group-hover:text-white transition-colors">Presentadas</span>
+                    <Info className="h-3.5 w-3.5 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-white">{metricas.presentadas}</div>
+                  <span className="text-[11px] text-emerald-400 font-medium">
+                    {metricas.show_rate_pct.toFixed(1).replace(".", ",")} % show rate
+                  </span>
+                </Card>
 
-              {/* Cierres & TC */}
-              <Card className="border-emerald-500/20 bg-emerald-500/5 p-4">
-                <span className="text-xs font-medium text-emerald-400">Cierres</span>
-                <div className="mt-2 text-2xl font-black text-emerald-400">{metricas.cierres}</div>
-                <span className="text-[11px] text-emerald-300">
-                  {metricas.tc_calificadas_pct.toFixed(1).replace(".", ",")} % s/calif
-                </span>
-              </Card>
+                {/* Calificadas Presentadas */}
+                <Card
+                  onClick={() => setMetricaAuditoriaKey("calificadas_presentadas")}
+                  role="button"
+                  tabIndex={0}
+                  className="border-white/10 bg-zinc-900/40 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-blue-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm"
+                  title="Clic para auditar Calificadas Presentadas"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground group-hover:text-white transition-colors">Calif. Presentadas</span>
+                    <Info className="h-3.5 w-3.5 text-zinc-500 group-hover:text-blue-400 transition-colors" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-blue-400">{metricas.calificadas_presentadas}</div>
+                  <span className="text-[11px] text-zinc-400">
+                    {metricas.show_rate_calificados_pct.toFixed(1).replace(".", ",")} % show calif
+                  </span>
+                </Card>
 
-              {/* Cash D1 */}
-              <Card className="border-emerald-500/20 bg-emerald-500/5 p-4">
-                <span className="text-xs font-medium text-emerald-400">Cash D1</span>
-                <div className="mt-2 text-2xl font-black text-emerald-400">
-                  ${metricas.cash_d1.toLocaleString("es-AR")}
-                </div>
-                <span className="text-[11px] text-muted-foreground">USD directo</span>
-              </Card>
+                {/* Cierres & TC */}
+                <Card
+                  onClick={() => setMetricaAuditoriaKey("cierres")}
+                  role="button"
+                  tabIndex={0}
+                  className="border-emerald-500/30 bg-emerald-500/5 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-400 hover:bg-emerald-500/10 active:scale-[0.99] group shadow-sm"
+                  title="Clic para auditar Cierres y Tasa de Conversión"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-emerald-400 group-hover:text-emerald-300 transition-colors">Cierres</span>
+                    <Info className="h-3.5 w-3.5 text-emerald-500 group-hover:text-emerald-300 transition-colors" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-emerald-400">{metricas.cierres}</div>
+                  <span className="text-[11px] text-emerald-300 font-medium">
+                    {metricas.tc_calificadas_pct.toFixed(1).replace(".", ",")} % s/calif
+                  </span>
+                </Card>
 
-              {/* Ticket Contratado */}
-              <Card className="border-white/10 bg-zinc-900/40 p-4">
-                <span className="text-xs font-medium text-muted-foreground">Ticket Contratado</span>
-                <div className="mt-2 text-2xl font-black text-white">
-                  ${metricas.ticket_total.toLocaleString("es-AR")}
-                </div>
-                <span className="text-[11px] text-zinc-400">USD total</span>
-              </Card>
+                {/* Cash D1 */}
+                <Card
+                  onClick={() => setMetricaAuditoriaKey("cash_d1")}
+                  role="button"
+                  tabIndex={0}
+                  className="border-emerald-500/30 bg-emerald-500/5 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-400 hover:bg-emerald-500/10 active:scale-[0.99] group shadow-sm"
+                  title="Clic para auditar Cash Recaudado Día 1"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-emerald-400 group-hover:text-emerald-300 transition-colors">Cash D1</span>
+                    <Info className="h-3.5 w-3.5 text-emerald-500 group-hover:text-emerald-300 transition-colors" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-emerald-400">
+                    ${metricas.cash_d1.toLocaleString("es-AR")}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">USD directo</span>
+                </Card>
+
+                {/* Ticket Contratado */}
+                <Card
+                  onClick={() => setMetricaAuditoriaKey("ticket_total")}
+                  role="button"
+                  tabIndex={0}
+                  className="border-white/10 bg-zinc-900/40 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm"
+                  title="Clic para auditar Ticket Contratado Total"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground group-hover:text-white transition-colors">Ticket Contratado</span>
+                    <Info className="h-3.5 w-3.5 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-white">
+                    ${metricas.ticket_total.toLocaleString("es-AR")}
+                  </div>
+                  <span className="text-[11px] text-zinc-400">USD total</span>
+                </Card>
+              </div>
             </div>
           )}
 
-          {/* Distribución por Arquetipos (4 Bloques: Dueño, Empleado, Estudiante, Sin Clasificar) */}
+          {/* Distribución por Arquetipos (Interactivos para auditar composición) */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             {/* Dueño de Negocio */}
-            <Card className="border-emerald-500/20 bg-emerald-500/[0.03] p-4">
+            <Card
+              onClick={() => setMetricaAuditoriaKey("dueno_negocio")}
+              role="button"
+              tabIndex={0}
+              className="border-emerald-500/20 bg-emerald-500/[0.03] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-emerald-500/[0.08] active:scale-[0.99] group shadow-sm"
+              title="Clic para auditar leads de Dueño de Negocio"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wide">Dueño de Negocio</span>
-                <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px]">Macro</Badge>
+                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wide group-hover:text-emerald-300">Dueño de Negocio</span>
+                <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px]">Macro · Auditar</Badge>
               </div>
               <div className="mt-3 flex items-baseline justify-between">
                 <div>
@@ -751,10 +828,16 @@ export default function ResumenVentasPage() {
             </Card>
 
             {/* Empleado 9-5 */}
-            <Card className="border-blue-500/20 bg-blue-500/[0.03] p-4">
+            <Card
+              onClick={() => setMetricaAuditoriaKey("empleado")}
+              role="button"
+              tabIndex={0}
+              className="border-blue-500/20 bg-blue-500/[0.03] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-blue-500/50 hover:bg-blue-500/[0.08] active:scale-[0.99] group shadow-sm"
+              title="Clic para auditar leads de Empleado"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">Empleado (9 a 5)</span>
-                <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[10px]">Macro</Badge>
+                <span className="text-xs font-bold text-blue-400 uppercase tracking-wide group-hover:text-blue-300">Empleado (9 a 5)</span>
+                <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[10px]">Macro · Auditar</Badge>
               </div>
               <div className="mt-3 flex items-baseline justify-between">
                 <div>
@@ -769,10 +852,16 @@ export default function ResumenVentasPage() {
             </Card>
 
             {/* Estudiante */}
-            <Card className="border-white/10 bg-white/[0.02] p-4">
+            <Card
+              onClick={() => setMetricaAuditoriaKey("estudiante")}
+              role="button"
+              tabIndex={0}
+              className="border-white/10 bg-white/[0.02] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-amber-500/50 hover:bg-amber-500/[0.05] active:scale-[0.99] group shadow-sm"
+              title="Clic para auditar leads de Estudiante"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Estudiante</span>
-                <Badge variant="outline" className="border-white/10 text-muted-foreground text-[10px]">Macro</Badge>
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide group-hover:text-amber-300">Estudiante</span>
+                <Badge variant="outline" className="border-white/10 text-muted-foreground text-[10px]">Macro · Auditar</Badge>
               </div>
               <div className="mt-3 flex items-baseline justify-between">
                 <div>
@@ -780,17 +869,23 @@ export default function ResumenVentasPage() {
                   <span className="text-xs text-muted-foreground ml-1.5">calls</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-bold text-zinc-300">{arq?.estudiante.cierres || 0} cierres</span>
+                  <span className="text-sm font-bold text-zinc-300 group-hover:text-amber-300">{arq?.estudiante.cierres || 0} cierres</span>
                   <span className="block text-[11px] text-muted-foreground">${arq?.estudiante.cash_d1 || 0} USD</span>
                 </div>
               </div>
             </Card>
 
             {/* Sin Clasificar */}
-            <Card className="border-amber-500/20 bg-amber-500/[0.03] p-4">
+            <Card
+              onClick={() => setMetricaAuditoriaKey("sin_clasificar")}
+              role="button"
+              tabIndex={0}
+              className="border-amber-500/20 bg-amber-500/[0.03] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-zinc-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm"
+              title="Clic para auditar leads Sin Clasificar"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wide">Sin Clasificar</span>
-                <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-[10px]">Pendiente</Badge>
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wide group-hover:text-zinc-200">Sin Clasificar</span>
+                <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-[10px]">Pendiente · Auditar</Badge>
               </div>
               <div className="mt-3 flex items-baseline justify-between">
                 <div>
@@ -798,7 +893,7 @@ export default function ResumenVentasPage() {
                   <span className="text-xs text-muted-foreground ml-1.5">calls</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-bold text-amber-400">{arq?.sin_clasificar.cierres || 0} cierres</span>
+                  <span className="text-sm font-bold text-amber-400 group-hover:text-zinc-200">{arq?.sin_clasificar.cierres || 0} cierres</span>
                   <span className="block text-[11px] text-muted-foreground">${arq?.sin_clasificar.cash_d1 || 0} USD</span>
                 </div>
               </div>
@@ -809,13 +904,28 @@ export default function ResumenVentasPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {/* Columna Izquierda: Detalle de Llamadas (7 Cols) */}
             <div className="space-y-4 lg:col-span-7">
-              {/* Buscador y Reubicador de Leads Global */}
-              <Card className="border-white/10 bg-zinc-900/60 p-3 shadow-sm">
+              {/* Globo de Búsqueda y Reubicación de Leads */}
+              <div id="globo-buscador-leads" className="relative rounded-2xl border-2 border-emerald-500/25 bg-gradient-to-r from-zinc-950 via-zinc-900/90 to-zinc-950 p-3.5 shadow-xl shadow-emerald-950/20 backdrop-blur">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 text-xs shadow-inner">
+                      🎈
+                    </span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                      Globo de Búsqueda de Leads
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-zinc-400 font-medium">
+                    Mover a: <strong className="text-emerald-300 font-semibold">{fecha}</strong>
+                  </span>
+                </div>
+
                 <div className="relative">
-                  <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-950/80 px-3 py-2 text-xs focus-within:border-emerald-500/50 transition-colors">
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-zinc-950/90 px-3.5 py-2 text-xs focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all shadow-inner">
                     <Search className="h-4 w-4 text-emerald-400 shrink-0" />
                     <Input
-                      placeholder="Buscar lead en todo el CRM (nombre, teléfono o IG) para mover a este día..."
+                      id="input-globo-busqueda"
+                      placeholder="Escribí el nombre, teléfono o @instagram para buscar y mover a este día..."
                       value={busquedaLead}
                       onChange={(e) => setBusquedaLead(e.target.value)}
                       className="h-6 border-0 bg-transparent p-0 text-xs text-white placeholder:text-zinc-500 focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -942,7 +1052,7 @@ export default function ResumenVentasPage() {
                     </div>
                   )}
                 </div>
-              </Card>
+              </div>
 
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-white">
@@ -1690,6 +1800,268 @@ export default function ResumenVentasPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Botón Globo Flotante en la esquina inferior */}
+      <button
+        onClick={() => {
+          const el = document.getElementById("globo-buscador-leads")
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" })
+            setTimeout(() => {
+              const inp = document.getElementById("input-globo-busqueda")
+              if (inp) inp.focus()
+            }, 300)
+          }
+        }}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 shadow-2xl shadow-emerald-500/30 border border-emerald-400/40 text-xs font-bold transition-all hover:scale-105 active:scale-95 group"
+        title="Abrir globo de búsqueda de leads en esta pantalla"
+      >
+        <span className="text-base group-hover:rotate-12 transition-transform">🎈</span>
+        <span>Globo Buscador</span>
+        <Search className="h-3.5 w-3.5 ml-0.5 text-emerald-200" />
+      </button>
+
+      {/* Modal / Dialog de Auditoría Interactiva de Métricas */}
+      <Dialog open={Boolean(metricaAuditoriaKey)} onOpenChange={(open) => !open && setMetricaAuditoriaKey(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col bg-zinc-950 border-white/10 text-white">
+          {(() => {
+            if (!metricaAuditoriaKey || !metricas) return null
+
+            // Definición canónica de cada métrica
+            const defs: Record<string, {
+              titulo: string
+              categoria: string
+              valor: string | number
+              color: string
+              definicion: string
+              formula: string
+              fuente: string
+              criterio: (c: CallDetalle) => boolean
+            }> = {
+              programadas: {
+                titulo: "Llamadas Programadas",
+                categoria: "Volumen Total",
+                valor: `${metricas.programadas} calls`,
+                color: "emerald",
+                definicion: "Total de llamadas únicas agendadas en el CRM cuya fecha cae en el período seleccionado. Ningún lead repetido computa doble.",
+                formula: "Conteo de agendas únicas por persona con fecha_closer en el período",
+                fuente: "CRM Agendas (iClosed + Agendas manuales). Excluye archivadas manualmente.",
+                criterio: () => true,
+              },
+              presentadas: {
+                titulo: "Llamadas Presentadas (Show Rate)",
+                categoria: "Asistencia Comercial",
+                valor: `${metricas.presentadas} calls (${metricas.show_rate_pct.toFixed(1).replace(".", ",")} %)`,
+                color: "emerald",
+                definicion: "Llamadas donde el lead asistió efectivamente a la sesión con el closer. Se consideran asistidas aquellas con show=true o resultado Adentro, Fee o Cierre.",
+                formula: "(Llamadas Presentadas ÷ Llamadas Programadas) × 100",
+                fuente: "CRM Agendas + Reconciliación con grabaciones de Fathom. Excluye No Shows y Canceladas.",
+                criterio: (c) => c.resultado !== "NO SHOW" && c.resultado !== "CANCELADA",
+              },
+              calificadas_presentadas: {
+                titulo: "Calificadas Presentadas",
+                categoria: "Calidad Comercial",
+                valor: `${metricas.calificadas_presentadas} calls (${metricas.show_rate_calificados_pct.toFixed(1).replace(".", ",")} %)`,
+                color: "blue",
+                definicion: "Leads calificados (LEAD S, A o B, o calificación confirmada) que además asistieron a la llamada con el closer.",
+                formula: "(Calificadas Presentadas ÷ Calificadas Programadas) × 100",
+                fuente: "Lead Scoring de Exposure OS + Validación del Closer.",
+                criterio: (c) => Boolean(c.es_calificado && c.resultado !== "NO SHOW" && c.resultado !== "CANCELADA"),
+              },
+              cierres: {
+                titulo: "Cierres & Tasa de Cierre (TC)",
+                categoria: "Conversión",
+                valor: `${metricas.cierres} cierres (${metricas.tc_calificadas_pct.toFixed(1).replace(".", ",")} %)`,
+                color: "emerald",
+                definicion: "Ventas concretadas de clientes que ingresaron formalmente al programa Exposure. Se valida por pago confirmado en el CRM o registro de cierre del closer.",
+                formula: "(Cierres ÷ Calificadas Presentadas) × 100",
+                fuente: "CRM Pagos + Estados de Cierre en Agendas.",
+                criterio: (c) => c.resultado === "CIERRE" || c.resultado === "FEE",
+              },
+              cash_d1: {
+                titulo: "Cash Recaudado Día 1 (Cash D1)",
+                categoria: "Finanzas",
+                valor: `${metricas.cash_d1.toLocaleString("es-AR")} USD`,
+                color: "emerald",
+                definicion: "Dinero cobrado inmediatamente en la primera llamada de cierre o durante el mismo día del evento comercial (Stripe, USDT, transferencias).",
+                formula: "Suma de pagos confirmados vinculados a la llamada / persona en el período",
+                fuente: "CRM Pagos (operaciones aprobadas y libres de duplicados).",
+                criterio: (c) => c.cash_d1 > 0,
+              },
+              ticket_total: {
+                titulo: "Ticket Contratado",
+                categoria: "Facturación",
+                valor: `${metricas.ticket_total.toLocaleString("es-AR")} USD`,
+                color: "zinc",
+                definicion: "Valor contractual total pactado por los cierres del período (ticket base estándar de $1.500 USD por programa cerrado).",
+                formula: "Cierres × $1.500 USD (o suma de acuerdos contractuales)",
+                fuente: "Contratos de Venta del CRM.",
+                criterio: (c) => c.resultado === "CIERRE",
+              },
+              dueno_negocio: {
+                titulo: "Arquetipo: Dueño de Negocio",
+                categoria: "Segmentación",
+                valor: `${arq?.dueno_negocio.total || 0} calls | ${arq?.dueno_negocio.cierres || 0} cierres`,
+                color: "emerald",
+                definicion: "Dueños de agencias, ecommerce o negocios de servicios que buscan escalar integrando soluciones de IA.",
+                formula: "Ocupación catalogada bajo el macro DUEÑO DE NEGOCIO",
+                fuente: "Triage iClosed + Entrevista de Triage.",
+                criterio: (c) => c.arquetipo_macro === "DUEÑO DE NEGOCIO",
+              },
+              empleado: {
+                titulo: "Arquetipo: Empleado (9 a 5)",
+                categoria: "Segmentación",
+                valor: `${arq?.empleado.total || 0} calls | ${arq?.empleado.cierres || 0} cierres`,
+                color: "blue",
+                definicion: "Personas en relación de dependencia que buscan una vía de salida o ingresos extra superiores a su sueldo vendiendo IA.",
+                formula: "Ocupación catalogada bajo el macro EMPLEADO",
+                fuente: "Triage iClosed + Entrevista de Triage.",
+                criterio: (c) => c.arquetipo_macro === "EMPLEADO",
+              },
+              estudiante: {
+                titulo: "Arquetipo: Estudiante",
+                categoria: "Segmentación",
+                valor: `${arq?.estudiante.total || 0} calls | ${arq?.estudiante.cierres || 0} cierres`,
+                color: "amber",
+                definicion: "Jóvenes universitarios o autodidactas con hambre de emprender y adquirir habilidades técnicas de alto valor.",
+                formula: "Ocupación catalogada bajo el macro ESTUDIANTE",
+                fuente: "Triage iClosed + Entrevista de Triage.",
+                criterio: (c) => c.arquetipo_macro === "ESTUDIANTE",
+              },
+              sin_clasificar: {
+                titulo: "Arquetipo: Sin Clasificar",
+                categoria: "Segmentación",
+                valor: `${arq?.sin_clasificar.total || 0} calls | ${arq?.sin_clasificar.cierres || 0} cierres`,
+                color: "zinc",
+                definicion: "Leads cuya ocupación o arquetipo aún no fue completado en el formulario o durante la llamada.",
+                formula: "Leads con ocupación pendiente o no mapeada",
+                fuente: "Formulario de agenda.",
+                criterio: (c) => c.arquetipo_macro === "SIN CLASIFICAR" || !c.arquetipo_macro,
+              },
+            }
+
+            const info = defs[metricaAuditoriaKey]
+            if (!info) return null
+
+            const leadsAsociados = callsUnicas.filter(info.criterio)
+
+            return (
+              <>
+                <DialogHeader className="px-6 pt-6 pb-4 border-b border-white/10">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-xs">
+                      {info.categoria}
+                    </Badge>
+                    <span className="text-xs text-zinc-400 font-mono">
+                      Período: <strong className="text-white">{periodo.toUpperCase()} ({fecha})</strong>
+                    </span>
+                  </div>
+                  <DialogTitle className="text-xl font-bold text-white flex items-center justify-between mt-2">
+                    <span>{info.titulo}</span>
+                    <span className="text-emerald-400 font-mono text-2xl font-black">{info.valor}</span>
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-zinc-400 mt-1">
+                    {info.definicion}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                  {/* Cajas de fórmula y fuente */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-3 rounded-lg border border-white/10 bg-zinc-900/60 space-y-1">
+                      <div className="text-[11px] font-semibold text-zinc-400 flex items-center gap-1.5">
+                        <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+                        Fórmula de cálculo
+                      </div>
+                      <p className="text-zinc-200 font-mono text-[11px]">{info.formula}</p>
+                    </div>
+
+                    <div className="p-3 rounded-lg border border-white/10 bg-zinc-900/60 space-y-1">
+                      <div className="text-[11px] font-semibold text-zinc-400 flex items-center gap-1.5">
+                        <HelpCircle className="h-3.5 w-3.5 text-blue-400" />
+                        Fuente de datos
+                      </div>
+                      <p className="text-zinc-300 text-[11px]">{info.fuente}</p>
+                    </div>
+                  </div>
+
+                  {/* Listado de leads componentes */}
+                  <div>
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <span className="text-xs font-bold uppercase tracking-wider text-white">
+                        Leads que componen esta métrica ({leadsAsociados.length})
+                      </span>
+                      <span className="text-[10px] text-zinc-400">
+                        100% libres de duplicados
+                      </span>
+                    </div>
+
+                    {leadsAsociados.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-zinc-500">
+                        No hay leads registrados para este criterio en el período seleccionado.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-white/5 max-h-60 overflow-y-auto pr-1 mt-2">
+                        {leadsAsociados.map((c) => (
+                          <div key={c.agenda_id || c.nombre} className="py-2.5 flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-white truncate">{c.nombre}</span>
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-white/10 text-zinc-300">
+                                  {c.lead_score || "SIN SCORE"}
+                                </Badge>
+                                {c.es_calificado && (
+                                  <Badge className="bg-blue-500/20 text-blue-300 text-[9px] px-1 py-0 h-3.5 border-0">
+                                    Calificada
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 text-[11px] text-zinc-400 mt-0.5">
+                                <span>Closer: <strong className="text-zinc-300">{c.closer}</strong></span>
+                                {c.hora && <span>⏰ {c.hora}</span>}
+                                {c.resultado && (
+                                  <span className={cn(
+                                    "font-semibold",
+                                    c.resultado === "CIERRE" && "text-emerald-400",
+                                    c.resultado === "FEE" && "text-purple-400",
+                                    c.resultado === "NO SHOW" && "text-rose-400",
+                                    c.resultado === "NO CIERRE" && "text-zinc-400"
+                                  )}>
+                                    {c.resultado}
+                                  </span>
+                                )}
+                                {c.cash_d1 > 0 && <span className="text-emerald-400 font-bold">${c.cash_d1} USD</span>}
+                              </div>
+                            </div>
+
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setMetricaAuditoriaKey(null)
+                                abrirEdicionLead(c)
+                              }}
+                              className="h-7 text-xs px-2.5 text-zinc-300 hover:text-white hover:bg-white/10 shrink-0"
+                            >
+                              <Pencil className="h-3 w-3 mr-1 text-zinc-400" />
+                              Ver ficha
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <DialogFooter className="px-6 py-3 border-t border-white/10 flex justify-end bg-zinc-900/50">
+                  <Button variant="outline" size="sm" onClick={() => setMetricaAuditoriaKey(null)} className="h-8 text-xs border-white/10 text-white">
+                    Cerrar Auditoría
+                  </Button>
+                </DialogFooter>
+              </>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

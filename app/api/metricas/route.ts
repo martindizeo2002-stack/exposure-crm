@@ -196,8 +196,15 @@ export async function GET(request: Request) {
       const key = identityKey(payment)
       if (!firstFrontendPayment.has(key) && payment.fecha) firstFrontendPayment.set(key, payment.fecha)
     }
-    // Sin dedup: la data viene limpia del Sheets (1 fila = 1 agenda real)
-    const a = (agendasRaw || []).filter((x) => enEmb(embudoDe(x.fuente)))
+    // Deduplicación por identidad para que ninguna métrica cuente con leads duplicados
+    const closingAgendaSeen = new Set<string>()
+    const a = (agendasRaw || []).filter((agenda: any) => {
+      const phone = String(agenda.telefono || "").replace(/\D/g, "")
+      const identity = agenda.person_id ? `person:${agenda.person_id}` : phone && phone.length >= 7 ? `phone:${phone}` : `id:${agenda.id}`
+      if (closingAgendaSeen.has(identity)) return false
+      closingAgendaSeen.add(identity)
+      return true
+    }).filter((x) => enEmb(embudoDe(x.fuente)))
     const setterAgendaSeen = new Set<string>()
     // primero se sacan los repetidos (mismo setter + misma persona) y después se recorta al embudo: así los embudos suman el total
     const aBySetterFecha = (agendasSetterRaw || []).filter((agenda: any) => {

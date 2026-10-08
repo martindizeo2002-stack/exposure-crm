@@ -197,19 +197,24 @@ export async function GET(request: NextRequest) {
     const agendaList: typeof rawAgendas = []
     const clusters: Record<string, typeof rawAgendas> = {}
 
+    // Mapeo para enlazar pagos de IDs duplicados al registro ganador consolidado
+    const clusterIdMap = new Map<string | number, string | number>()
+
     for (const item of rawAgendas) {
       const p = normPhone(item.telefono)
       const ig = normIg(item.instagram)
       const nm = normName(item.nombre)
-      const datePart = (item.fecha_closer || item.fecha_agenda || "").slice(0, 10)
 
+      // Clave unívoca por persona en todo el período seleccionado (evita duplicar métricas entre días de la semana o mes)
       let clusterKey = ""
-      if (p && p.length >= 7) {
-        clusterKey = `phone:${p}_${datePart}`
+      if (item.person_id) {
+        clusterKey = `person:${item.person_id}`
+      } else if (p && p.length >= 7) {
+        clusterKey = `phone:${p}`
       } else if (ig && ig.length >= 3) {
-        clusterKey = `ig:${ig}_${datePart}`
+        clusterKey = `ig:${ig}`
       } else if (nm && nm.length >= 5) {
-        clusterKey = `nm:${nm}_${datePart}`
+        clusterKey = `nm:${nm}`
       } else {
         clusterKey = `id:${item.id}`
       }
@@ -225,10 +230,12 @@ export async function GET(request: NextRequest) {
       if (items.length === 1) {
         agendaList.push(items[0])
       } else {
+        // Ordenar por completitud y calificación
         items.sort((a, b) => getLeadCompletenessScore(b) - getLeadCompletenessScore(a))
         const winner = { ...items[0] }
         for (let i = 1; i < items.length; i++) {
           const other = items[i]
+          clusterIdMap.set(other.id, winner.id)
           for (const field of Object.keys(other)) {
             if ((winner as any)[field] === null || (winner as any)[field] === undefined || (winner as any)[field] === "") {
               (winner as any)[field] = (other as any)[field]
@@ -320,10 +327,10 @@ export async function GET(request: NextRequest) {
         if (esCalif) calificadasPresentadas++
       }
 
-      // Cruce con pagos para validar cierres y cash
+      // Cruce con pagos para validar cierres y cash (soportando IDs consolidados)
       const pagosLead = (pagos || []).filter(
         (p: any) =>
-          (p.agenda_id && p.agenda_id === a.id) ||
+          (p.agenda_id && (p.agenda_id === a.id || clusterIdMap.get(p.agenda_id) === a.id)) ||
           (p.person_id && a.person_id && p.person_id === a.person_id) ||
           (p.cliente && a.nombre && p.cliente.toLowerCase().includes(a.nombre.toLowerCase().split(" ")[0]))
       )
