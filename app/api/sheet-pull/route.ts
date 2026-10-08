@@ -36,7 +36,7 @@ const fechaSerie = (v: unknown): string | null => {
   return iso ? iso[1] : null
 }
 const telefono = (v: unknown) => { const t = texto(v); if (!t || /\d[.,]?\d*e[+-]?\d/i.test(t)) return null; const d = t.replace(/\D/g, ""); return d.length >= 8 ? d : null }
-const closer = (v: unknown) => { const t = texto(v); if (!t || /^exposure/i.test(t)) return null; return nombreCanonico(t) || null }
+const closer = (v: unknown) => { const t = texto(v); if (!t) return null; return nombreCanonico(t) || null }
 const clave = (c: unknown, f: unknown, t: unknown, m: unknown) => `${norm(c)}|${String(f ?? "").slice(0, 10)}|${norm(t)}|${Math.round(Number(m || 0))}`
 
 export async function GET(request: Request) { return correr(request) }

@@ -79,8 +79,7 @@ function callWallTime(call: any): string | null {
 
 function hostName(call: any): string | null {
   const full = [call.user?.firstName, call.user?.lastName].filter(Boolean).join(" ").trim()
-  // la cuenta "exposure Consulting" es la empresa (superadmin de iClosed), no un closer: queda sin asignar
-  if (!full || /^exposure/i.test(full)) return null
+  if (!full) return null
   return canonicalCloserName(full)
 }
 

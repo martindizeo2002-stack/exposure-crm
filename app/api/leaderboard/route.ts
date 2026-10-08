@@ -358,7 +358,7 @@ export async function GET(request: Request) {
           tipo,
           operacion: (pago as any).operacion || null,
           fecha: (pago as any).fecha || null,
-          closer: (pago as any).closer || null,
+          closer: canonical((pago as any).closer || "") || null,
           cohort: cohort || null,
           comisionable: setterCommissionableCc,
           en_ventana: Boolean(setterWindow),
@@ -414,7 +414,7 @@ export async function GET(request: Request) {
           cerro: Boolean(ag.cerro),
           calificacion: ag.calificacion || null,
           estado: ag.estado || null,
-          closer: (ag as any).closer || null,
+          closer: canonical((ag as any).closer || "") || null,
         })
       }
     }

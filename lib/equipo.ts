@@ -24,7 +24,7 @@ export function settersPara(fecha?: string | null): string[] {
 // Apodos que aparecen en pagos/agendas cargados a mano → nombre canónico.
 const ALIAS: Record<string, string> = {
   alex: "Alex",
-  nahuel: "Nahuel", nawe: "Nahuel",
+  nahuel: "Nahuel", nawe: "Nahuel", exposure: "Nahuel",
   cristian: "Cristian", cris: "Cristian",
   tobias: "Tobias",
   bener: "Bener", benner: "Bener", "bener.salvod": "Bener",
@@ -50,4 +50,4 @@ export function nombreCanonico(value: unknown): string {
 // Nombres completos de closers conocidos, en minúsculas y sin tildes, para
 // reconocer llamadas de venta en Fathom por el título o los participantes.
 // Cristian Lescano y Bener Salvo salen de los títulos de Fathom (11/09). FALTA: apellido de Tobias.
-export const CLOSERS_NOMBRE_COMPLETO = ["alex carrera", "nahuel carballo", "cristian lescano", "bener salvo"]
+export const CLOSERS_NOMBRE_COMPLETO = ["alex carrera", "nahuel carballo", "cristian lescano", "bener salvo", "exposure"]
