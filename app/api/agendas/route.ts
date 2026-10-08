@@ -60,6 +60,7 @@ export async function GET(request: Request) {
     const mine = searchParams.get("mine") === "1"
     const start = searchParams.get("start")
     const end = searchParams.get("end")
+    const qSearch = (searchParams.get("q") || searchParams.get("buscar") || "").trim()
     const pagination = parsePagination(searchParams)
     const includeArchived = searchParams.get("include_archived") === "1"
 
@@ -79,11 +80,15 @@ export async function GET(request: Request) {
 
     const applyDates = (q: any) => {
       if (!includeArchived) q = q.or("estado.is.null,estado.neq.Archivada manualmente")
+      if (qSearch) {
+        q = q.or(`nombre.ilike.%${qSearch}%,telefono.ilike.%${qSearch}%,instagram.ilike.%${qSearch}%`)
+      }
       if (startTs) q = q.gte("fecha_agenda", startTs)
       if (endTs) q = q.lte("fecha_agenda", endTs)
       if (ownerFilter?.name) q = q.ilike(ownerFilter.column, `${ownerFilter.name}%`)
       if (pagination) q = q.range(pagination.from, pagination.to)
-      else if (!start && !end) q = q.limit(1000)
+      else if (!start && !end && !qSearch) q = q.limit(1000)
+      else if (qSearch && !start && !end) q = q.limit(50)
       return q
     }
 

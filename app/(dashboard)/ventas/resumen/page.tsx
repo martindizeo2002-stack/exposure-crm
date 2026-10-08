@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { mutate } from "swr"
 import { Calendar as CalendarIcon,
   PhoneCall,
@@ -19,7 +19,10 @@ import { Calendar as CalendarIcon,
   RefreshCw,
   Award,
   Pencil,
-  Loader2, ArrowUpRight } from "lucide-react"
+  Loader2, ArrowUpRight,
+  Search,
+  X,
+  CalendarDays } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -115,13 +118,34 @@ export default function ResumenVentasPage() {
   })
   const [guardandoLead, setGuardandoLead] = useState(false)
 
-  const abrirEdicionLead = async (c: CallDetalle) => {
-    if (!c.agenda_id) {
+  // Buscador de leads para mover al reporte
+  const [busquedaLead, setBusquedaLead] = useState("")
+  const [resultadosBusqueda, setResultadosBusqueda] = useState<any[]>([])
+  const [buscandoLead, setBuscandoLead] = useState(false)
+  const [moviendoLeadId, setMoviendoLeadId] = useState<string | number | null>(null)
+
+  const abrirEdicionLead = async (c: any) => {
+    const agendaId = c.agenda_id || c.id
+    if (!agendaId) {
       toast.error("No se encontró el ID de la agenda para editar")
       return
     }
-    setCargandoAgendaId(c.agenda_id)
-    setLeadEditando(c)
+    setCargandoAgendaId(agendaId)
+    const leadObj: CallDetalle = {
+      agenda_id: agendaId,
+      nombre: c.nombre || "Lead",
+      closer: c.closer || "Nahuel",
+      arquetipo_macro: c.arquetipo_macro || "SIN CLASIFICAR",
+      subarquetipo: c.subarquetipo || null,
+      lead_score: c.lead_score || c.calificacion || "SIN SCORING",
+      es_calificado: Boolean(c.es_calificado || (c.calificacion && c.calificacion.startsWith("LEAD") && !c.calificacion.includes("D"))),
+      origen: c.fuente || c.origen || "Instagram",
+      resultado: c.resultado || (c.cerro ? "CIERRE" : c.show === false ? "NO SHOW" : "NO CIERRE"),
+      cash_d1: Number(c.cc_dia_1) || 0,
+      ticket_total: Number(c.cc_dia_1) || 0,
+      ...c,
+    }
+    setLeadEditando(leadObj)
     setTabModal("comercial")
     setModalLeadAbierto(true)
 
@@ -287,6 +311,69 @@ export default function ResumenVentasPage() {
       setGuardandoLead(false)
     }
   }
+  // Búsqueda global de leads en todo el CRM (debounce 300ms)
+  useEffect(() => {
+    const term = busquedaLead.trim()
+    if (term.length < 2) {
+      setResultadosBusqueda([])
+      setBuscandoLead(false)
+      return
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setBuscandoLead(true)
+        const res = await fetch(`/api/agendas?q=${encodeURIComponent(term)}&light=1`)
+        if (res.ok) {
+          const list = await res.json()
+          setResultadosBusqueda(Array.isArray(list) ? list : [])
+        }
+      } catch (err) {
+        console.error("Error buscando leads:", err)
+      } finally {
+        setBuscandoLead(false)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [busquedaLead])
+
+  // Mover lead de otra fecha a la fecha seleccionada en el reporte
+  const moverLeadAFecha = async (lead: any, fechaDestino: string) => {
+    try {
+      setMoviendoLeadId(lead.id)
+      const horaOriginal = lead.fecha_closer
+        ? lead.fecha_closer.slice(11, 16)
+        : lead.fecha_agenda
+        ? lead.fecha_agenda.slice(11, 16)
+        : "10:00"
+      const nuevaFecha = `${fechaDestino}T${horaOriginal || "10:00"}:00`
+
+      const res = await fetch("/api/agendas", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: lead.id,
+          fecha_closer: nuevaFecha,
+          fecha_agenda: nuevaFecha,
+        }),
+      })
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}))
+        throw new Error(errJson.error || "No se pudo mover el lead")
+      }
+
+      toast.success(`¡Lead ${lead.nombre || ""} movido al ${fechaDestino} (${horaOriginal})!`)
+      setBusquedaLead("")
+      setResultadosBusqueda([])
+      await cargarResumen()
+      void mutate((key: string) => typeof key === "string" && key.startsWith("/api/agendas"))
+    } catch (err: any) {
+      toast.error(err.message || "Error al mover el lead")
+    } finally {
+      setMoviendoLeadId(null)
+    }
+  }
+
 
 
   const [datos, setDatos] = useState<ResumenPayload | null>(null)
@@ -400,7 +487,31 @@ export default function ResumenVentasPage() {
   const arq = datos?.arquetipos
   const calls = datos?.calls || []
 
-  const callsFiltradas = calls.filter((c) => {
+  // Deduplicación defensiva en UI para garantizar llamadas únicas en cualquier período
+  const callsUnicas = useMemo(() => {
+    const seen = new Set<string>()
+    return calls.filter((c) => {
+      if (c.agenda_id && seen.has(`id:${c.agenda_id}`)) return false
+      if (c.agenda_id) seen.add(`id:${c.agenda_id}`)
+
+      const cleanNom = (c.nombre || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim()
+      const horaStr = (c.hora || "").trim()
+      const fechaStr = (c.fecha || "").trim()
+      if (cleanNom && cleanNom.length >= 4) {
+        const combo = `nhf:${cleanNom}_${fechaStr}_${horaStr}`
+        if (seen.has(combo)) return false
+        seen.add(combo)
+      }
+      return true
+    })
+  }, [calls])
+
+  const callsFiltradas = callsUnicas.filter((c) => {
     if (filtroResultado === "todos") return true
     if (filtroResultado === "cierres") return c.resultado === "CIERRE" || c.resultado === "FEE"
     if (filtroResultado === "calificados") return c.es_calificado
@@ -698,6 +809,141 @@ export default function ResumenVentasPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {/* Columna Izquierda: Detalle de Llamadas (7 Cols) */}
             <div className="space-y-4 lg:col-span-7">
+              {/* Buscador y Reubicador de Leads Global */}
+              <Card className="border-white/10 bg-zinc-900/60 p-3 shadow-sm">
+                <div className="relative">
+                  <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-950/80 px-3 py-2 text-xs focus-within:border-emerald-500/50 transition-colors">
+                    <Search className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <Input
+                      placeholder="Buscar lead en todo el CRM (nombre, teléfono o IG) para mover a este día..."
+                      value={busquedaLead}
+                      onChange={(e) => setBusquedaLead(e.target.value)}
+                      className="h-6 border-0 bg-transparent p-0 text-xs text-white placeholder:text-zinc-500 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    />
+                    {busquedaLead && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-zinc-400 hover:text-white"
+                        onClick={() => {
+                          setBusquedaLead("")
+                          setResultadosBusqueda([])
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {buscandoLead && <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400 shrink-0" />}
+                  </div>
+
+                  {/* Dropdown flotante con resultados de búsqueda */}
+                  {busquedaLead.trim().length >= 2 && (
+                    <div className="mt-2.5 space-y-2 rounded-lg border border-white/10 bg-zinc-950/95 p-2 shadow-xl">
+                      <div className="flex items-center justify-between px-2 py-1 text-[11px] text-zinc-400 border-b border-white/5">
+                        <span>
+                          {buscandoLead
+                            ? "Buscando en la base de datos..."
+                            : `Resultados encontrados (${resultadosBusqueda.length})`}
+                        </span>
+                        <span className="text-[10px] text-zinc-500">
+                          Día destino: <strong className="text-emerald-400">{fecha}</strong>
+                        </span>
+                      </div>
+
+                      {resultadosBusqueda.length === 0 && !buscandoLead ? (
+                        <div className="p-4 text-center text-xs text-zinc-500">
+                          No se encontraron leads con "{busquedaLead}" en el CRM.
+                        </div>
+                      ) : (
+                        <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
+                          {resultadosBusqueda.map((lead: any) => {
+                            const leadFecha = lead.fecha_closer || lead.fecha_agenda || ""
+                            const fechaCorta = leadFecha ? leadFecha.slice(0, 10) : "Sin fecha"
+                            const horaCorta = leadFecha && leadFecha.length >= 16 ? leadFecha.slice(11, 16) : ""
+                            const esMismoDia = fechaCorta === fecha
+                            const moviendo = moviendoLeadId === lead.id
+
+                            return (
+                              <div
+                                key={lead.id}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-md border border-white/5 bg-zinc-900/60 p-2.5 hover:bg-zinc-900 transition-colors"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs font-bold text-white truncate">
+                                      {lead.nombre || "Sin nombre"}
+                                    </span>
+                                    {lead.calificacion && (
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "text-[10px] px-1.5 py-0 h-4 border-white/10",
+                                          lead.calificacion.includes("A") && "border-emerald-500/40 text-emerald-300 bg-emerald-500/10",
+                                          lead.calificacion.includes("B") && "border-blue-500/40 text-blue-300 bg-blue-500/10",
+                                          lead.calificacion.includes("C") && "border-amber-500/40 text-amber-300 bg-amber-500/10",
+                                          lead.calificacion.includes("D") && "border-zinc-500/40 text-zinc-400 bg-zinc-500/10"
+                                        )}
+                                      >
+                                        {lead.calificacion}
+                                      </Badge>
+                                    )}
+                                    {lead.closer && (
+                                      <span className="text-[10px] text-zinc-400">
+                                        Closer: <strong className="text-zinc-300">{lead.closer}</strong>
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="mt-1 flex items-center gap-3 text-[11px] text-zinc-400 flex-wrap">
+                                    {lead.telefono && <span>📞 {lead.telefono}</span>}
+                                    {lead.instagram && <span>📸 @{lead.instagram.replace(/^@/, "")}</span>}
+                                    <span className={cn(
+                                      "font-medium",
+                                      esMismoDia ? "text-emerald-400" : "text-amber-400"
+                                    )}>
+                                      📅 {esMismoDia ? `En este día (${horaCorta || "10:00"})` : `Agendado: ${fechaCorta} ${horaCorta}`}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={moviendo}
+                                    onClick={() => moverLeadAFecha(lead, fecha)}
+                                    className="h-7 text-[11px] px-2.5 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200"
+                                    title={`Mover lead al día del reporte (${fecha})`}
+                                  >
+                                    {moviendo ? (
+                                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                    ) : (
+                                      <CalendarDays className="h-3 w-3 mr-1 text-emerald-400" />
+                                    )}
+                                    Mover a {fecha}
+                                  </Button>
+
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => abrirEdicionLead(lead)}
+                                    className="h-7 text-[11px] px-2 text-zinc-300 hover:text-white hover:bg-white/5"
+                                    title="Abrir ficha completa del lead"
+                                  >
+                                    <Pencil className="h-3 w-3 mr-1 text-zinc-400" />
+                                    Ficha
+                                  </Button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </Card>
+
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-white">
                   Llamadas del período ({callsFiltradas.length})
@@ -1303,7 +1549,22 @@ export default function ResumenVentasPage() {
                   </div>
 
                   <div>
-                    <Label className="text-zinc-300 text-xs">Fecha y hora de llamada {formEdit.estado === "Reprogramó" ? "(Reprogramar)" : ""}</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-zinc-300 text-xs">
+                        Fecha y hora de llamada {formEdit.estado === "Reprogramó" ? "(Reprogramar)" : ""}
+                      </Label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const horaActual = formEdit.fecha_closer && formEdit.fecha_closer.length >= 16 ? formEdit.fecha_closer.slice(11, 16) : "10:00"
+                          setFormEdit(prev => ({ ...prev, fecha_closer: `${fecha}T${horaActual || "10:00"}` }))
+                          toast.info(`Fecha ajustada al día del reporte (${fecha})`)
+                        }}
+                        className="text-[11px] text-emerald-400 hover:text-emerald-300 underline font-medium cursor-pointer"
+                      >
+                        Mover a fecha del reporte ({fecha})
+                      </button>
+                    </div>
                     <Input
                       type="datetime-local"
                       className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white"

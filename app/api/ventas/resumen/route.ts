@@ -120,20 +120,27 @@ export async function GET(request: NextRequest) {
       fechaDesde = fecha
       fechaHasta = fecha
     } else if (periodo === "semana" && !searchParams.get("fecha_desde")) {
-      const curr = new Date(fecha)
-      const first = curr.getDate() - curr.getDay() + 1
-      const last = first + 6
-      const d1 = new Date(curr.setDate(first))
-      const d2 = new Date(curr.setDate(last))
-      fechaDesde = d1.toISOString().slice(0, 10)
-      fechaHasta = d2.toISOString().slice(0, 10)
+      const parts = fecha.split("-").map(Number)
+      const d = new Date(parts[0], parts[1] - 1, parts[2])
+      const day = d.getDay() // 0 = Domingo, 1 = Lunes
+      const diffToMonday = day === 0 ? -6 : 1 - day
+      const monday = new Date(parts[0], parts[1] - 1, parts[2] + diffToMonday)
+      const sunday = new Date(parts[0], parts[1] - 1, parts[2] + diffToMonday + 6)
+      const fmt = (x: Date) =>
+        `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`
+      fechaDesde = fmt(monday)
+      fechaHasta = fmt(sunday)
     } else if (periodo === "mes" && !searchParams.get("fecha_desde")) {
-      const mes = fecha.slice(0, 7)
-      fechaDesde = `${mes}-01`
-      fechaHasta = `${mes}-31`
+      const parts = fecha.split("-").map(Number)
+      const year = parts[0]
+      const month = parts[1]
+      const lastDay = new Date(year, month, 0).getDate()
+      const mStr = String(month).padStart(2, "0")
+      fechaDesde = `${year}-${mStr}-01`
+      fechaHasta = `${year}-${mStr}-${String(lastDay).padStart(2, "0")}`
     }
 
-    // Consultamos agendas reales del CRM por fecha_closer
+    // Consultamos agendas reales del CRM por fecha_closer (excluyendo registros archivados manualmente)
     let query = sb
       .from("agendas")
       .select(
@@ -141,6 +148,7 @@ export async function GET(request: NextRequest) {
       )
       .gte("fecha_closer", `${fechaDesde}T00:00:00`)
       .lte("fecha_closer", `${fechaHasta}T23:59:59`)
+      .or("estado.is.null,estado.neq.Archivada manualmente")
       .order("fecha_closer", { ascending: true })
 
     if (closer && closer !== "todos") {
@@ -150,7 +158,86 @@ export async function GET(request: NextRequest) {
     const { data: agendas, error: errAg } = await query
     if (errAg) throw new Error(errAg.message)
 
-    const agendaList = agendas || []
+    // Filtrar archivadas defensivamente y deduplicar en memoria por identidad y fecha
+    const rawAgendas = (agendas || []).filter(
+      (a: any) => a.estado !== "Archivada manualmente" && a.estado !== "Archivada"
+    )
+
+    const normPhone = (p?: string | null) => (p || "").replace(/\D/g, "")
+    const normIg = (i?: string | null) => (i || "").replace(/[@\s]/g, "").toLowerCase()
+    const normName = (n?: string | null) =>
+      (n || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim()
+
+    function getLeadCompletenessScore(item: any): number {
+      let score = 0
+      if (item.calificaba_realmente) score += 20
+      if (item.calificacion) score += 15
+      if (item.lead_score_grade === "A") score += 25
+      else if (item.lead_score_grade === "B") score += 20
+      else if (item.lead_score_grade === "C") score += 15
+      else if (item.lead_score_grade === "D") score += 10
+      if (item.cerro) score += 50
+      if (item.show === true) score += 30
+      if (item.medio_de_pago || item.cc_dia_1) score += 20
+      if (item.ocupacion) score += 10
+      if (item.problema_actual) score += 10
+      if (item.ingresos) score += 5
+      if (item.inversion) score += 5
+      if (item.motivo_urgencia) score += 5
+      if (item.intentos_previos) score += 5
+      if (item.link_fathom) score += 10
+      return score
+    }
+
+    const agendaList: typeof rawAgendas = []
+    const clusters: Record<string, typeof rawAgendas> = {}
+
+    for (const item of rawAgendas) {
+      const p = normPhone(item.telefono)
+      const ig = normIg(item.instagram)
+      const nm = normName(item.nombre)
+      const datePart = (item.fecha_closer || item.fecha_agenda || "").slice(0, 10)
+
+      let clusterKey = ""
+      if (p && p.length >= 7) {
+        clusterKey = `phone:${p}_${datePart}`
+      } else if (ig && ig.length >= 3) {
+        clusterKey = `ig:${ig}_${datePart}`
+      } else if (nm && nm.length >= 5) {
+        clusterKey = `nm:${nm}_${datePart}`
+      } else {
+        clusterKey = `id:${item.id}`
+      }
+
+      if (!clusters[clusterKey]) {
+        clusters[clusterKey] = []
+      }
+      clusters[clusterKey].push(item)
+    }
+
+    for (const key of Object.keys(clusters)) {
+      const items = clusters[key]
+      if (items.length === 1) {
+        agendaList.push(items[0])
+      } else {
+        items.sort((a, b) => getLeadCompletenessScore(b) - getLeadCompletenessScore(a))
+        const winner = { ...items[0] }
+        for (let i = 1; i < items.length; i++) {
+          const other = items[i]
+          for (const field of Object.keys(other)) {
+            if ((winner as any)[field] === null || (winner as any)[field] === undefined || (winner as any)[field] === "") {
+              (winner as any)[field] = (other as any)[field]
+            }
+          }
+        }
+        agendaList.push(winner)
+      }
+    }
     const agendaIds = agendaList.map((a) => a.id).filter(Boolean)
 
     // Consultamos pagos reales en el rango

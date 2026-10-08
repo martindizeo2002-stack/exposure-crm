@@ -53,7 +53,7 @@ export async function GET() {
     const [agendas, pagos, cuotas, clientes, metricas, settingDias] = await Promise.all([
       todas<Record<string, unknown>>((a, b) => sb.from("agendas")
         .select("id,nombre,fecha_agenda,fecha_closer,fecha_lead,fecha_tc,closer,setter,fuente,recurso,angulo_entrada,calificacion,calificaba_realmente,show,cerro,estado,tipo_cierre,seguimiento_estado,seguimiento_nota,seguimiento_actualizado_at,motivo_urgencia,operacion,plan_de_pago,cc_dia_1,created_at,lead_score_grade,lead_score")
-        .or(`fecha_agenda.gte.${desdeIso},fecha_agenda.is.null`)
+        .or(`fecha_agenda.gte.${desdeIso},fecha_agenda.is.null`).or("estado.is.null,estado.neq.Archivada manualmente")
         .order("fecha_agenda", { ascending: false })
         .range(a, b)),
       todas<Record<string, unknown>>((a, b) => sb.from("pagos")

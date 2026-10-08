@@ -234,7 +234,7 @@ export async function POST(request: Request) {
       const desde = new Date(new Date(fecha).getTime() - 11 * 86400000).toISOString().slice(0, 10)
       const hasta = new Date(new Date(fecha).getTime() + 11 * 86400000).toISOString().slice(0, 10)
       const { data: filas, error: eAg } = await sb.from("agendas").select("id,nombre,instagram,fecha_agenda,fecha_closer,person_id,fuente,recurso,angulo_entrada,problema_actual,motivo_urgencia,setter")
-        .or(`fecha_agenda.gte.${desde},fecha_closer.gte.${desde}`).or(`fecha_agenda.lte.${hasta}T23:59:59,fecha_closer.lte.${hasta}T23:59:59`).limit(2000)
+        .or(`fecha_agenda.gte.${desde},fecha_closer.gte.${desde}`).or(`fecha_agenda.lte.${hasta}T23:59:59,fecha_closer.lte.${hasta}T23:59:59`).or("estado.is.null,estado.neq.Archivada manualmente").limit(2000)
       if (eAg) throw new Error(eAg.message)
       const agendas: AgendaCruce[] = (filas || []).map((a) => ({ ...a, fecha: (a.fecha_agenda || a.fecha_closer || null) as string | null }))
       const sinAgenda: string[] = [], ambiguos: string[] = []
