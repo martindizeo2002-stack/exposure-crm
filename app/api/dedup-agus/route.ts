@@ -9,94 +9,58 @@ export async function GET(request: Request) {
     const action = searchParams.get("action")
     const sb = createSupabaseAdmin()
 
-    // 1. Buscar todos los registros de Agus Garcia
-    const { data: records, error } = await sb
-      .from("agendas")
-      .select("id, nombre, closer, setter, fecha_agenda, fecha_closer, show, cerro, estado, calificacion, motivo_no_cierre, created_at")
-      .or("nombre.ilike.%agus%garcia%,nombre.ilike.%agustin%garcia%")
-      .order("id", { ascending: true })
+    const originalId = "998262ee-2eaa-4902-ab61-ecb8d2122770"
+    const duplicateIds = [
+      "00480eaa-5d80-4d43-ad59-7c617ffdd4da",
+      "a68ba429-2424-425f-84aa-e308ae883ebe",
+    ]
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    let actionResults = null
 
-    if (!records || records.length === 0) {
-      const { data: broader, error: bErr } = await sb
+    if (action === "archive_duplicates") {
+      // 1. Archivar los dos duplicados
+      const { data: archData, error: archErr } = await sb
         .from("agendas")
-        .select("id, nombre, closer, setter, fecha_agenda, fecha_closer, show, cerro, estado, calificacion, motivo_no_cierre, created_at")
-        .or("nombre.ilike.%agus%,nombre.ilike.%garcia%")
-        .order("id", { ascending: true })
+        .update({
+          estado: "Archivada manualmente",
+          motivo_no_cierre: "Archivado manual: Duplicado de llamada original del 06/10",
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", duplicateIds)
+        .select("id, nombre, estado")
 
-      return NextResponse.json({
-        foundDirect: 0,
-        broaderResults: broader || [],
-        bErr: bErr?.message,
-      })
-    }
+      // 2. Asegurar que el registro original esté activo bajo Nahuel
+      const { data: origData, error: origErr } = await sb
+        .from("agendas")
+        .update({
+          closer: "Nahuel",
+          estado: "Se presentó",
+          calificacion: "LEAD C",
+          motivo_no_cierre: "Miedo",
+          show: true,
+          cerro: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", originalId)
+        .select("id, nombre, closer, estado, calificacion, motivo_no_cierre")
 
-    let archivedResult = null
-
-    if (action === "archive_oct8") {
-      // Identificar el registro del 8/10 y el del 6/10
-      const recOct8 = records.find(r => 
-        (r.fecha_closer && r.fecha_closer.includes("2026-10-08")) ||
-        (r.fecha_agenda && r.fecha_agenda.includes("2026-10-08"))
-      )
-
-      if (recOct8) {
-        const { data: arch, error: aErr } = await sb
-          .from("agendas")
-          .update({
-            estado: "Archivada manualmente",
-            motivo_no_cierre: "Archivado manual: Duplicado de llamada tomada el 06/10",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", recOct8.id)
-          .select()
-
-        archivedResult = { archivedId: recOct8.id, data: arch, error: aErr?.message }
-      } else if (records.length > 1) {
-        const toArchive = records[records.length - 1]
-        const { data: arch, error: aErr } = await sb
-          .from("agendas")
-          .update({
-            estado: "Archivada manualmente",
-            motivo_no_cierre: "Archivado manual: Duplicado",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", toArchive.id)
-          .select()
-
-        archivedResult = { archivedId: toArchive.id, fallback: true, data: arch, error: aErr?.message }
-      }
-
-      // Asegurar que el registro del 6/10 quede impecable con Nahuel
-      const recOct6 = records.find(r => 
-        (r.fecha_closer && r.fecha_closer.includes("2026-10-06")) ||
-        (r.fecha_agenda && r.fecha_agenda.includes("2026-10-06"))
-      ) || records[0]
-
-      if (recOct6 && recOct6.id !== (archivedResult?.archivedId)) {
-        await sb
-          .from("agendas")
-          .update({
-            closer: "Nahuel",
-            estado: recOct6.estado === "Archivada manualmente" ? "Seguimiento" : recOct6.estado,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", recOct6.id)
+      actionResults = {
+        archivedDuplicates: archData,
+        archError: archErr?.message,
+        preservedOriginal: origData,
+        origError: origErr?.message,
       }
     }
 
-    const { data: finalRecords } = await sb
+    // Consultar estado de los tres registros
+    const { data: currentRecords } = await sb
       .from("agendas")
       .select("id, nombre, closer, setter, fecha_agenda, fecha_closer, show, cerro, estado, calificacion, motivo_no_cierre")
-      .in("id", records.map(r => r.id))
+      .in("id", [originalId, ...duplicateIds])
 
     return NextResponse.json({
-      recordsFound: records,
-      archivedResult,
-      finalRecords,
+      actionResults,
+      currentRecords,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
