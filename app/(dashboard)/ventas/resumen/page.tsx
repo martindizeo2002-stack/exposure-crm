@@ -128,7 +128,22 @@ export default function ResumenVentasPage() {
   const [moviendoLeadId, setMoviendoLeadId] = useState<string | number | null>(null)
 
   // Auditoría interactiva de métricas
+  const [globoBuscadorAbierto, setGloboBuscadorAbierto] = useState(false)
   const [metricaAuditoriaKey, setMetricaAuditoriaKey] = useState<string | null>(null)
+
+  // Shortcut Ctrl+K / Cmd+K para abrir el Globo Buscador
+  useEffect(() => {
+    /* keydown-globo-shortcut */
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setGloboBuscadorAbierto((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
 
   const abrirEdicionLead = async (c: any) => {
     const agendaId = c.agenda_id || c.id
@@ -547,6 +562,20 @@ export default function ResumenVentasPage() {
         {/* Acciones principales */}
         <div className="flex items-center gap-2">
           <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setGloboBuscadorAbierto(true)}
+            className="border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200 flex items-center gap-1.5 shadow-sm font-semibold"
+            title="Abrir Globo Buscador de Leads (Ctrl+K)"
+          >
+            <span className="text-base">🎈</span>
+            <span>Globo Buscador</span>
+            <kbd className="ml-1 hidden rounded bg-emerald-950/60 px-1.5 py-0.5 text-[10px] font-mono text-emerald-400 border border-emerald-500/30 sm:inline-block">
+              Ctrl K
+            </kbd>
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             onClick={copiarWhatsApp}
@@ -680,13 +709,14 @@ export default function ResumenVentasPage() {
           {/* Scorecards Principales (Interactivos para auditar fórmula y leads) */}
           {metricas && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] text-zinc-400 font-medium flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+              <div className="flex items-center justify-between px-1 flex-wrap gap-2">
+                <span className="text-xs text-zinc-300 font-semibold flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-emerald-400" />
                   Métricas Operativas del Período
                 </span>
-                <span className="text-[10px] text-emerald-400/90 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 font-medium">
-                  💡 Hacé clic en cualquier métrica para auditar su fórmula y ver los leads que la componen
+                <span className="text-[11px] text-emerald-300 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30 font-medium flex items-center gap-1.5 shadow-sm">
+                  <span>💡</span>
+                  <span>Cada métrica es un botón: pulsá <strong>&quot;Ver información&quot;</strong> para ver su fórmula y listado de leads reales</span>
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
@@ -695,17 +725,32 @@ export default function ResumenVentasPage() {
                   onClick={() => setMetricaAuditoriaKey("programadas")}
                   role="button"
                   tabIndex={0}
-                  className="border-white/10 bg-zinc-900/40 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm"
-                  title="Clic para auditar Llamadas Programadas"
+                  className="border-white/10 bg-zinc-900/50 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-zinc-800/70 hover:shadow-lg hover:shadow-emerald-500/5 active:scale-[0.99] group flex flex-col justify-between"
+                  title="Pulsá para ver información de Llamadas Programadas"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground group-hover:text-white transition-colors">Programadas</span>
-                    <Info className="h-3.5 w-3.5 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-zinc-300 group-hover:text-white transition-colors">Programadas</span>
+                      <Info className="h-3.5 w-3.5 text-zinc-400 group-hover:text-emerald-400 transition-colors" />
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-white">{metricas.programadas}</div>
+                    <span className="text-[11px] text-zinc-400">
+                      {metricas.calificadas_programadas} calificadas
+                    </span>
                   </div>
-                  <div className="mt-2 text-2xl font-black text-white">{metricas.programadas}</div>
-                  <span className="text-[11px] text-zinc-400">
-                    {metricas.calificadas_programadas} calificadas
-                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMetricaAuditoriaKey("programadas");
+                    }}
+                    className="w-full mt-3 h-7 text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 flex items-center justify-center gap-1 shadow-sm transition-all"
+                  >
+                    <Info className="h-3 w-3 text-emerald-400" />
+                    <span>Ver información</span>
+                  </Button>
                 </Card>
 
                 {/* Presentadas (Show Rate) */}
@@ -713,17 +758,32 @@ export default function ResumenVentasPage() {
                   onClick={() => setMetricaAuditoriaKey("presentadas")}
                   role="button"
                   tabIndex={0}
-                  className="border-white/10 bg-zinc-900/40 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm"
-                  title="Clic para auditar Llamadas Presentadas"
+                  className="border-white/10 bg-zinc-900/50 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-zinc-800/70 hover:shadow-lg hover:shadow-emerald-500/5 active:scale-[0.99] group flex flex-col justify-between"
+                  title="Pulsá para ver información de Llamadas Presentadas"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground group-hover:text-white transition-colors">Presentadas</span>
-                    <Info className="h-3.5 w-3.5 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-zinc-300 group-hover:text-white transition-colors">Presentadas</span>
+                      <Info className="h-3.5 w-3.5 text-zinc-400 group-hover:text-emerald-400 transition-colors" />
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-white">{metricas.presentadas}</div>
+                    <span className="text-[11px] text-emerald-400 font-medium">
+                      {metricas.show_rate_pct.toFixed(1).replace(".", ",")} % show rate
+                    </span>
                   </div>
-                  <div className="mt-2 text-2xl font-black text-white">{metricas.presentadas}</div>
-                  <span className="text-[11px] text-emerald-400 font-medium">
-                    {metricas.show_rate_pct.toFixed(1).replace(".", ",")} % show rate
-                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMetricaAuditoriaKey("presentadas");
+                    }}
+                    className="w-full mt-3 h-7 text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 flex items-center justify-center gap-1 shadow-sm transition-all"
+                  >
+                    <Info className="h-3 w-3 text-emerald-400" />
+                    <span>Ver información</span>
+                  </Button>
                 </Card>
 
                 {/* Calificadas Presentadas */}
@@ -731,17 +791,32 @@ export default function ResumenVentasPage() {
                   onClick={() => setMetricaAuditoriaKey("calificadas_presentadas")}
                   role="button"
                   tabIndex={0}
-                  className="border-white/10 bg-zinc-900/40 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-blue-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm"
-                  title="Clic para auditar Calificadas Presentadas"
+                  className="border-blue-500/20 bg-zinc-900/50 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-blue-500/50 hover:bg-zinc-800/70 hover:shadow-lg hover:shadow-blue-500/5 active:scale-[0.99] group flex flex-col justify-between"
+                  title="Pulsá para ver información de Calificadas Presentadas"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground group-hover:text-white transition-colors">Calif. Presentadas</span>
-                    <Info className="h-3.5 w-3.5 text-zinc-500 group-hover:text-blue-400 transition-colors" />
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-blue-300 group-hover:text-white transition-colors">Calif. Presentadas</span>
+                      <Info className="h-3.5 w-3.5 text-blue-400 group-hover:text-blue-300 transition-colors" />
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-blue-400">{metricas.calificadas_presentadas}</div>
+                    <span className="text-[11px] text-zinc-400">
+                      {metricas.show_rate_calificados_pct.toFixed(1).replace(".", ",")} % show calif
+                    </span>
                   </div>
-                  <div className="mt-2 text-2xl font-black text-blue-400">{metricas.calificadas_presentadas}</div>
-                  <span className="text-[11px] text-zinc-400">
-                    {metricas.show_rate_calificados_pct.toFixed(1).replace(".", ",")} % show calif
-                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMetricaAuditoriaKey("calificadas_presentadas");
+                    }}
+                    className="w-full mt-3 h-7 text-[11px] font-semibold bg-blue-500/10 hover:bg-blue-500/25 text-blue-300 hover:text-blue-200 border border-blue-500/30 flex items-center justify-center gap-1 shadow-sm transition-all"
+                  >
+                    <Info className="h-3 w-3 text-blue-400" />
+                    <span>Ver información</span>
+                  </Button>
                 </Card>
 
                 {/* Cierres & TC */}
@@ -749,17 +824,32 @@ export default function ResumenVentasPage() {
                   onClick={() => setMetricaAuditoriaKey("cierres")}
                   role="button"
                   tabIndex={0}
-                  className="border-emerald-500/30 bg-emerald-500/5 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-400 hover:bg-emerald-500/10 active:scale-[0.99] group shadow-sm"
-                  title="Clic para auditar Cierres y Tasa de Conversión"
+                  className="border-emerald-500/30 bg-emerald-500/5 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-400 hover:bg-emerald-500/10 hover:shadow-lg hover:shadow-emerald-500/10 active:scale-[0.99] group flex flex-col justify-between"
+                  title="Pulsá para ver información de Cierres y Tasa de Conversión"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-emerald-400 group-hover:text-emerald-300 transition-colors">Cierres</span>
-                    <Info className="h-3.5 w-3.5 text-emerald-500 group-hover:text-emerald-300 transition-colors" />
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-emerald-400 group-hover:text-emerald-300 transition-colors">Cierres</span>
+                      <Info className="h-3.5 w-3.5 text-emerald-500 group-hover:text-emerald-300 transition-colors" />
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-emerald-400">{metricas.cierres}</div>
+                    <span className="text-[11px] text-emerald-300 font-medium">
+                      {metricas.tc_calificadas_pct.toFixed(1).replace(".", ",")} % s/calif
+                    </span>
                   </div>
-                  <div className="mt-2 text-2xl font-black text-emerald-400">{metricas.cierres}</div>
-                  <span className="text-[11px] text-emerald-300 font-medium">
-                    {metricas.tc_calificadas_pct.toFixed(1).replace(".", ",")} % s/calif
-                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMetricaAuditoriaKey("cierres");
+                    }}
+                    className="w-full mt-3 h-7 text-[11px] font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 hover:text-emerald-100 border border-emerald-500/40 flex items-center justify-center gap-1 shadow-sm transition-all"
+                  >
+                    <Info className="h-3 w-3 text-emerald-400" />
+                    <span>Ver información</span>
+                  </Button>
                 </Card>
 
                 {/* Cash D1 */}
@@ -767,17 +857,32 @@ export default function ResumenVentasPage() {
                   onClick={() => setMetricaAuditoriaKey("cash_d1")}
                   role="button"
                   tabIndex={0}
-                  className="border-emerald-500/30 bg-emerald-500/5 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-400 hover:bg-emerald-500/10 active:scale-[0.99] group shadow-sm"
-                  title="Clic para auditar Cash Recaudado Día 1"
+                  className="border-emerald-500/30 bg-emerald-500/5 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-400 hover:bg-emerald-500/10 hover:shadow-lg hover:shadow-emerald-500/10 active:scale-[0.99] group flex flex-col justify-between"
+                  title="Pulsá para ver información de Cash Recaudado Día 1"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-emerald-400 group-hover:text-emerald-300 transition-colors">Cash D1</span>
-                    <Info className="h-3.5 w-3.5 text-emerald-500 group-hover:text-emerald-300 transition-colors" />
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-emerald-400 group-hover:text-emerald-300 transition-colors">Cash D1</span>
+                      <Info className="h-3.5 w-3.5 text-emerald-500 group-hover:text-emerald-300 transition-colors" />
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-emerald-400">
+                      ${metricas.cash_d1.toLocaleString("es-AR")}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">USD directo</span>
                   </div>
-                  <div className="mt-2 text-2xl font-black text-emerald-400">
-                    ${metricas.cash_d1.toLocaleString("es-AR")}
-                  </div>
-                  <span className="text-[11px] text-muted-foreground">USD directo</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMetricaAuditoriaKey("cash_d1");
+                    }}
+                    className="w-full mt-3 h-7 text-[11px] font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 hover:text-emerald-100 border border-emerald-500/40 flex items-center justify-center gap-1 shadow-sm transition-all"
+                  >
+                    <Info className="h-3 w-3 text-emerald-400" />
+                    <span>Ver información</span>
+                  </Button>
                 </Card>
 
                 {/* Ticket Contratado */}
@@ -785,119 +890,205 @@ export default function ResumenVentasPage() {
                   onClick={() => setMetricaAuditoriaKey("ticket_total")}
                   role="button"
                   tabIndex={0}
-                  className="border-white/10 bg-zinc-900/40 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm"
-                  title="Clic para auditar Ticket Contratado Total"
+                  className="border-white/10 bg-zinc-900/50 p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-zinc-500/50 hover:bg-zinc-800/70 hover:shadow-lg hover:shadow-white/5 active:scale-[0.99] group flex flex-col justify-between"
+                  title="Pulsá para ver información de Ticket Contratado Total"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground group-hover:text-white transition-colors">Ticket Contratado</span>
-                    <Info className="h-3.5 w-3.5 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-zinc-300 group-hover:text-white transition-colors">Ticket Contratado</span>
+                      <Info className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-200 transition-colors" />
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-white">
+                      ${metricas.ticket_total.toLocaleString("es-AR")}
+                    </div>
+                    <span className="text-[11px] text-zinc-400">USD total</span>
                   </div>
-                  <div className="mt-2 text-2xl font-black text-white">
-                    ${metricas.ticket_total.toLocaleString("es-AR")}
-                  </div>
-                  <span className="text-[11px] text-zinc-400">USD total</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMetricaAuditoriaKey("ticket_total");
+                    }}
+                    className="w-full mt-3 h-7 text-[11px] font-semibold bg-white/5 hover:bg-white/15 text-zinc-200 hover:text-white border border-white/20 flex items-center justify-center gap-1 shadow-sm transition-all"
+                  >
+                    <Info className="h-3 w-3 text-zinc-300" />
+                    <span>Ver información</span>
+                  </Button>
                 </Card>
               </div>
             </div>
           )}
 
           {/* Distribución por Arquetipos (Interactivos para auditar composición) */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-            {/* Dueño de Negocio */}
-            <Card
-              onClick={() => setMetricaAuditoriaKey("dueno_negocio")}
-              role="button"
-              tabIndex={0}
-              className="border-emerald-500/20 bg-emerald-500/[0.03] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-emerald-500/[0.08] active:scale-[0.99] group shadow-sm"
-              title="Clic para auditar leads de Dueño de Negocio"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wide group-hover:text-emerald-300">Dueño de Negocio</span>
-                <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px]">Macro · Auditar</Badge>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs text-zinc-300 font-semibold flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-blue-400" />
+                Arquetipos de Leads del Período
+              </span>
+              <span className="text-[11px] text-zinc-400">
+                Pulsá cualquier arquetipo para ver los leads específicos que lo integran
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+              {/* Dueño de Negocio */}
+              <Card
+                onClick={() => setMetricaAuditoriaKey("dueno_negocio")}
+                role="button"
+                tabIndex={0}
+                className="border-emerald-500/20 bg-emerald-500/[0.03] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-emerald-500/50 hover:bg-emerald-500/[0.08] active:scale-[0.99] group shadow-sm flex flex-col justify-between"
+                title="Pulsá para ver información de Dueño de Negocio"
+              >
                 <div>
-                  <span className="text-2xl font-black">{arq?.dueno_negocio.total || 0}</span>
-                  <span className="text-xs text-muted-foreground ml-1.5">calls</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wide group-hover:text-emerald-300">Dueño de Negocio</span>
+                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px]">Macro</Badge>
+                  </div>
+                  <div className="mt-3 flex items-baseline justify-between">
+                    <div>
+                      <span className="text-2xl font-black text-white">{arq?.dueno_negocio.total || 0}</span>
+                      <span className="text-xs text-muted-foreground ml-1.5">calls</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-emerald-400">{arq?.dueno_negocio.cierres || 0} cierres</span>
+                      <span className="block text-[11px] text-muted-foreground">${arq?.dueno_negocio.cash_d1 || 0} USD</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-bold text-emerald-400">{arq?.dueno_negocio.cierres || 0} cierres</span>
-                  <span className="block text-[11px] text-muted-foreground">${arq?.dueno_negocio.cash_d1 || 0} USD</span>
-                </div>
-              </div>
-            </Card>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMetricaAuditoriaKey("dueno_negocio");
+                  }}
+                  className="w-full mt-3 h-7 text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 flex items-center justify-center gap-1 shadow-sm transition-all"
+                >
+                  <Info className="h-3 w-3 text-emerald-400" />
+                  <span>Ver información y leads</span>
+                </Button>
+              </Card>
 
-            {/* Empleado 9-5 */}
-            <Card
-              onClick={() => setMetricaAuditoriaKey("empleado")}
-              role="button"
-              tabIndex={0}
-              className="border-blue-500/20 bg-blue-500/[0.03] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-blue-500/50 hover:bg-blue-500/[0.08] active:scale-[0.99] group shadow-sm"
-              title="Clic para auditar leads de Empleado"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-blue-400 uppercase tracking-wide group-hover:text-blue-300">Empleado (9 a 5)</span>
-                <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[10px]">Macro · Auditar</Badge>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between">
+              {/* Empleado 9-5 */}
+              <Card
+                onClick={() => setMetricaAuditoriaKey("empleado")}
+                role="button"
+                tabIndex={0}
+                className="border-blue-500/20 bg-blue-500/[0.03] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-blue-500/50 hover:bg-blue-500/[0.08] active:scale-[0.99] group shadow-sm flex flex-col justify-between"
+                title="Pulsá para ver información de Empleado"
+              >
                 <div>
-                  <span className="text-2xl font-black">{arq?.empleado.total || 0}</span>
-                  <span className="text-xs text-muted-foreground ml-1.5">calls</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wide group-hover:text-blue-300">Empleado (9 a 5)</span>
+                    <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[10px]">Macro</Badge>
+                  </div>
+                  <div className="mt-3 flex items-baseline justify-between">
+                    <div>
+                      <span className="text-2xl font-black text-white">{arq?.empleado.total || 0}</span>
+                      <span className="text-xs text-muted-foreground ml-1.5">calls</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-blue-400">{arq?.empleado.cierres || 0} cierres</span>
+                      <span className="block text-[11px] text-muted-foreground">${arq?.empleado.cash_d1 || 0} USD</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-bold text-blue-400">{arq?.empleado.cierres || 0} cierres</span>
-                  <span className="block text-[11px] text-muted-foreground">${arq?.empleado.cash_d1 || 0} USD</span>
-                </div>
-              </div>
-            </Card>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMetricaAuditoriaKey("empleado");
+                  }}
+                  className="w-full mt-3 h-7 text-[11px] font-semibold bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 hover:text-blue-200 border border-blue-500/30 flex items-center justify-center gap-1 shadow-sm transition-all"
+                >
+                  <Info className="h-3 w-3 text-blue-400" />
+                  <span>Ver información y leads</span>
+                </Button>
+              </Card>
 
-            {/* Estudiante */}
-            <Card
-              onClick={() => setMetricaAuditoriaKey("estudiante")}
-              role="button"
-              tabIndex={0}
-              className="border-white/10 bg-white/[0.02] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-amber-500/50 hover:bg-amber-500/[0.05] active:scale-[0.99] group shadow-sm"
-              title="Clic para auditar leads de Estudiante"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide group-hover:text-amber-300">Estudiante</span>
-                <Badge variant="outline" className="border-white/10 text-muted-foreground text-[10px]">Macro · Auditar</Badge>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between">
+              {/* Estudiante */}
+              <Card
+                onClick={() => setMetricaAuditoriaKey("estudiante")}
+                role="button"
+                tabIndex={0}
+                className="border-white/10 bg-white/[0.02] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-amber-500/50 hover:bg-amber-500/[0.05] active:scale-[0.99] group shadow-sm flex flex-col justify-between"
+                title="Pulsá para ver información de Estudiante"
+              >
                 <div>
-                  <span className="text-2xl font-black">{arq?.estudiante.total || 0}</span>
-                  <span className="text-xs text-muted-foreground ml-1.5">calls</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide group-hover:text-amber-300">Estudiante</span>
+                    <Badge variant="outline" className="border-white/10 text-muted-foreground text-[10px]">Macro</Badge>
+                  </div>
+                  <div className="mt-3 flex items-baseline justify-between">
+                    <div>
+                      <span className="text-2xl font-black text-white">{arq?.estudiante.total || 0}</span>
+                      <span className="text-xs text-muted-foreground ml-1.5">calls</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-zinc-300 group-hover:text-amber-300">{arq?.estudiante.cierres || 0} cierres</span>
+                      <span className="block text-[11px] text-muted-foreground">${arq?.estudiante.cash_d1 || 0} USD</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-bold text-zinc-300 group-hover:text-amber-300">{arq?.estudiante.cierres || 0} cierres</span>
-                  <span className="block text-[11px] text-muted-foreground">${arq?.estudiante.cash_d1 || 0} USD</span>
-                </div>
-              </div>
-            </Card>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMetricaAuditoriaKey("estudiante");
+                  }}
+                  className="w-full mt-3 h-7 text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 border border-amber-500/30 flex items-center justify-center gap-1 shadow-sm transition-all"
+                >
+                  <Info className="h-3 w-3 text-amber-400" />
+                  <span>Ver información y leads</span>
+                </Button>
+              </Card>
 
-            {/* Sin Clasificar */}
-            <Card
-              onClick={() => setMetricaAuditoriaKey("sin_clasificar")}
-              role="button"
-              tabIndex={0}
-              className="border-amber-500/20 bg-amber-500/[0.03] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-zinc-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm"
-              title="Clic para auditar leads Sin Clasificar"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wide group-hover:text-zinc-200">Sin Clasificar</span>
-                <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-[10px]">Pendiente · Auditar</Badge>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between">
+              {/* Sin Clasificar */}
+              <Card
+                onClick={() => setMetricaAuditoriaKey("sin_clasificar")}
+                role="button"
+                tabIndex={0}
+                className="border-amber-500/20 bg-amber-500/[0.03] p-4 cursor-pointer transition-all hover:scale-[1.02] hover:border-zinc-500/50 hover:bg-zinc-800/60 active:scale-[0.99] group shadow-sm flex flex-col justify-between"
+                title="Pulsá para ver información de leads Sin Clasificar"
+              >
                 <div>
-                  <span className="text-2xl font-black text-amber-300">{arq?.sin_clasificar.total || 0}</span>
-                  <span className="text-xs text-muted-foreground ml-1.5">calls</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wide group-hover:text-zinc-200">Sin Clasificar</span>
+                    <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-[10px]">Pendiente</Badge>
+                  </div>
+                  <div className="mt-3 flex items-baseline justify-between">
+                    <div>
+                      <span className="text-2xl font-black text-amber-300">{arq?.sin_clasificar.total || 0}</span>
+                      <span className="text-xs text-muted-foreground ml-1.5">calls</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-amber-400 group-hover:text-zinc-200">{arq?.sin_clasificar.cierres || 0} cierres</span>
+                      <span className="block text-[11px] text-muted-foreground">${arq?.sin_clasificar.cash_d1 || 0} USD</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-bold text-amber-400 group-hover:text-zinc-200">{arq?.sin_clasificar.cierres || 0} cierres</span>
-                  <span className="block text-[11px] text-muted-foreground">${arq?.sin_clasificar.cash_d1 || 0} USD</span>
-                </div>
-              </div>
-            </Card>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMetricaAuditoriaKey("sin_clasificar");
+                  }}
+                  className="w-full mt-3 h-7 text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 border border-amber-500/30 flex items-center justify-center gap-1 shadow-sm transition-all"
+                >
+                  <Info className="h-3 w-3 text-amber-400" />
+                  <span>Ver información y leads</span>
+                </Button>
+              </Card>
+            </div>
           </div>
 
           {/* Split 2 Columnas: Detalle de Llamadas & Vista Previa WhatsApp */}
@@ -1059,6 +1250,17 @@ export default function ResumenVentasPage() {
                   Llamadas del período ({callsFiltradas.length})
                 </h3>
                 <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs border-emerald-500/30 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center gap-1 font-medium"
+                    onClick={() => setGloboBuscadorAbierto(true)}
+                    title="Abrir Globo Buscador de Leads"
+                  >
+                    <span>🎈</span>
+                    <span>Globo Buscador</span>
+                  </Button>
                   <Button
                     variant={filtroResultado === "todos" ? "secondary" : "ghost"}
                     size="sm"
@@ -1802,23 +2004,188 @@ export default function ResumenVentasPage() {
 
       {/* Botón Globo Flotante en la esquina inferior */}
       <button
-        onClick={() => {
-          const el = document.getElementById("globo-buscador-leads")
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" })
-            setTimeout(() => {
-              const inp = document.getElementById("input-globo-busqueda")
-              if (inp) inp.focus()
-            }, 300)
-          }
-        }}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 shadow-2xl shadow-emerald-500/30 border border-emerald-400/40 text-xs font-bold transition-all hover:scale-105 active:scale-95 group"
-        title="Abrir globo de búsqueda de leads en esta pantalla"
+        type="button"
+        onClick={() => setGloboBuscadorAbierto(true)}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 shadow-2xl shadow-emerald-500/40 border-2 border-emerald-400/50 text-xs font-bold transition-all hover:scale-105 active:scale-95 group"
+        title="Abrir Globo Buscador de Leads (Ctrl+K)"
       >
         <span className="text-base group-hover:rotate-12 transition-transform">🎈</span>
         <span>Globo Buscador</span>
         <Search className="h-3.5 w-3.5 ml-0.5 text-emerald-200" />
       </button>
+
+      {/* Dialog Emergente del Globo Buscador de Leads */}
+      <Dialog open={globoBuscadorAbierto} onOpenChange={setGloboBuscadorAbierto}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col bg-zinc-950 border-emerald-500/30 text-white shadow-2xl">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 bg-emerald-500/10 text-xs">
+                🎈 Globo Buscador de Leads
+              </Badge>
+              <span className="text-xs text-zinc-400">
+                Fecha activa: <strong className="text-emerald-300 font-semibold">{fecha}</strong>
+              </span>
+            </div>
+            <DialogTitle className="text-xl font-bold text-white flex items-center gap-2 mt-2">
+              <span>🎈 Buscador Universal de Leads</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400 mt-1">
+              Buscá cualquier lead en Exposure OS por nombre, teléfono o @instagram para auditar sus agendas, moverlo a la fecha de este reporte ({fecha}) o abrir su ficha comercial.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="px-6 pt-4">
+            <div className="relative">
+              <div className="flex items-center gap-2.5 rounded-xl border border-emerald-500/40 bg-zinc-900/90 px-3.5 py-2.5 text-sm focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/25 transition-all shadow-inner">
+                <Search className="h-4 w-4 text-emerald-400 shrink-0" />
+                <Input
+                  autoFocus
+                  placeholder="Escribí el nombre, teléfono o @instagram del lead..."
+                  value={busquedaLead}
+                  onChange={(e) => setBusquedaLead(e.target.value)}
+                  className="h-7 border-0 bg-transparent p-0 text-sm text-white placeholder:text-zinc-500 focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
+                {busquedaLead && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-zinc-400 hover:text-white"
+                    onClick={() => {
+                      setBusquedaLead("")
+                      setResultadosBusqueda([])
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                {buscandoLead && <Loader2 className="h-4 w-4 animate-spin text-emerald-400 shrink-0" />}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+            {busquedaLead.trim().length < 2 ? (
+              <div className="p-8 text-center text-xs text-zinc-500 space-y-2">
+                <span className="text-3xl block">🎈</span>
+                <p className="text-zinc-400 font-medium">Globo Buscador Activo</p>
+                <p className="text-zinc-500">Escribí al menos 2 caracteres para buscar leads en toda la base de datos del CRM.</p>
+              </div>
+            ) : buscandoLead ? (
+              <div className="p-8 text-center text-xs text-zinc-400 flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                <span>Buscando leads en el CRM...</span>
+              </div>
+            ) : resultadosBusqueda.length === 0 ? (
+              <div className="p-8 text-center text-xs text-zinc-500">
+                No se encontraron leads con &quot;{busquedaLead}&quot; en el CRM.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider pb-1">
+                  Resultados encontrados ({resultadosBusqueda.length})
+                </div>
+                {resultadosBusqueda.map((lead: any) => {
+                  const fechaCorta = lead.fecha_closer ? lead.fecha_closer.slice(0, 10) : "Sin fecha"
+                  const horaCorta = lead.fecha_closer ? lead.fecha_closer.slice(11, 16) : ""
+                  const esMismoDia = fechaCorta === fecha
+                  const moviendo = moviendoLeadId === lead.id
+
+                  return (
+                    <div
+                      key={lead.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-zinc-900/60 p-3 hover:border-emerald-500/40 hover:bg-zinc-900 transition-all text-xs"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-white truncate">
+                            {lead.nombre || "Sin nombre"}
+                          </span>
+                          {lead.calificacion && (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px] px-1.5 py-0 h-4 border-white/10",
+                                lead.calificacion.includes("A") && "border-emerald-500/40 text-emerald-300 bg-emerald-500/10",
+                                lead.calificacion.includes("B") && "border-blue-500/40 text-blue-300 bg-blue-500/10",
+                                lead.calificacion.includes("C") && "border-amber-500/40 text-amber-300 bg-amber-500/10",
+                                lead.calificacion.includes("D") && "border-zinc-500/40 text-zinc-400 bg-zinc-500/10"
+                              )}
+                            >
+                              {lead.calificacion}
+                            </Badge>
+                          )}
+                          {lead.closer && (
+                            <span className="text-[10px] text-zinc-400">
+                              Closer: <strong className="text-zinc-300">{lead.closer}</strong>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-1 flex items-center gap-3 text-[11px] text-zinc-400 flex-wrap">
+                          {lead.telefono && <span>📞 {lead.telefono}</span>}
+                          {lead.instagram && <span>📸 @{lead.instagram.replace(/^@/, "")}</span>}
+                          <span className={cn(
+                            "font-medium",
+                            esMismoDia ? "text-emerald-400" : "text-amber-400"
+                          )}>
+                            📅 {esMismoDia ? `En este día (${horaCorta || "10:00"})` : `Agendado: ${fechaCorta} ${horaCorta}`}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={moviendo}
+                          onClick={() => moverLeadAFecha(lead, fecha)}
+                          className="h-7 text-[11px] px-2.5 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200"
+                          title={`Mover lead al día del reporte (${fecha})`}
+                        >
+                          {moviendo ? (
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          ) : (
+                            <CalendarDays className="h-3 w-3 mr-1 text-emerald-400" />
+                          )}
+                          Mover a {fecha}
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setGloboBuscadorAbierto(false);
+                            abrirEdicionLead(lead);
+                          }}
+                          className="h-7 text-[11px] px-2 text-zinc-300 hover:text-white hover:bg-white/5"
+                          title="Abrir ficha completa del lead"
+                        >
+                          <Pencil className="h-3 w-3 mr-1 text-zinc-400" />
+                          Ficha
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="px-6 py-3 border-t border-white/10 flex items-center justify-between">
+            <span className="text-[11px] text-zinc-500">
+              Tip: También podés abrir este globo pulsando <strong>Ctrl + K</strong>
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setGloboBuscadorAbierto(false)}
+              className="text-xs border-white/10"
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal / Dialog de Auditoría Interactiva de Métricas */}
       <Dialog open={Boolean(metricaAuditoriaKey)} onOpenChange={(open) => !open && setMetricaAuditoriaKey(null)}>
