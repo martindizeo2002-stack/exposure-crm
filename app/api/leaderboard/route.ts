@@ -326,6 +326,18 @@ export async function GET(request: Request) {
         if (CC_NUEVO_TIPOS.has(tipo)) c.cc_nuevo += monto
         if (UNIDAD_TIPOS.has(tipo)) c.unidades++
         if (FEE_TIPOS.has(tipo)) c.fees++
+        c.detalles_pagos.push({
+          id: (pago as any).id,
+          cliente: (pago as any).cliente || (pago as any).nombre || "Cliente",
+          monto,
+          tipo,
+          operacion: (pago as any).operacion || null,
+          fecha: (pago as any).fecha || null,
+          setter: (pago as any).setter || null,
+          cohort: cohort || null,
+          comisionable: closerCommissionableCc,
+          es_unidad: UNIDAD_TIPOS.has(tipo),
+        })
       }
 
       if (isRealMember(setter)) {
@@ -339,6 +351,19 @@ export async function GET(request: Request) {
         if (CC_NUEVO_TIPOS.has(tipo)) s.cc_nuevo += monto
         if (UNIDAD_TIPOS.has(tipo)) s.unidades++
         if (FEE_TIPOS.has(tipo)) s.fees++
+        s.detalles_pagos.push({
+          id: (pago as any).id,
+          cliente: (pago as any).cliente || (pago as any).nombre || "Cliente",
+          monto,
+          tipo,
+          operacion: (pago as any).operacion || null,
+          fecha: (pago as any).fecha || null,
+          closer: (pago as any).closer || null,
+          cohort: cohort || null,
+          comisionable: setterCommissionableCc,
+          en_ventana: Boolean(setterWindow),
+          es_unidad: UNIDAD_TIPOS.has(tipo),
+        })
       }
     }
 
@@ -360,6 +385,16 @@ export async function GET(request: Request) {
             if (ag.cerro) c.cerr_ab++
           }
         }
+        c.detalles_llamadas.push({
+          id: (ag as any).id,
+          nombre: (ag as any).nombre || (ag as any).cliente || "Lead",
+          fecha_agenda: (ag as any).fecha_agenda || null,
+          show: Boolean(ag.show),
+          cerro: Boolean(ag.cerro),
+          calificacion: ag.calificacion || null,
+          estado: ag.estado || null,
+          setter: (ag as any).setter || null,
+        })
       }
 
       if (isRealMember(setter)) {
@@ -371,6 +406,16 @@ export async function GET(request: Request) {
           // Solo cuenta calificadas (A/B/C) sobre llamadas que se presentaron
           if (CALIFS_AB.has(ag.calificacion || "")) s.agendas_ab++
         }
+        s.detalles_agendas.push({
+          id: (ag as any).id,
+          nombre: (ag as any).nombre || (ag as any).cliente || "Lead",
+          fecha_agenda: (ag as any).fecha_agenda || null,
+          show: Boolean(ag.show),
+          cerro: Boolean(ag.cerro),
+          calificacion: ag.calificacion || null,
+          estado: ag.estado || null,
+          closer: (ag as any).closer || null,
+        })
       }
     }
 
@@ -401,6 +446,8 @@ export async function GET(request: Request) {
           is_top: nombre === topCloser, next_target: nextTarget, next_rate: nextRate,
           personal_goal: personalMonthlyGoal(month, nombre),
           comisiones: round2((uses2026Scheme ? d.commission_base : d.cc_ponderado) * rate),
+          detalles_pagos: d.detalles_pagos.sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")),
+          detalles_llamadas: d.detalles_llamadas.sort((a, b) => (b.fecha_agenda || "").localeCompare(a.fecha_agenda || "")),
         }
       })
       .filter(c => isRealMember(c.nombre) && (c.nombre === CEO || c.personal_goal || c.cc_total > 0 || c.llamadas > 0) && !(month >= CLOSERS_FUERA_DESDE && CLOSERS_FUERA.has(c.nombre)))
@@ -429,6 +476,8 @@ export async function GET(request: Request) {
           is_top: nombre === topSetter, next_target: nextTarget, next_rate: nextRate,
           personal_goal: personalMonthlyGoal(month, nombre),
           comisiones: round2((uses2026Scheme ? d.cc_total : d.cc_ponderado) * rate),
+          detalles_pagos: d.detalles_pagos.sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")),
+          detalles_agendas: d.detalles_agendas.sort((a, b) => (b.fecha_agenda || "").localeCompare(a.fecha_agenda || "")),
         }
       })
       .filter(s => isRealMember(s.nombre) && (s.personal_goal || s.cc_total > 0 || s.agendas > 0) && !(month >= SETTERS_FUERA_DESDE && SETTERS_FUERA.has(s.nombre)))

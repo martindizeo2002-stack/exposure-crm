@@ -52,11 +52,12 @@ export type DetalleModalData = {
   titulo: string
   subtitulo: string
   tipo: "pagos" | "llamadas"
-  pagos?: DetallePago[]
-  llamadas?: DetalleLlamada[]
   persona: string
   rol: "Closer" | "Setter"
   metrica: string
+  subfiltroInicial?: string
+  todosLosPagos?: DetallePago[]
+  todasLasLlamadas?: DetalleLlamada[]
 }
 
 type CloserData = {
@@ -222,27 +223,52 @@ function ModalDetalleMetrica({
   onClose: () => void
 }) {
   const [busqueda, setBusqueda] = useState("")
+  const [subfiltro, setSubfiltro] = useState<string>("todos")
+
+  // Sincronizar subfiltro cuando se abre el modal
+  useEffect(() => {
+    if (data?.subfiltroInicial) {
+      setSubfiltro(data.subfiltroInicial)
+    } else {
+      setSubfiltro("todos")
+    }
+    setBusqueda("")
+  }, [data])
 
   if (!data) return null
 
-  const itemsPagos = (data.pagos || []).filter((p) => {
+  // Filtros de pagos
+  const todosPagos = data.todosLosPagos || []
+  const pagosFiltrados = todosPagos.filter((p) => {
+    if (subfiltro === "unidades" && !p.es_unidad) return false
+    if (subfiltro === "feccu" && p.cohort !== "FECCU") return false
+    if (subfiltro === "feccpp" && p.cohort !== "FECCPP") return false
+    if (subfiltro === "comisionable" && (p.comisionable ?? 0) <= 0 && p.monto <= 0) return false
+
     if (!busqueda.trim()) return true
     const q = busqueda.toLowerCase()
     return (
-      p.cliente.toLowerCase().includes(q) ||
-      p.tipo.toLowerCase().includes(q) ||
+      (p.cliente || "").toLowerCase().includes(q) ||
+      (p.tipo || "").toLowerCase().includes(q) ||
       (p.setter || "").toLowerCase().includes(q) ||
       (p.closer || "").toLowerCase().includes(q)
     )
   })
 
-  const totalMontoPagos = itemsPagos.reduce((s, p) => s + (p.monto || 0), 0)
+  const totalMontoPagos = pagosFiltrados.reduce((s, p) => s + (p.monto || 0), 0)
 
-  const itemsLlamadas = (data.llamadas || []).filter((l) => {
+  // Filtros de llamadas
+  const todasLlamadas = data.todasLasLlamadas || []
+  const llamadasFiltradas = todasLlamadas.filter((l) => {
+    if (subfiltro === "presentadas" && !l.show) return false
+    if (subfiltro === "cerradas" && (!l.show || !l.cerro)) return false
+    if (subfiltro === "noshow" && l.show) return false
+    if (subfiltro === "calificadas" && (!l.show || !CALIFS_AB_SET.has(l.calificacion || ""))) return false
+
     if (!busqueda.trim()) return true
     const q = busqueda.toLowerCase()
     return (
-      l.nombre.toLowerCase().includes(q) ||
+      (l.nombre || "").toLowerCase().includes(q) ||
       (l.calificacion || "").toLowerCase().includes(q) ||
       (l.setter || "").toLowerCase().includes(q) ||
       (l.closer || "").toLowerCase().includes(q) ||
@@ -250,12 +276,13 @@ function ModalDetalleMetrica({
     )
   })
 
-  const totalPresentadas = itemsLlamadas.filter((l) => l.show).length
-  const totalCerradas = itemsLlamadas.filter((l) => l.show && l.cerro).length
+  const countPresentadas = todasLlamadas.filter((l) => l.show).length
+  const countCerradas = todasLlamadas.filter((l) => l.show && l.cerro).length
+  const countNoShow = todasLlamadas.filter((l) => !l.show).length
 
   return (
     <Dialog open={Boolean(data)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[88vh] flex flex-col p-0 overflow-hidden bg-zinc-950 border-white/10 text-white shadow-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-zinc-950 border-white/10 text-white shadow-2xl">
         <DialogHeader className="p-6 pb-4 border-b border-white/10 bg-zinc-900/60">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -276,6 +303,139 @@ function ModalDetalleMetrica({
             </div>
           </div>
 
+          {/* Selector de subfiltros */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {data.tipo === "pagos" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSubfiltro("todos")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition border",
+                    subfiltro === "todos"
+                      ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                      : "bg-white/[.04] border-white/10 text-zinc-400 hover:bg-white/[.08]"
+                  )}
+                >
+                  Todas las ventas ({todosPagos.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubfiltro("unidades")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition border",
+                    subfiltro === "unidades"
+                      ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
+                      : "bg-white/[.04] border-white/10 text-zinc-400 hover:bg-white/[.08]"
+                  )}
+                >
+                  Unidades cerradas ({todosPagos.filter((p) => p.es_unidad).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubfiltro("feccu")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition border",
+                    subfiltro === "feccu"
+                      ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                      : "bg-white/[.04] border-white/10 text-zinc-400 hover:bg-white/[.08]"
+                  )}
+                >
+                  FECCU Upfront ({todosPagos.filter((p) => p.cohort === "FECCU").length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubfiltro("feccpp")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition border",
+                    subfiltro === "feccpp"
+                      ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                      : "bg-white/[.04] border-white/10 text-zinc-400 hover:bg-white/[.08]"
+                  )}
+                >
+                  FECCPP Cuotas ({todosPagos.filter((p) => p.cohort === "FECCPP").length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubfiltro("comisionable")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition border",
+                    subfiltro === "comisionable"
+                      ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                      : "bg-white/[.04] border-white/10 text-zinc-400 hover:bg-white/[.08]"
+                  )}
+                >
+                  Comisionables ({todosPagos.filter((p) => (p.comisionable ?? 0) > 0 || p.monto > 0).length})
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSubfiltro("todos")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition border",
+                    subfiltro === "todos"
+                      ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                      : "bg-white/[.04] border-white/10 text-zinc-400 hover:bg-white/[.08]"
+                  )}
+                >
+                  Todas las agendas ({todasLlamadas.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubfiltro("presentadas")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition border",
+                    subfiltro === "presentadas"
+                      ? "bg-blue-500/20 border-blue-500/40 text-blue-300"
+                      : "bg-white/[.04] border-white/10 text-zinc-400 hover:bg-white/[.08]"
+                  )}
+                >
+                  Calls presentadas ({countPresentadas})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubfiltro("cerradas")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition border",
+                    subfiltro === "cerradas"
+                      ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                      : "bg-white/[.04] border-white/10 text-zinc-400 hover:bg-white/[.08]"
+                  )}
+                >
+                  Cerradas ({countCerradas})
+                </button>
+                {data.rol === "Setter" && (
+                  <button
+                    type="button"
+                    onClick={() => setSubfiltro("calificadas")}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-bold transition border",
+                      subfiltro === "calificadas"
+                        ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
+                        : "bg-white/[.04] border-white/10 text-zinc-400 hover:bg-white/[.08]"
+                    )}
+                  >
+                    Calificadas A/B/C ({todasLlamadas.filter((l) => l.show && CALIFS_AB_SET.has(l.calificacion || "")).length})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSubfiltro("noshow")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition border",
+                    subfiltro === "noshow"
+                      ? "bg-red-500/20 border-red-500/40 text-red-300"
+                      : "bg-white/[.04] border-white/10 text-zinc-400 hover:bg-white/[.08]"
+                  )}
+                >
+                  No show ({countNoShow})
+                </button>
+              </>
+            )}
+          </div>
+
           <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
@@ -291,7 +451,7 @@ function ModalDetalleMetrica({
               {data.tipo === "pagos" ? (
                 <>
                   <span className="rounded-lg bg-zinc-900 px-3 py-1.5 border border-white/10">
-                    {itemsPagos.length} {itemsPagos.length === 1 ? "registro" : "registros"}
+                    {pagosFiltrados.length} {pagosFiltrados.length === 1 ? "venta" : "ventas"}
                   </span>
                   <span className="rounded-lg bg-emerald-500/10 px-3 py-1.5 border border-emerald-500/20 text-emerald-400 font-black">
                     Total: {fUSD(totalMontoPagos)}
@@ -300,13 +460,7 @@ function ModalDetalleMetrica({
               ) : (
                 <>
                   <span className="rounded-lg bg-zinc-900 px-3 py-1.5 border border-white/10">
-                    {itemsLlamadas.length} {itemsLlamadas.length === 1 ? "llamada" : "llamadas"}
-                  </span>
-                  <span className="rounded-lg bg-blue-500/10 px-3 py-1.5 border border-blue-500/20 text-blue-400">
-                    {totalPresentadas} presentadas
-                  </span>
-                  <span className="rounded-lg bg-emerald-500/10 px-3 py-1.5 border border-emerald-500/20 text-emerald-400">
-                    {totalCerradas} cerradas
+                    {llamadasFiltradas.length} {llamadasFiltradas.length === 1 ? "llamada" : "llamadas"}
                   </span>
                 </>
               )}
@@ -316,11 +470,11 @@ function ModalDetalleMetrica({
 
         <div className="flex-1 overflow-y-auto p-6 space-y-2">
           {data.tipo === "pagos" ? (
-            itemsPagos.length === 0 ? (
+            pagosFiltrados.length === 0 ? (
               <div className="text-center py-16 text-zinc-500">
                 <DollarSign className="h-10 w-10 mx-auto mb-2 opacity-30" />
                 <p className="font-semibold text-zinc-400">No hay registros de pagos para mostrar</p>
-                <p className="text-xs text-zinc-600 mt-1">Verificá los filtros de búsqueda o el período seleccionado</p>
+                <p className="text-xs text-zinc-600 mt-1">Probá cambiando el filtro o la búsqueda</p>
               </div>
             ) : (
               <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-900/40">
@@ -328,25 +482,37 @@ function ModalDetalleMetrica({
                   <TableHeader className="bg-zinc-900/80">
                     <TableRow className="border-white/10 hover:bg-transparent">
                       <TableHead className="text-xs font-bold uppercase text-zinc-400">Fecha</TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Cliente</TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Tipo</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Cliente / Usuario</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400">Tipo de venta</TableHead>
                       <TableHead className="text-xs font-bold uppercase text-zinc-400">Responsable</TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-zinc-400 text-right">Monto</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400 text-right">Monto USD</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {itemsPagos.map((p, idx) => (
+                    {pagosFiltrados.map((p, idx) => (
                       <TableRow key={p.id || idx} className="border-white/5 hover:bg-white/[.04]">
                         <TableCell className="text-xs text-zinc-400 font-mono whitespace-nowrap">
                           {p.fecha ? p.fecha.slice(0, 10) : "—"}
                         </TableCell>
                         <TableCell className="font-bold text-white text-sm">
-                          {p.cliente}
+                          {p.cliente || "Sin nombre"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-[11px] font-medium border-white/10 bg-white/[.03] text-zinc-300">
-                            {p.tipo}
-                          </Badge>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge variant="outline" className="text-[11px] font-medium border-white/10 bg-white/[.03] text-zinc-300">
+                              {p.tipo}
+                            </Badge>
+                            {p.es_unidad && (
+                              <Badge className="text-[10px] font-bold bg-purple-500/20 text-purple-300 border-purple-500/30">
+                                Unidad
+                              </Badge>
+                            )}
+                            {p.cohort && (
+                              <Badge className="text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border-cyan-500/30">
+                                {p.cohort}
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-xs text-zinc-400">
                           {data.rol === "Closer" ? (
@@ -365,11 +531,11 @@ function ModalDetalleMetrica({
               </div>
             )
           ) : (
-            itemsLlamadas.length === 0 ? (
+            llamadasFiltradas.length === 0 ? (
               <div className="text-center py-16 text-zinc-500">
                 <PhoneCall className="h-10 w-10 mx-auto mb-2 opacity-30" />
                 <p className="font-semibold text-zinc-400">No hay llamadas para mostrar</p>
-                <p className="text-xs text-zinc-600 mt-1">Verificá los filtros de búsqueda o el período seleccionado</p>
+                <p className="text-xs text-zinc-600 mt-1">Probá cambiando el filtro o la búsqueda</p>
               </div>
             ) : (
               <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-900/40">
@@ -385,13 +551,13 @@ function ModalDetalleMetrica({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {itemsLlamadas.map((l, idx) => (
+                    {llamadasFiltradas.map((l, idx) => (
                       <TableRow key={l.id || idx} className="border-white/5 hover:bg-white/[.04]">
                         <TableCell className="text-xs text-zinc-400 font-mono whitespace-nowrap">
                           {l.fecha_agenda ? l.fecha_agenda.replace("T", " ").slice(0, 16) : "—"}
                         </TableCell>
                         <TableCell className="font-bold text-white text-sm">
-                          {l.nombre}
+                          {l.nombre || "Sin nombre"}
                         </TableCell>
                         <TableCell className="text-center">
                           {l.calificacion ? (
@@ -464,10 +630,11 @@ function CloserGameCard({ closer, index, businessGoal, onOpenDetalle }: { closer
           titulo: `Comisión · ${closer.nombre}`,
           subtitulo: `Tasa aplicada: ${closer.rate}% · Base neta comisionable: ${fUSD(closer.commissionable_cc)} · Total: ${fUSD(closer.comisiones)}`,
           tipo: "pagos",
-          pagos: (closer.detalles_pagos || []).filter(p => (p.comisionable ?? 0) > 0),
           persona: closer.nombre,
           rol: "Closer",
-          metrica: "Comisión"
+          metrica: "Comisión",
+          subfiltroInicial: "comisionable",
+          todosLosPagos: closer.detalles_pagos || [],
         })} className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 text-right cursor-pointer transition hover:scale-105 hover:border-emerald-300/50 hover:bg-emerald-400/20 active:scale-95 group/comm" title="Click para ver desglose de comisiones"><div className="flex items-center justify-end gap-1"><p className="text-[10px] font-black uppercase text-emerald-200/60">Comisión</p><span className="text-[9px] text-emerald-300/60 opacity-0 group-hover/comm:opacity-100 transition">↗</span></div><p className="text-lg font-black text-emerald-300">{fUSD(closer.comisiones)}</p><p className="text-[9px] font-bold text-emerald-100/45">Base neta {fUSD(closer.commissionable_cc)}</p></div>
       </div>
       <div className="relative mt-5 grid grid-cols-1 gap-2 text-center">
@@ -475,10 +642,11 @@ function CloserGameCard({ closer, index, businessGoal, onOpenDetalle }: { closer
           titulo: `Cash Collected Total · ${closer.nombre}`,
           subtitulo: `Total comisionable recaudado: ${fUSD(closer.cc_total)}`,
           tipo: "pagos",
-          pagos: (closer.detalles_pagos || []).filter(p => (p.comisionable ?? 0) > 0),
           persona: closer.nombre,
           rol: "Closer",
-          metrica: "CC Total"
+          metrica: "CC Total",
+          subfiltroInicial: "todos",
+          todosLosPagos: closer.detalles_pagos || [],
         })} className="rounded-2xl border border-emerald-300/15 bg-emerald-400/[.07] p-3 cursor-pointer transition hover:scale-[1.02] hover:border-emerald-300/40 hover:bg-emerald-400/15 active:scale-95 group/cct" title="Click para ver todas las ventas"><div className="flex items-center justify-center gap-1"><p className="text-[10px] font-black uppercase text-white/35">CC Total</p><span className="text-[9px] text-emerald-300/60 opacity-0 group-hover/cct:opacity-100 transition">ver ventas ↗</span></div><p className="text-lg font-black text-emerald-300">{fUSD(closer.cc_total)}</p></div>
       </div>
       <div className="relative mt-6"><CommissionTrack rate={closer.rate ?? (closer.nivel === 3 ? 10 : closer.nivel === 2 ? 9 : 8)} /></div>
@@ -525,10 +693,11 @@ function SetterGameCard({ setter, index, businessGoal, onOpenDetalle }: { setter
           titulo: `Cash Collected Total (≤30d) · ${setter.nombre}`,
           subtitulo: `Total comisionable recaudado en ventana de 30 días: ${fUSD(setter.cc_total)}`,
           tipo: "pagos",
-          pagos: (setter.detalles_pagos || []).filter(p => (p.comisionable ?? 0) > 0),
           persona: setter.nombre,
           rol: "Setter",
-          metrica: "CC Total"
+          metrica: "CC Total",
+          subfiltroInicial: "todos",
+          todosLosPagos: setter.detalles_pagos || [],
         })} className="rounded-2xl border border-emerald-300/15 bg-emerald-400/[.07] p-3 cursor-pointer transition hover:scale-[1.02] hover:border-emerald-300/40 hover:bg-emerald-400/15 active:scale-95 group/scc" title="Click para ver ventas asociadas">
           <div className="flex items-center justify-center gap-1">
             <p className="text-[10px] font-black uppercase text-white/35">CC Total</p>
