@@ -228,6 +228,7 @@ export async function GET(request: Request) {
       tipo: string
       operacion?: string | null
       fecha: string | null
+      closer?: string | null
       setter?: string | null
       cohort?: string | null
       comisionable: number
@@ -241,6 +242,7 @@ export async function GET(request: Request) {
       cerro: boolean
       calificacion?: string | null
       estado?: string | null
+      closer?: string | null
       setter?: string | null
     }
 
@@ -287,6 +289,8 @@ export async function GET(request: Request) {
     let teamFeccu = 0
     let teamFeccpp = 0
     let teamBeccu = 0
+    const teamDetallesPagos: DetallePagoCloser[] = []
+    const teamDetallesAgendas: DetalleLlamadaCloser[] = []
 
     // El CEO también cierra. Debe permanecer visible en el ranking aun cuando
     // en el mes seleccionado todavía no tenga pagos o llamadas. El resto del
@@ -316,6 +320,21 @@ export async function GET(request: Request) {
 
       if (CSM_NOMBRES.has(closer)) { csmCc += monto; continue }
 
+      const pagoItem: DetallePagoCloser = {
+        id: (pago as any).id,
+        cliente: (pago as any).cliente || (pago as any).nombre || "Cliente",
+        monto,
+        tipo,
+        operacion: (pago as any).operacion || null,
+        fecha: (pago as any).fecha || null,
+        closer: closer || null,
+        setter: (pago as any).setter || null,
+        cohort: cohort || null,
+        comisionable: closerCommissionableCc,
+        es_unidad: UNIDAD_TIPOS.has(tipo),
+      }
+      teamDetallesPagos.push(pagoItem)
+
       if (isRealMember(closer)) {
         if (!closerMap.has(closer)) closerMap.set(closer, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0, detalles_pagos: [], detalles_llamadas: [] })
         const c = closerMap.get(closer)!
@@ -327,18 +346,7 @@ export async function GET(request: Request) {
         if (CC_NUEVO_TIPOS.has(tipo)) c.cc_nuevo += monto
         if (UNIDAD_TIPOS.has(tipo)) c.unidades++
         if (FEE_TIPOS.has(tipo)) c.fees++
-        c.detalles_pagos.push({
-          id: (pago as any).id,
-          cliente: (pago as any).cliente || (pago as any).nombre || "Cliente",
-          monto,
-          tipo,
-          operacion: (pago as any).operacion || null,
-          fecha: (pago as any).fecha || null,
-          setter: (pago as any).setter || null,
-          cohort: cohort || null,
-          comisionable: closerCommissionableCc,
-          es_unidad: UNIDAD_TIPOS.has(tipo),
-        })
+        c.detalles_pagos.push(pagoItem)
       }
 
       if (isRealMember(setter)) {
@@ -375,6 +383,19 @@ export async function GET(request: Request) {
       if (closerNorm.toLowerCase() === "exposure") closerNorm = "Nahuel"
       const setter = canonical(ag.setter || "")
 
+      const agItem: DetalleLlamadaCloser = {
+        id: (ag as any).id,
+        nombre: (ag as any).nombre || (ag as any).cliente || "Lead",
+        fecha_agenda: (ag as any).fecha_agenda || null,
+        show: Boolean(ag.show),
+        cerro: Boolean(ag.cerro),
+        calificacion: ag.calificacion || null,
+        estado: ag.estado || null,
+        closer: closerNorm || null,
+        setter: (ag as any).setter || null,
+      }
+      teamDetallesAgendas.push(agItem)
+
       if (isRealMember(closerNorm)) {
         if (!closerMap.has(closerNorm)) closerMap.set(closerNorm, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0, detalles_pagos: [], detalles_llamadas: [] })
         const c = closerMap.get(closerNorm)!
@@ -387,16 +408,7 @@ export async function GET(request: Request) {
             if (ag.cerro) c.cerr_ab++
           }
         }
-        c.detalles_llamadas.push({
-          id: (ag as any).id,
-          nombre: (ag as any).nombre || (ag as any).cliente || "Lead",
-          fecha_agenda: (ag as any).fecha_agenda || null,
-          show: Boolean(ag.show),
-          cerro: Boolean(ag.cerro),
-          calificacion: ag.calificacion || null,
-          estado: ag.estado || null,
-          setter: (ag as any).setter || null,
-        })
+        c.detalles_llamadas.push(agItem)
       }
 
       if (isRealMember(setter)) {
@@ -498,8 +510,9 @@ export async function GET(request: Request) {
       team_feccu: round2(teamFeccu),
       team_feccpp: round2(teamFeccpp),
       team_beccu: round2(teamBeccu),
-      // Compatibilidad temporal para clientes cacheados del preview.
       team_cc_pond: round2(teamCCTotal),
+      team_detalles_pagos: teamDetallesPagos.sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")),
+      team_detalles_agendas: teamDetallesAgendas.sort((a, b) => (b.fecha_agenda || "").localeCompare(a.fecha_agenda || "")),
       scheme: {
         closer_top_target: closerTopTarget(month), closer_mid_target: 40000,
         setter_top_target: 30000, setter_mid_target: 25000, setter_window_days: 30,

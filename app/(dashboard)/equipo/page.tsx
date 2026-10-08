@@ -51,9 +51,10 @@ export type DetalleLlamada = {
 export type DetalleModalData = {
   titulo: string
   subtitulo: string
+  fuente?: string
   tipo: "pagos" | "llamadas"
   persona: string
-  rol: "Closer" | "Setter"
+  rol: "Closer" | "Setter" | "Equipo" | "Negocio"
   metrica: string
   subfiltroInicial?: string
   todosLosPagos?: DetallePago[]
@@ -84,6 +85,8 @@ type LeaderboardData = {
   closers: CloserData[]; setters: SetterData[]; csm_nombres?: string[]; csm_cc: number; csm_comision: number
   team_cc_total: number; team_cc_pond?: number
   team_feccu: number; team_feccpp: number; team_beccu: number
+  team_detalles_pagos?: DetallePago[]
+  team_detalles_agendas?: DetalleLlamada[]
 }
 
 // Períodos válidos desde agosto 2024 (arranque real de datos históricos
@@ -293,6 +296,12 @@ function ModalDetalleMetrica({
                 <Badge className="bg-white/10 text-white/80 border-white/15 text-xs font-semibold">
                   {data.metrica}
                 </Badge>
+                {data.fuente && (
+                  <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 text-[11px] font-semibold flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    <span>Fuente: {data.fuente}</span>
+                  </Badge>
+                )}
               </div>
               <DialogTitle className="text-xl font-black text-white sm:text-2xl">
                 {data.titulo}
@@ -486,6 +495,7 @@ function ModalDetalleMetrica({
                       <TableHead className="text-xs font-bold uppercase text-zinc-400">Tipo de venta</TableHead>
                       <TableHead className="text-xs font-bold uppercase text-zinc-400">Responsable</TableHead>
                       <TableHead className="text-xs font-bold uppercase text-zinc-400 text-right">Monto USD</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400 text-center">Auditoría</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -515,14 +525,21 @@ function ModalDetalleMetrica({
                           </div>
                         </TableCell>
                         <TableCell className="text-xs text-zinc-400">
-                          {data.rol === "Closer" ? (
-                            p.setter ? <span className="text-cyan-400">Setter: {p.setter}</span> : <span className="text-zinc-500">—</span>
-                          ) : (
-                            p.closer ? <span className="text-amber-400">Closer: {p.closer}</span> : <span className="text-zinc-500">—</span>
-                          )}
+                          {p.closer && <div className="text-amber-400 font-medium">Closer: {p.closer}</div>}
+                          {p.setter && <div className="text-cyan-400 font-medium">Setter: {p.setter}</div>}
+                          {!p.closer && !p.setter && <span className="text-zinc-500">—</span>}
                         </TableCell>
                         <TableCell className="text-right font-black text-emerald-400 text-sm whitespace-nowrap font-mono">
                           {fUSD(p.monto)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Link
+                            href="/todos-pagos"
+                            className="inline-flex items-center gap-1 rounded-md bg-white/[.04] px-2 py-1 text-[11px] font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white border border-white/10"
+                            title="Auditar en módulo Carga de Pagos"
+                          >
+                            Pagos <ExternalLink className="h-3 w-3" />
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -548,6 +565,7 @@ function ModalDetalleMetrica({
                       <TableHead className="text-xs font-bold uppercase text-zinc-400 text-center">Asistencia</TableHead>
                       <TableHead className="text-xs font-bold uppercase text-zinc-400 text-center">Cierre</TableHead>
                       <TableHead className="text-xs font-bold uppercase text-zinc-400">Responsable</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-zinc-400 text-center">Auditoría</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -589,11 +607,18 @@ function ModalDetalleMetrica({
                           )}
                         </TableCell>
                         <TableCell className="text-xs text-zinc-400">
-                          {data.rol === "Closer" ? (
-                            l.setter ? <span className="text-cyan-400">Setter: {l.setter}</span> : <span className="text-zinc-500">—</span>
-                          ) : (
-                            l.closer ? <span className="text-amber-400">Closer: {l.closer}</span> : <span className="text-zinc-500">—</span>
-                          )}
+                          {l.closer && <div className="text-amber-400 font-medium">Closer: {l.closer}</div>}
+                          {l.setter && <div className="text-cyan-400 font-medium">Setter: {l.setter}</div>}
+                          {!l.closer && !l.setter && <span className="text-zinc-500">—</span>}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Link
+                            href="/pipeline"
+                            className="inline-flex items-center gap-1 rounded-md bg-white/[.04] px-2 py-1 text-[11px] font-bold text-cyan-300 transition hover:bg-cyan-500/20 hover:text-cyan-200 border border-cyan-500/20"
+                            title="Auditar lead en Pipeline"
+                          >
+                            Pipeline <ExternalLink className="h-3 w-3" />
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -629,6 +654,7 @@ function CloserGameCard({ closer, index, businessGoal, onOpenDetalle }: { closer
         <div onClick={() => onOpenDetalle({
           titulo: `Comisión · ${closer.nombre}`,
           subtitulo: `Tasa aplicada: ${closer.rate}% · Base neta comisionable: ${fUSD(closer.commissionable_cc)} · Total: ${fUSD(closer.comisiones)}`,
+          fuente: "Ventas → Carga de Pagos (Stripe / Cobros conciliados)",
           tipo: "pagos",
           persona: closer.nombre,
           rol: "Closer",
@@ -640,7 +666,8 @@ function CloserGameCard({ closer, index, businessGoal, onOpenDetalle }: { closer
       <div className="relative mt-5 grid grid-cols-1 gap-2 text-center">
         <div onClick={() => onOpenDetalle({
           titulo: `Cash Collected Total · ${closer.nombre}`,
-          subtitulo: `Total comisionable recaudado: ${fUSD(closer.cc_total)}`,
+          subtitulo: `Total comisionable recaudado: ${fUSD(closer.cc_total)} en ${closer.detalles_pagos?.length || 0} operaciones`,
+          fuente: "Ventas → Carga de Pagos (Stripe / Cobros conciliados)",
           tipo: "pagos",
           persona: closer.nombre,
           rol: "Closer",
@@ -654,11 +681,125 @@ function CloserGameCard({ closer, index, businessGoal, onOpenDetalle }: { closer
         <div className="mb-2 flex justify-between text-xs"><span className="font-bold text-white/55">{nextLabel}</span><span className="font-black text-white">{fUSD(commissionCc)} / {fUSD(nextCash)}</span></div>
         <div className="h-2.5 overflow-hidden rounded-full bg-white/[.07]"><div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-300 transition-[width] duration-1000" style={{ width: `${cashProgress}%` }} /></div>
         <div className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-5">
-          <div><p className="text-[10px] font-black uppercase text-white/35">FECCU</p><p className="text-lg font-black text-emerald-300">{fUSD(closer.feccu)}</p></div>
-          <div><p className="text-[10px] font-black uppercase text-white/35">FECCPP</p><p className="text-lg font-black text-cyan-300">{fUSD(closer.feccpp)}</p></div>
-          <div><p className="text-[10px] font-black uppercase text-white/35">Unidades</p><p className="text-lg font-black text-white">{closer.unidades || "—"}</p></div>
-          <div><p className="text-[10px] font-black uppercase text-white/35">Cierre sobre presentada</p><p className="text-lg font-black text-white">{fPct(closer.tasa_cierre)}</p></div>
-          <div><p className="text-[10px] font-black uppercase text-white/35">Calls</p><p className="text-lg font-black text-white">{closer.llamadas || "—"}</p></div>
+          <div
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenDetalle({
+                titulo: `FECCU (Upfront Nuevo) · ${closer.nombre}`,
+                subtitulo: `Cash upfront de clientes nuevos cerrado: ${fUSD(closer.feccu)}`,
+                fuente: "Ventas → Carga de Pagos (Stripe / Cobros conciliados)",
+                tipo: "pagos",
+                persona: closer.nombre,
+                rol: "Closer",
+                metrica: "FECCU",
+                subfiltroInicial: "feccu",
+                todosLosPagos: closer.detalles_pagos || [],
+              })
+            }}
+            className="rounded-xl p-1.5 cursor-pointer transition hover:bg-emerald-500/15 hover:scale-105 active:scale-95 group/stat border border-transparent hover:border-emerald-500/30"
+            title="Click para auditar ventas FECCU"
+          >
+            <p className="text-[10px] font-black uppercase text-white/35 flex items-center justify-center gap-0.5">
+              FECCU <span className="text-[8px] text-emerald-400 opacity-0 group-hover/stat:opacity-100 transition">↗</span>
+            </p>
+            <p className="text-lg font-black text-emerald-300">{fUSD(closer.feccu)}</p>
+          </div>
+
+          <div
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenDetalle({
+                titulo: `FECCPP (Cuotas Front-End) · ${closer.nombre}`,
+                subtitulo: `Cash recaudado en cuotas: ${fUSD(closer.feccpp)}`,
+                fuente: "Ventas → Carga de Pagos / Planes de Pago",
+                tipo: "pagos",
+                persona: closer.nombre,
+                rol: "Closer",
+                metrica: "FECCPP",
+                subfiltroInicial: "feccpp",
+                todosLosPagos: closer.detalles_pagos || [],
+              })
+            }}
+            className="rounded-xl p-1.5 cursor-pointer transition hover:bg-cyan-500/15 hover:scale-105 active:scale-95 group/stat border border-transparent hover:border-cyan-500/30"
+            title="Click para auditar cuotas FECCPP"
+          >
+            <p className="text-[10px] font-black uppercase text-white/35 flex items-center justify-center gap-0.5">
+              FECCPP <span className="text-[8px] text-cyan-400 opacity-0 group-hover/stat:opacity-100 transition">↗</span>
+            </p>
+            <p className="text-lg font-black text-cyan-300">{fUSD(closer.feccpp)}</p>
+          </div>
+
+          <div
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenDetalle({
+                titulo: `Unidades Cerradas · ${closer.nombre}`,
+                subtitulo: `Total de adquisiciones de clientes nuevos cerrados: ${closer.unidades || 0}`,
+                fuente: "Ventas → Carga de Pagos (Venta Nueva)",
+                tipo: "pagos",
+                persona: closer.nombre,
+                rol: "Closer",
+                metrica: "Unidades",
+                subfiltroInicial: "unidades",
+                todosLosPagos: closer.detalles_pagos || [],
+              })
+            }}
+            className="rounded-xl p-1.5 cursor-pointer transition hover:bg-purple-500/15 hover:scale-105 active:scale-95 group/stat border border-transparent hover:border-purple-500/30"
+            title="Click para ver clientes nuevos cerrados"
+          >
+            <p className="text-[10px] font-black uppercase text-white/35 flex items-center justify-center gap-0.5">
+              Unidades <span className="text-[8px] text-purple-400 opacity-0 group-hover/stat:opacity-100 transition">↗</span>
+            </p>
+            <p className="text-lg font-black text-white">{closer.unidades || "—"}</p>
+          </div>
+
+          <div
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenDetalle({
+                titulo: `Tasa de Cierre sobre Presentadas · ${closer.nombre}`,
+                subtitulo: `Cierres: ${closer.cerradas} / Presentadas: ${closer.llamadas} (${fPct(closer.tasa_cierre)})`,
+                fuente: "Ventas → Agendas / Pipeline (iClosed / Fathom)",
+                tipo: "llamadas",
+                persona: closer.nombre,
+                rol: "Closer",
+                metrica: "Tasa de Cierre",
+                subfiltroInicial: "cerradas",
+                todasLasLlamadas: closer.detalles_llamadas || [],
+              })
+            }}
+            className="rounded-xl p-1.5 cursor-pointer transition hover:bg-amber-500/15 hover:scale-105 active:scale-95 group/stat border border-transparent hover:border-amber-500/30"
+            title="Click para ver llamadas y cierres"
+          >
+            <p className="text-[10px] font-black uppercase text-white/35 flex items-center justify-center gap-0.5">
+              Cierre s/ pres. <span className="text-[8px] text-amber-400 opacity-0 group-hover/stat:opacity-100 transition">↗</span>
+            </p>
+            <p className="text-lg font-black text-white">{fPct(closer.tasa_cierre)}</p>
+          </div>
+
+          <div
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenDetalle({
+                titulo: `Llamadas Presentadas · ${closer.nombre}`,
+                subtitulo: `Total de llamadas asistidas: ${closer.llamadas || 0} de ${closer.detalles_llamadas?.length || 0} agendas`,
+                fuente: "Ventas → Agendas / Pipeline (iClosed / Fathom)",
+                tipo: "llamadas",
+                persona: closer.nombre,
+                rol: "Closer",
+                metrica: "Calls",
+                subfiltroInicial: "presentadas",
+                todasLasLlamadas: closer.detalles_llamadas || [],
+              })
+            }}
+            className="rounded-xl p-1.5 cursor-pointer transition hover:bg-blue-500/15 hover:scale-105 active:scale-95 group/stat border border-transparent hover:border-blue-500/30"
+            title="Click para ver llamadas"
+          >
+            <p className="text-[10px] font-black uppercase text-white/35 flex items-center justify-center gap-0.5">
+              Calls <span className="text-[8px] text-blue-400 opacity-0 group-hover/stat:opacity-100 transition">↗</span>
+            </p>
+            <p className="text-lg font-black text-white">{closer.llamadas || "—"}</p>
+          </div>
         </div>
       </div>
     </article>
@@ -881,17 +1022,54 @@ export default function EquipoPage() {
 
       <section className="overflow-hidden rounded-[30px] border border-white/10 bg-zinc-950 p-5 text-white shadow-[0_22px_70px_rgba(0,0,0,.28)] sm:p-7">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-          <div><p className="text-xs font-black uppercase tracking-[.18em] text-violet-300">Objetivo mensual del negocio</p><p className="mt-1 text-3xl font-black sm:text-4xl">{fUSD(goalCollected)} <span className="text-lg text-white/35">/ {fUSD(businessGoal)}</span></p></div>
+          <div
+            onClick={() => setDetalleModal({
+              titulo: "Objetivo Mensual del Negocio",
+              subtitulo: `Total recaudado: ${fUSD(goalCollected)} de ${fUSD(businessGoal)} (${Math.min(100, Math.round((goalCollected / businessGoal) * 100))}%)`,
+              fuente: "Ventas → Carga de Pagos (Stripe / Cobros conciliados)",
+              tipo: "pagos",
+              persona: "Todo el equipo",
+              rol: "Negocio",
+              metrica: "Objetivo Mensual",
+              subfiltroInicial: "todos",
+              todosLosPagos: raw?.team_detalles_pagos || [],
+            })}
+            className="cursor-pointer group/goal transition hover:opacity-90"
+            title="Click para ver todas las ventas del objetivo mensual"
+          >
+            <p className="text-xs font-black uppercase tracking-[.18em] text-violet-300 flex items-center gap-1.5">
+              Objetivo mensual del negocio <span className="opacity-0 group-hover/goal:opacity-100 text-[10px] text-violet-300 transition">ver ventas ↗</span>
+            </p>
+            <p className="mt-1 text-3xl font-black sm:text-4xl">{fUSD(goalCollected)} <span className="text-lg text-white/35">/ {fUSD(businessGoal)}</span></p>
+          </div>
           <p className="text-2xl font-black text-amber-300">{Math.min(100, Math.round((goalCollected / businessGoal) * 100))}%</p>
         </div>
         <div className="mt-5 flex gap-1">
           {goalBuckets.map((bucket) => (
-            <div key={bucket.label} style={{ width: `${(bucket.goal / businessGoal) * 100}%` }}>
+            <div
+              key={bucket.label}
+              style={{ width: `${(bucket.goal / businessGoal) * 100}%` }}
+              onClick={() => setDetalleModal({
+                titulo: `Cohort ${bucket.label} · Objetivo Negocio`,
+                subtitulo: `Recaudado en ${bucket.label}: ${fUSD(bucket.value)} de meta ${fUSD(bucket.goal)}`,
+                fuente: "Ventas → Carga de Pagos (Stripe / Cobros conciliados)",
+                tipo: "pagos",
+                persona: "Todo el equipo",
+                rol: "Negocio",
+                metrica: bucket.label,
+                subfiltroInicial: bucket.label.toLowerCase() === "feccu" ? "feccu" : bucket.label.toLowerCase() === "feccpp" ? "feccpp" : "todos",
+                todosLosPagos: raw?.team_detalles_pagos || [],
+              })}
+              className="cursor-pointer group/bucket transition hover:opacity-90"
+              title={`Click para ver ventas de ${bucket.label}`}
+            >
               <div className="mb-2 flex items-end justify-between gap-2 text-[10px] font-black uppercase tracking-wider">
-                <span className="text-white/70">{bucket.label}</span>
+                <span className="text-white/70 group-hover/bucket:text-white transition flex items-center gap-1">
+                  {bucket.label} <span className="opacity-0 group-hover/bucket:opacity-100 text-[8px] text-white/50">↗</span>
+                </span>
                 <span className="text-white/40">{fUSD(bucket.value)} / {fUSD(bucket.goal)}</span>
               </div>
-              <div className="h-5 overflow-hidden rounded-md border border-white/10 bg-white/[.06]">
+              <div className="h-5 overflow-hidden rounded-md border border-white/10 bg-white/[.06] group-hover/bucket:border-white/30 transition">
                 <div className={`h-full bg-gradient-to-r ${bucket.color} transition-[width] duration-1000`} style={{ width: `${Math.min(100, (bucket.value / bucket.goal) * 100)}%` }} />
               </div>
             </div>
@@ -901,10 +1079,77 @@ export default function EquipoPage() {
       </section>
 
       <div className="crm-kpis">
-        <CrmStat label="CC total equipo" value={fUSD(teamCCTotal)} detail={monthLabel} icon={<Target className="h-5 w-5" />} tone="amber" />
-        <CrmStat label="Unidades cerradas" value={closerTotals.unidades} detail={`${closerTotals.fees} fees adicionales`} icon={<Trophy className="h-5 w-5" />} tone="red" />
-        <CrmStat label="Agendas setters" value={setterTotals.agendas} detail={`${setterTotals.agendas_ab} calificadas presentadas`} icon={<Users className="h-5 w-5" />} tone="blue" />
-        <CrmStat label="Comisiones" value={fUSD(closerTotals.comisiones + setterTotals.comisiones + csmComision)} detail="closers + setters + CSM" icon={<Coins className="h-5 w-5" />} tone="emerald" />
+        <div
+          onClick={() => setDetalleModal({
+            titulo: `CC Total Equipo · ${monthLabel}`,
+            subtitulo: `Recaudación total de todo el equipo comercial: ${fUSD(teamCCTotal)}`,
+            fuente: "Ventas → Carga de Pagos (Stripe / Cobros conciliados)",
+            tipo: "pagos",
+            persona: "Todo el equipo",
+            rol: "Equipo",
+            metrica: "CC Total Equipo",
+            subfiltroInicial: "todos",
+            todosLosPagos: raw?.team_detalles_pagos || [],
+          })}
+          className="cursor-pointer transition hover:scale-[1.02] active:scale-95 group/kpi"
+          title="Click para ver todas las ventas del equipo"
+        >
+          <CrmStat label="CC total equipo" value={fUSD(teamCCTotal)} detail={`${monthLabel} · click para ver ↗`} icon={<Target className="h-5 w-5" />} tone="amber" />
+        </div>
+
+        <div
+          onClick={() => setDetalleModal({
+            titulo: `Unidades Cerradas del Equipo · ${monthLabel}`,
+            subtitulo: `Total de clientes nuevos cerrados: ${closerTotals.unidades} (${closerTotals.fees} fees adicionales)`,
+            fuente: "Ventas → Carga de Pagos (Venta Nueva / Upfront)",
+            tipo: "pagos",
+            persona: "Todo el equipo",
+            rol: "Equipo",
+            metrica: "Unidades Cerradas",
+            subfiltroInicial: "unidades",
+            todosLosPagos: raw?.team_detalles_pagos || [],
+          })}
+          className="cursor-pointer transition hover:scale-[1.02] active:scale-95 group/kpi"
+          title="Click para ver clientes nuevos cerrados"
+        >
+          <CrmStat label="Unidades cerradas" value={closerTotals.unidades} detail={`${closerTotals.fees} fees adicionales · click para ver ↗`} icon={<Trophy className="h-5 w-5" />} tone="red" />
+        </div>
+
+        <div
+          onClick={() => setDetalleModal({
+            titulo: `Agendas Setters del Equipo · ${monthLabel}`,
+            subtitulo: `Total de agendas del equipo: ${setterTotals.agendas} (${setterTotals.agendas_ab} calificadas presentadas)`,
+            fuente: "Ventas → Agendas / Pipeline (iClosed / Fathom)",
+            tipo: "llamadas",
+            persona: "Setters del equipo",
+            rol: "Equipo",
+            metrica: "Agendas Setters",
+            subfiltroInicial: "todos",
+            todasLasLlamadas: raw?.team_detalles_agendas || [],
+          })}
+          className="cursor-pointer transition hover:scale-[1.02] active:scale-95 group/kpi"
+          title="Click para ver agendas del equipo"
+        >
+          <CrmStat label="Agendas setters" value={setterTotals.agendas} detail={`${setterTotals.agendas_ab} calificadas · click para ver ↗`} icon={<Users className="h-5 w-5" />} tone="blue" />
+        </div>
+
+        <div
+          onClick={() => setDetalleModal({
+            titulo: `Comisiones Totales del Equipo · ${monthLabel}`,
+            subtitulo: `Total comisiones liquidadas: ${fUSD(closerTotals.comisiones + setterTotals.comisiones + csmComision)} (closers + setters + CSM)`,
+            fuente: "Ventas → Esquema de comisiones y Carga de Pagos",
+            tipo: "pagos",
+            persona: "Todo el equipo",
+            rol: "Equipo",
+            metrica: "Comisiones",
+            subfiltroInicial: "comisionable",
+            todosLosPagos: raw?.team_detalles_pagos || [],
+          })}
+          className="cursor-pointer transition hover:scale-[1.02] active:scale-95 group/kpi"
+          title="Click para ver comisiones"
+        >
+          <CrmStat label="Comisiones" value={fUSD(closerTotals.comisiones + setterTotals.comisiones + csmComision)} detail="closers + setters + CSM · click para ver ↗" icon={<Coins className="h-5 w-5" />} tone="emerald" />
+        </div>
       </div>
 
       {lbLoading ? (
@@ -1075,8 +1320,27 @@ export default function EquipoPage() {
 
       {/* CSM + STRIKES */}
       <div className={cn("grid grid-cols-1 gap-6", isManager && "sm:grid-cols-2")}>
-        <Card className="border border-border">
-          <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">CSM</CardTitle></CardHeader>
+        <Card
+          onClick={() => setDetalleModal({
+            titulo: `CSM · ${csmNombre}`,
+            subtitulo: `CC Backend recaudado: ${fUSD(csmCc)} · Comisión (5% flat): ${fUSD(csmComision)}`,
+            fuente: "Ventas → Carga de Pagos (Back-End)",
+            tipo: "pagos",
+            persona: csmNombre,
+            rol: "Equipo",
+            metrica: "CC Backend CSM",
+            subfiltroInicial: "todos",
+            todosLosPagos: raw?.team_detalles_pagos?.filter(p => !p.cohort || p.cohort === "BECCU") || [],
+          })}
+          className="border border-border cursor-pointer transition hover:border-white/30 hover:bg-white/[.02] group/csm"
+          title="Click para ver ventas de Backend del CSM"
+        >
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold">CSM</CardTitle>
+              <span className="text-[10px] text-zinc-500 opacity-0 group-hover/csm:opacity-100 transition">ver ventas ↗</span>
+            </div>
+          </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">
               <Avatar className="h-12 w-12 border-2 border-border">
