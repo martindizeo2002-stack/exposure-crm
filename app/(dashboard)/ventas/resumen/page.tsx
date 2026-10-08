@@ -1091,160 +1091,175 @@ export default function ResumenVentasPage() {
             </div>
           </div>
 
+          {/* Barra de Búsqueda y Globo Buscador de Leads (Ancho Completo) */}
+          <div id="globo-buscador-leads" className="rounded-2xl border-2 border-emerald-500/30 bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 p-4 shadow-xl shadow-emerald-950/20 backdrop-blur space-y-3">
+            <div className="flex items-center justify-between px-1 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300 text-sm shadow-inner border border-emerald-500/40">
+                  🎈
+                </span>
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                    <span>Barra de Búsqueda de Leads &amp; Globo Emergente</span>
+                  </h4>
+                  <p className="text-[11px] text-zinc-400">
+                    Buscá cualquier lead por nombre, teléfono o @instagram para auditar sus datos o moverlo a la fecha activa: <strong className="text-emerald-300 font-semibold">{fecha}</strong>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setGloboBuscadorAbierto(true)}
+                  className="h-7 text-xs border-emerald-500/40 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/25 flex items-center gap-1.5 shadow-sm font-semibold"
+                  title="Abrir en ventana emergente (Ctrl+K)"
+                >
+                  <span className="text-sm">🎈</span>
+                  <span>Abrir Globo Modal</span>
+                  <kbd className="hidden sm:inline-block text-[10px] bg-emerald-950 px-1 py-0.5 rounded border border-emerald-500/30 font-mono text-emerald-400">Ctrl K</kbd>
+                </Button>
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2.5 rounded-xl border border-emerald-500/40 bg-zinc-950 px-3.5 py-2.5 text-xs focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/25 transition-all shadow-inner">
+                <Search className="h-4 w-4 text-emerald-400 shrink-0" />
+                <Input
+                  id="input-globo-busqueda"
+                  placeholder="Escribí el nombre, teléfono o @instagram para buscar en todo el CRM y mover a este día..."
+                  value={busquedaLead}
+                  onChange={(e) => setBusquedaLead(e.target.value)}
+                  className="h-6 border-0 bg-transparent p-0 text-xs text-white placeholder:text-zinc-500 focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
+                {busquedaLead && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-zinc-400 hover:text-white"
+                    onClick={() => {
+                      setBusquedaLead("")
+                      setResultadosBusqueda([])
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                {buscandoLead && <Loader2 className="h-4 w-4 animate-spin text-emerald-400 shrink-0" />}
+              </div>
+
+              {/* Resultados de Búsqueda Desplegables */}
+              {busquedaLead.trim().length >= 2 && (
+                <div className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-emerald-500/30 bg-zinc-950 p-2 text-xs shadow-2xl space-y-1.5">
+                  <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 border-b border-white/10">
+                    <span>
+                      {buscandoLead
+                        ? "Buscando en la base de datos..."
+                        : `Resultados encontrados (${resultadosBusqueda.length})`}
+                    </span>
+                    <span className="text-[10px] text-zinc-500 font-normal">
+                      Hacé clic en &quot;Mover a {fecha}&quot; para reubicar la llamada
+                    </span>
+                  </div>
+
+                  {resultadosBusqueda.length === 0 && !buscandoLead ? (
+                    <div className="p-4 text-center text-zinc-500 text-xs">
+                      No se encontraron leads con &quot;{busquedaLead}&quot; en el CRM.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 pt-1">
+                      {resultadosBusqueda.map((lead: any) => {
+                        const fechaCorta = lead.fecha_closer ? lead.fecha_closer.slice(0, 10) : "Sin fecha"
+                        const horaCorta = lead.fecha_closer ? lead.fecha_closer.slice(11, 16) : ""
+                        const esMismoDia = fechaCorta === fecha
+                        const moviendo = moviendoLeadId === lead.id
+
+                        return (
+                          <div
+                            key={lead.id}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-zinc-900/70 p-2.5 hover:border-emerald-500/40 hover:bg-zinc-900 transition-all"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-white truncate">
+                                  {lead.nombre || "Sin nombre"}
+                                </span>
+                                {lead.calificacion && (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "text-[10px] px-1.5 py-0 h-4 border-white/10",
+                                      lead.calificacion.includes("A") && "border-emerald-500/40 text-emerald-300 bg-emerald-500/10",
+                                      lead.calificacion.includes("B") && "border-blue-500/40 text-blue-300 bg-blue-500/10",
+                                      lead.calificacion.includes("C") && "border-amber-500/40 text-amber-300 bg-amber-500/10",
+                                      lead.calificacion.includes("D") && "border-zinc-500/40 text-zinc-400 bg-zinc-500/10"
+                                    )}
+                                  >
+                                    {lead.calificacion}
+                                  </Badge>
+                                )}
+                                {lead.closer && (
+                                  <span className="text-[10px] text-zinc-400">
+                                    Closer: <strong className="text-zinc-300">{lead.closer}</strong>
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="mt-1 flex items-center gap-3 text-[11px] text-zinc-400 flex-wrap">
+                                {lead.telefono && <span>📞 {lead.telefono}</span>}
+                                {lead.instagram && <span>📸 @{lead.instagram.replace(/^@/, "")}</span>}
+                                <span className={cn(
+                                  "font-medium",
+                                  esMismoDia ? "text-emerald-400" : "text-amber-400"
+                                )}>
+                                  📅 {esMismoDia ? `En este día (${horaCorta || "10:00"})` : `Agendado: ${fechaCorta} ${horaCorta}`}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={moviendo}
+                                onClick={() => moverLeadAFecha(lead, fecha)}
+                                className="h-7 text-[11px] px-2.5 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200"
+                                title={`Mover lead al día del reporte (${fecha})`}
+                              >
+                                {moviendo ? (
+                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                ) : (
+                                  <CalendarDays className="h-3 w-3 mr-1 text-emerald-400" />
+                                )}
+                                Mover a {fecha}
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => abrirEdicionLead(lead)}
+                                className="h-7 text-[11px] px-2 text-zinc-300 hover:text-white hover:bg-white/5"
+                                title="Abrir ficha completa del lead"
+                              >
+                                <Pencil className="h-3 w-3 mr-1 text-zinc-400" />
+                                Ficha
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Split 2 Columnas: Detalle de Llamadas & Vista Previa WhatsApp */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {/* Columna Izquierda: Detalle de Llamadas (7 Cols) */}
             <div className="space-y-4 lg:col-span-7">
-              {/* Globo de Búsqueda y Reubicación de Leads */}
-              <div id="globo-buscador-leads" className="relative rounded-2xl border-2 border-emerald-500/25 bg-gradient-to-r from-zinc-950 via-zinc-900/90 to-zinc-950 p-3.5 shadow-xl shadow-emerald-950/20 backdrop-blur">
-                <div className="flex items-center justify-between mb-2 px-1">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 text-xs shadow-inner">
-                      🎈
-                    </span>
-                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                      Globo de Búsqueda de Leads
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-zinc-400 font-medium">
-                    Mover a: <strong className="text-emerald-300 font-semibold">{fecha}</strong>
-                  </span>
-                </div>
-
-                <div className="relative">
-                  <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-zinc-950/90 px-3.5 py-2 text-xs focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all shadow-inner">
-                    <Search className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <Input
-                      id="input-globo-busqueda"
-                      placeholder="Escribí el nombre, teléfono o @instagram para buscar y mover a este día..."
-                      value={busquedaLead}
-                      onChange={(e) => setBusquedaLead(e.target.value)}
-                      className="h-6 border-0 bg-transparent p-0 text-xs text-white placeholder:text-zinc-500 focus-visible:ring-0 focus-visible:ring-offset-0"
-                    />
-                    {busquedaLead && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 text-zinc-400 hover:text-white"
-                        onClick={() => {
-                          setBusquedaLead("")
-                          setResultadosBusqueda([])
-                        }}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    {buscandoLead && <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400 shrink-0" />}
-                  </div>
-
-                  {/* Dropdown flotante con resultados de búsqueda */}
-                  {busquedaLead.trim().length >= 2 && (
-                    <div className="mt-2.5 space-y-2 rounded-lg border border-white/10 bg-zinc-950/95 p-2 shadow-xl">
-                      <div className="flex items-center justify-between px-2 py-1 text-[11px] text-zinc-400 border-b border-white/5">
-                        <span>
-                          {buscandoLead
-                            ? "Buscando en la base de datos..."
-                            : `Resultados encontrados (${resultadosBusqueda.length})`}
-                        </span>
-                        <span className="text-[10px] text-zinc-500">
-                          Día destino: <strong className="text-emerald-400">{fecha}</strong>
-                        </span>
-                      </div>
-
-                      {resultadosBusqueda.length === 0 && !buscandoLead ? (
-                        <div className="p-4 text-center text-xs text-zinc-500">
-                          No se encontraron leads con "{busquedaLead}" en el CRM.
-                        </div>
-                      ) : (
-                        <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
-                          {resultadosBusqueda.map((lead: any) => {
-                            const leadFecha = lead.fecha_closer || lead.fecha_agenda || ""
-                            const fechaCorta = leadFecha ? leadFecha.slice(0, 10) : "Sin fecha"
-                            const horaCorta = leadFecha && leadFecha.length >= 16 ? leadFecha.slice(11, 16) : ""
-                            const esMismoDia = fechaCorta === fecha
-                            const moviendo = moviendoLeadId === lead.id
-
-                            return (
-                              <div
-                                key={lead.id}
-                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-md border border-white/5 bg-zinc-900/60 p-2.5 hover:bg-zinc-900 transition-colors"
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-xs font-bold text-white truncate">
-                                      {lead.nombre || "Sin nombre"}
-                                    </span>
-                                    {lead.calificacion && (
-                                      <Badge
-                                        variant="outline"
-                                        className={cn(
-                                          "text-[10px] px-1.5 py-0 h-4 border-white/10",
-                                          lead.calificacion.includes("A") && "border-emerald-500/40 text-emerald-300 bg-emerald-500/10",
-                                          lead.calificacion.includes("B") && "border-blue-500/40 text-blue-300 bg-blue-500/10",
-                                          lead.calificacion.includes("C") && "border-amber-500/40 text-amber-300 bg-amber-500/10",
-                                          lead.calificacion.includes("D") && "border-zinc-500/40 text-zinc-400 bg-zinc-500/10"
-                                        )}
-                                      >
-                                        {lead.calificacion}
-                                      </Badge>
-                                    )}
-                                    {lead.closer && (
-                                      <span className="text-[10px] text-zinc-400">
-                                        Closer: <strong className="text-zinc-300">{lead.closer}</strong>
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <div className="mt-1 flex items-center gap-3 text-[11px] text-zinc-400 flex-wrap">
-                                    {lead.telefono && <span>📞 {lead.telefono}</span>}
-                                    {lead.instagram && <span>📸 @{lead.instagram.replace(/^@/, "")}</span>}
-                                    <span className={cn(
-                                      "font-medium",
-                                      esMismoDia ? "text-emerald-400" : "text-amber-400"
-                                    )}>
-                                      📅 {esMismoDia ? `En este día (${horaCorta || "10:00"})` : `Agendado: ${fechaCorta} ${horaCorta}`}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={moviendo}
-                                    onClick={() => moverLeadAFecha(lead, fecha)}
-                                    className="h-7 text-[11px] px-2.5 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200"
-                                    title={`Mover lead al día del reporte (${fecha})`}
-                                  >
-                                    {moviendo ? (
-                                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                    ) : (
-                                      <CalendarDays className="h-3 w-3 mr-1 text-emerald-400" />
-                                    )}
-                                    Mover a {fecha}
-                                  </Button>
-
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => abrirEdicionLead(lead)}
-                                    className="h-7 text-[11px] px-2 text-zinc-300 hover:text-white hover:bg-white/5"
-                                    title="Abrir ficha completa del lead"
-                                  >
-                                    <Pencil className="h-3 w-3 mr-1 text-zinc-400" />
-                                    Ficha
-                                  </Button>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-white">
                   Llamadas del período ({callsFiltradas.length})
