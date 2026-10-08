@@ -168,16 +168,52 @@ export async function POST(request: Request) {
         const fechaCloser = callWallTime(call)
         // misma persona (teléfono o nombre) con llamada el mismo día = la misma agenda (el sheet y iClosed
         // pueden diferir en minutos o zona horaria)
-        const duplicate = (agendas || []).find((row: any) => {
-          const sameIdentity = (phone && normPhone(row.telefono) === phone)
-            || String(row.nombre || "").trim().toLowerCase() === String(call.inviteeName || "").trim().toLowerCase()
-          const dia = String(fechaCloser || "").slice(0, 10)
-          const diaRow = String(row.fecha_closer || row.fecha_agenda || "").slice(0, 10)
-          const cerca = dia && diaRow && Math.abs(new Date(dia).getTime() - new Date(diaRow).getTime()) <= 86400000
-          return sameIdentity && cerca
+        const extracted = answerFields(call)
+        const cleanCallName = String(call.inviteeName || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
+        const cleanCallIg = extracted.instagram ? String(extracted.instagram).replace(/[@\s]/g, "").toLowerCase().trim() : ""
+
+        // Identificar si ya existe una agenda para esta persona (evitar duplicados por reagendamientos o cambio de fecha)
+        const existingAgenda = (agendas || []).find((row: any) => {
+          const samePhone = phone && normPhone(row.telefono) === phone
+          const rowIg = row.instagram ? String(row.instagram).replace(/[@\s]/g, "").toLowerCase().trim() : ""
+          const sameIg = cleanCallIg && rowIg && cleanCallIg === rowIg
+          const samePerson = personId && row.person_id && row.person_id === personId
+          const rowName = String(row.nombre || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
+          const sameName = cleanCallName.length >= 6 && cleanCallName === rowName
+          const sameIdentity = samePhone || sameIg || samePerson || sameName
+          if (!sameIdentity) return false
+
+          const rowDateStr = row.fecha_closer || row.fecha_agenda || row.created_at
+          if (!rowDateStr) return true
+          const rowDate = new Date(rowDateStr)
+          const callDate = new Date(fechaCloser || call.createdAt || "")
+          const diffDays = Math.abs(callDate.getTime() - rowDate.getTime()) / (1000 * 60 * 60 * 24)
+          return diffDays <= 45
         })
-        if (!duplicate && recent && fechaCloser && call.inviteeName) {
-          const extracted = answerFields(call)
+
+        if (existingAgenda) {
+          // Reagendamiento / actualizacion: actualizar fecha de llamada y datos en la agenda existente sin crear duplicado
+          if (!dryRun) {
+            const updates: Record<string, any> = {}
+            if (fechaCloser && existingAgenda.fecha_closer !== fechaCloser) {
+              updates.fecha_closer = fechaCloser
+              updates.fecha_agenda = fechaCloser
+            }
+            if (closer && !existingAgenda.closer) updates.closer = closer
+            if (phone && !existingAgenda.telefono) updates.telefono = phone
+            if (extracted.instagram && !existingAgenda.instagram) updates.instagram = extracted.instagram
+            for (const [k, v] of Object.entries(extracted)) {
+              if (!k.startsWith("__") && v && !existingAgenda[k]) {
+                updates[k] = v
+              }
+            }
+            if (Object.keys(updates).length > 0) {
+              await admin.from("agendas").update(updates).eq("id", existingAgenda.id)
+              Object.assign(existingAgenda, updates)
+              agendasUpdated++
+            }
+          }
+        } else if (recent && fechaCloser && call.inviteeName) {
           const score = autoScoreLead(extracted)
           if (!dryRun) {
             const { data: inserted, error } = await admin.from("agendas").insert({

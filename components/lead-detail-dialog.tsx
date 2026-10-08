@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
@@ -320,16 +321,27 @@ export function LeadDetailDialog({
       updates.fecha_agenda = updates.fecha_closer
     }
     const { id: _id, ...body } = updates
-    const response = await fetch("/api/agendas", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: agenda.id, ...body }),
-    })
-    setSaving(false)
-    if (!response.ok) return
-    const updated = { ...agenda, ...body } as Agenda
-    onSaved(updated)
-    setEditMode(false)
+    try {
+      const response = await fetch("/api/agendas", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: agenda.id, ...body }),
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        toast.error(data?.error || "Error al actualizar la ficha del lead")
+        setSaving(false)
+        return
+      }
+      toast.success("Ficha del lead actualizada")
+      const updated = { ...agenda, ...body } as Agenda
+      onSaved(updated)
+      setEditMode(false)
+    } catch (err: any) {
+      toast.error(err?.message || "Error de conexión al guardar cambios")
+    } finally {
+      setSaving(false)
+    }
   }
 
   const inputClass = "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold"

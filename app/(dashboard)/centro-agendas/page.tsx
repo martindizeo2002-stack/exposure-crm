@@ -859,7 +859,15 @@ export default function CentroAgendasPage() {
         // Es esencial al usar “Guardar y siguiente”, donde cambia el registro
         // sin que el usuario cierre manualmente el flujo.
         setEditing({ ...full })
-        setForm({ ...full })
+        setForm(prev => {
+          const merged = { ...full }
+          for (const key of Object.keys(prev) as Array<keyof Agenda>) {
+            if (prev[key] !== undefined && prev[key] !== (a as any)[key]) {
+              (merged as any)[key] = prev[key]
+            }
+          }
+          return merged
+        })
       }
     } catch {}
   }

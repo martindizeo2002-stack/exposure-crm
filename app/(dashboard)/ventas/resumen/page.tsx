@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { mutate } from "swr"
 import { Calendar as CalendarIcon,
   PhoneCall,
   CheckCircle2,
@@ -66,6 +67,7 @@ export default function ResumenVentasPage() {
   const [leadEditando, setLeadEditando] = useState<CallDetalle | null>(null)
   const [cargandoAgendaId, setCargandoAgendaId] = useState<string | number | null>(null)
   const [tabModal, setTabModal] = useState<"comercial" | "contacto" | "llamada" | "contexto">("comercial")
+  const agendaOriginalRef = useRef<Agenda | null>(null)
   const [formEdit, setFormEdit] = useState<{
     lead_scoring: string
     macro_arquetipo: string
@@ -164,6 +166,7 @@ export default function ResumenVentasPage() {
       if (res.ok) {
         const data: Agenda = await res.json()
         if (data) {
+          agendaOriginalRef.current = data
           setFormEdit(prev => ({
             ...prev,
             closer: data.closer || prev.closer,
@@ -217,26 +220,32 @@ export default function ResumenVentasPage() {
         estadoFinal = "Cierre"
       }
 
+      const orig = agendaOriginalRef.current
+      const pickVal = (newVal: string | null | undefined, origVal: string | null | undefined) => {
+        if (newVal !== undefined && newVal !== null && newVal.trim() !== "") return newVal.trim()
+        return origVal || null
+      }
+
       const updates: any = {
         id: leadEditando.agenda_id,
-        closer: formEdit.closer || null,
-        setter: formEdit.setter || null,
-        telefono: formEdit.telefono || null,
-        email: formEdit.email || null,
-        instagram: formEdit.instagram || null,
-        fecha_closer: formEdit.fecha_closer ? `${formEdit.fecha_closer}:00` : null,
-        link_fathom: formEdit.link_fathom || null,
-        problema_actual: formEdit.problema_actual || null,
-        tiempo_problema: formEdit.tiempo_problema || null,
-        intentos_previos: formEdit.intentos_previos || null,
-        motivo_urgencia: formEdit.motivo_urgencia || null,
-        ingresos: formEdit.ingresos || null,
-        inversion: formEdit.inversion || null,
+        closer: pickVal(formEdit.closer, orig?.closer),
+        setter: pickVal(formEdit.setter, orig?.setter),
+        telefono: pickVal(formEdit.telefono, orig?.telefono),
+        email: pickVal(formEdit.email, orig?.email || (orig as any)?.crm_people?.primary_email),
+        instagram: pickVal(formEdit.instagram, orig?.instagram),
+        fecha_closer: formEdit.fecha_closer ? `${formEdit.fecha_closer}:00` : (orig?.fecha_closer || null),
+        link_fathom: pickVal(formEdit.link_fathom, orig?.link_fathom),
+        problema_actual: pickVal(formEdit.problema_actual, orig?.problema_actual),
+        tiempo_problema: pickVal(formEdit.tiempo_problema, orig?.tiempo_problema),
+        intentos_previos: pickVal(formEdit.intentos_previos, orig?.intentos_previos),
+        motivo_urgencia: pickVal(formEdit.motivo_urgencia, orig?.motivo_urgencia),
+        ingresos: pickVal(formEdit.ingresos, orig?.ingresos),
+        inversion: pickVal(formEdit.inversion, orig?.inversion),
         calificacion: formEdit.lead_scoring,
         lead_score_grade: formEdit.lead_scoring,
-        ocupacion: ocupacionFinal,
-        calificaba_realmente: formEdit.calificaba_realmente === "Sin definir" ? null : formEdit.calificaba_realmente,
-        motivo_no_cierre: formEdit.motivo_no_cierre || (formEdit.objecion && formEdit.objecion !== "none" ? formEdit.objecion : null),
+        ocupacion: ocupacionFinal || orig?.ocupacion || null,
+        calificaba_realmente: formEdit.calificaba_realmente === "Sin definir" ? (orig?.calificaba_realmente || null) : formEdit.calificaba_realmente,
+        motivo_no_cierre: formEdit.motivo_no_cierre || (formEdit.objecion && formEdit.objecion !== "none" ? formEdit.objecion : null) || orig?.motivo_no_cierre || null,
         estado: estadoFinal,
       }
 
@@ -270,6 +279,7 @@ export default function ResumenVentasPage() {
       toast.success("Lead actualizado exitosamente en Agendas de Exposure OS")
       setModalLeadAbierto(false)
       setLeadEditando(null)
+      await mutate((key: string) => typeof key === "string" && key.startsWith("/api/agendas"))
       await cargarResumen()
     } catch (err: any) {
       toast.error(err.message || "Error al guardar cambios")

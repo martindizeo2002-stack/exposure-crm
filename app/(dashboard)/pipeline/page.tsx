@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
-import useSWR from "swr"
+import useSWR, { mutate } from "swr"
 import {
   DndContext,
   DragOverlay,
@@ -668,6 +668,7 @@ export default function PipelinePage() {
       })
       if (!res.ok) throw new Error(`PATCH /api/agendas fallo con status ${res.status}`)
       mutateAgendas()
+      void mutate((key: string) => typeof key === "string" && key.startsWith("/api/agendas"))
     } catch (err) {
       console.error("Error al mover el lead en el pipeline:", err)
       mutateAgendas(previousAgendas, { revalidate: false })
@@ -828,7 +829,7 @@ export default function PipelinePage() {
         </DndContext>
       )}
 
-      <LeadDetailDialog agenda={detailAgenda} stage={detailStage} pays={pays} onClose={() => setDetailAgenda(null)} onSaved={(updated) => { setDetailAgenda(updated); mutateAgendas() }} />
+      <LeadDetailDialog agenda={detailAgenda} stage={detailStage} pays={pays} onClose={() => setDetailAgenda(null)} onSaved={(updated) => { setDetailAgenda(updated); void mutateAgendas(); void mutate((key: string) => typeof key === "string" && key.startsWith("/api/agendas")) }} />
     </div>
   )
 }

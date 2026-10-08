@@ -166,19 +166,59 @@ export async function POST(request: Request) {
     // borró el período, por lo que solo necesita el filtro interno de arriba.
     let preparedToInsert = prepared
     if (mode !== "replace_month") {
-      const callDates = rows.map((row) => String(row.fecha_closer || "")).filter(Boolean).sort()
-      const bookingDates = rows.map((row) => String(row.fecha_agenda || "")).filter(Boolean).sort()
-      let existingQuery = sb.from("agendas").select("nombre,telefono,instagram,fecha_agenda,fecha_closer,closer")
-      if (callDates.length) existingQuery = existingQuery.gte("fecha_closer", callDates[0]).lte("fecha_closer", callDates.at(-1)!)
-      else if (bookingDates.length) existingQuery = existingQuery.gte("fecha_agenda", bookingDates[0]).lte("fecha_agenda", bookingDates.at(-1)!)
-      const { data: existing, error: existingError } = await existingQuery.limit(5000)
+      // Traer agendas recientes para matchear tanto por clave exacta como por identidad (evitar duplicados por reagendas)
+      const { data: existingRecent, error: existingError } = await sb
+        .from("agendas")
+        .select("id,nombre,telefono,instagram,fecha_agenda,fecha_closer,closer,created_at")
+        .or("estado.is.null,estado.neq.Archivada manualmente")
+        .order("created_at", { ascending: false })
+        .limit(3000)
       if (existingError) return NextResponse.json({ error: `dedupe: ${existingError.message}` }, { status: 500 })
-      const existingKeys = new Set((existing || []).map((row) => agendaExactKey(row)).filter(Boolean))
-      preparedToInsert = prepared.filter(({ row }) => {
+
+      const existingKeys = new Set((existingRecent || []).map((row) => agendaExactKey(row)).filter(Boolean))
+
+      const toInsert: typeof prepared = []
+      for (const item of prepared) {
+        const { row } = item
         const key = agendaExactKey(row)
-        return !key || !existingKeys.has(key)
-      })
-      ignoredDuplicates += prepared.length - preparedToInsert.length
+        if (key && existingKeys.has(key)) {
+          ignoredDuplicates++
+          continue
+        }
+
+        // Buscar si coincide con un lead existente por telefono o Instagram en la misma ventana (reagenda)
+        const rowPhone = normKey(row.telefono)
+        const rowIg = normKey(row.instagram)
+        const rowName = normKey(row.nombre)
+
+        const match = (existingRecent || []).find((ex) => {
+          const exPhone = normKey(ex.telefono)
+          const exIg = normKey(ex.instagram)
+          const exName = normKey(ex.nombre)
+          const samePhone = rowPhone && exPhone && rowPhone === exPhone
+          const sameIg = rowIg && exIg && rowIg === exIg
+          const sameName = rowName.length >= 6 && rowName === exName
+          return samePhone || sameIg || sameName
+        })
+
+        if (match) {
+          // Reagendamiento: actualizar fecha_closer y datos en la agenda existente sin crear duplicado
+          const patch: Record<string, unknown> = {}
+          if (row.fecha_closer && match.fecha_closer !== row.fecha_closer) patch.fecha_closer = row.fecha_closer
+          if (row.closer && !match.closer) patch.closer = row.closer
+          if (row.telefono && !match.telefono) patch.telefono = row.telefono
+          if (row.instagram && !match.instagram) patch.instagram = row.instagram
+          if (Object.keys(patch).length > 0) {
+            patch.updated_at = new Date().toISOString()
+            await sb.from("agendas").update(patch).eq("id", match.id)
+          }
+          ignoredDuplicates++
+        } else {
+          toInsert.push(item)
+        }
+      }
+
+      preparedToInsert = toInsert
       rows = preparedToInsert.map(({ row }) => row)
     }
     if (rows.length === 0) return NextResponse.json({ ok: true, mode, deleted, inserted: 0, ignored_duplicates: ignoredDuplicates, attribution: { inserted: 0 } })
