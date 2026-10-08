@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     // 1. Buscar todos los registros de Agus Garcia
     const { data: records, error } = await sb
       .from("agendas")
-      .select("id, nombre, closer, setter, fecha_agenda, fecha_closer, show, cerro, estado, calificacion, motivo_no_cierre, created_at, iclosed_id")
+      .select("id, nombre, closer, setter, fecha_agenda, fecha_closer, show, cerro, estado, calificacion, motivo_no_cierre, created_at")
       .or("nombre.ilike.%agus%garcia%,nombre.ilike.%agustin%garcia%")
       .order("id", { ascending: true })
 
@@ -21,10 +21,9 @@ export async function GET(request: Request) {
     }
 
     if (!records || records.length === 0) {
-      // Buscar con filtro mas amplio
       const { data: broader, error: bErr } = await sb
         .from("agendas")
-        .select("id, nombre, closer, setter, fecha_agenda, fecha_closer, show, cerro, estado, calificacion, motivo_no_cierre, created_at, iclosed_id")
+        .select("id, nombre, closer, setter, fecha_agenda, fecha_closer, show, cerro, estado, calificacion, motivo_no_cierre, created_at")
         .or("nombre.ilike.%agus%,nombre.ilike.%garcia%")
         .order("id", { ascending: true })
 
@@ -57,8 +56,6 @@ export async function GET(request: Request) {
 
         archivedResult = { archivedId: recOct8.id, data: arch, error: aErr?.message }
       } else if (records.length > 1) {
-        // Fallback: si hay dos y ninguno dice 8/10 explicitamente en fecha_closer,
-        // archivar el que NO sea del 6/10 o el mas reciente
         const toArchive = records[records.length - 1]
         const { data: arch, error: aErr } = await sb
           .from("agendas")
@@ -91,7 +88,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // Consultar estado final tras la acción
     const { data: finalRecords } = await sb
       .from("agendas")
       .select("id, nombre, closer, setter, fecha_agenda, fecha_closer, show, cerro, estado, calificacion, motivo_no_cierre")
