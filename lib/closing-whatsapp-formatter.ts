@@ -57,6 +57,9 @@ export type CallDetalle = {
   ia_analisis?: string | null
   resumen_chat?: string | null
   calificacion?: string | null
+  fathom_summary?: string | null
+  transcript?: string | null
+  trace_analysis?: any | null
 }
 
 export type MetricasClosing = {

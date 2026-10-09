@@ -80,72 +80,99 @@ function getDiagnosticoTextoLead(c: CallDetalle | null | undefined): string {
   if (!c) return "No hay ningún lead seleccionado en el período activo."
 
   const f = c.fathom_lead || {}
-  const textIA = (c as any).ia_analisis || ""
   const textFathom = (c as any).fathom_summary || ""
+  const textIA = (c as any).ia_analisis || ""
   const textChat = (c as any).resumen_chat || ""
 
-  // 1. Situacion actual del lead: (que lo saque del fathom)
-  const situacionActual =
-    f.situacion_actual ||
-    extractSectionText(textIA, ["situacion actual", "situacion", "perfil", "ocupacion"]) ||
-    extractSectionText(textFathom, ["situacion actual", "situacion", "current situation"]) ||
-    c.subarquetipo ||
-    c.arquetipo_macro ||
-    "No registrada en la llamada"
+  // 1. Situacion actual del lead: (Fathom + CRM)
+  let situacionActual = f.situacion_actual || ""
+  if (!situacionActual || situacionActual === "No registrada en la llamada") {
+    situacionActual =
+      extractSectionText(textFathom, ["current situation", "situacion actual", "situacion", "perfil", "background"]) ||
+      extractSectionText(textIA, ["situacion actual", "situacion", "perfil", "ocupacion"]) ||
+      c.subarquetipo ||
+      c.arquetipo_macro ||
+      "No registrada en la llamada"
+  }
 
-  // 2. Calificacion del lead: \"A-B-C-D\" (que lo saque del crm)
+  // 2. Calificacion del lead: "A-B-C-D" (del CRM)
   const califRaw = (c.calificacion || c.lead_score || "B").replace(/LEAD\s*/i, "").trim().slice(0, 1).toUpperCase()
   const califCRM = ["A", "B", "C", "D"].includes(califRaw) ? califRaw : (c.es_calificado ? "A" : "C")
 
-  // 3. Situacion deseada: (que lo saque del fathom)
-  const situacionDeseada =
-    f.situacion_deseada ||
-    extractSectionText(textIA, ["situacion deseada", "deseo", "objetivo", "meta"]) ||
-    extractSectionText(textFathom, ["desired outcome", "goal", "deseo", "objetivo"]) ||
-    c.fathom?.deseo_principal ||
-    "No especificada en la grabación"
+  // 3. Situacion deseada: (Fathom + CRM)
+  let situacionDeseada = f.situacion_deseada || ""
+  if (!situacionDeseada || situacionDeseada.toLowerCase().includes("no especificada")) {
+    situacionDeseada =
+      extractSectionText(textFathom, ["desired outcome", "desired outcomes", "goal", "goals", "deseo", "objetivo", "meta", "aspira"]) ||
+      extractSectionText(textIA, ["situacion deseada", "deseo", "objetivo", "meta", "aspira"]) ||
+      c.fathom?.deseo_principal ||
+      ""
+  }
+  if ((!situacionDeseada || situacionDeseada.toLowerCase().includes("no especificada")) && c.porque_agendo && /quiere|vivir de|ganar|libertad|extra/i.test(c.porque_agendo)) {
+    const m = c.porque_agendo.match(/(?:quiere|busca|desea)\s+([^.]+)/i)
+    if (m) situacionDeseada = `Quiere ${m[1].trim()}`
+  }
+  if (!situacionDeseada) {
+    situacionDeseada = "No especificada en la llamada"
+  }
 
-  // 4. Dolor o Problema: (que lo saque del fathom)
-  const dolorProblema =
-    f.dolor_problema ||
-    extractSectionText(textIA, ["dolor", "problema", "pain point", "freno"]) ||
-    extractSectionText(textFathom, ["pain point", "dolor", "problema"]) ||
-    c.porque_agendo ||
-    c.fathom?.dolor_principal ||
-    "No detectado"
+  // 4. Dolor o Problema: (Fathom + CRM)
+  let dolorProblema = f.dolor_problema || ""
+  if (!dolorProblema || dolorProblema === "No detectado") {
+    dolorProblema =
+      extractSectionText(textFathom, ["pain point", "pain points", "challenges", "dolor", "problema", "desafio"]) ||
+      extractSectionText(textIA, ["dolor", "problema", "pain point", "freno"]) ||
+      c.porque_agendo ||
+      c.fathom?.dolor_principal ||
+      "No detectado"
+  }
 
-  // 5. Objecion: (que lo saque del fathom)
-  const objecion =
-    f.objecion ||
-    extractSectionText(textIA, ["objecion", "freno", "duda"]) ||
-    extractSectionText(textFathom, ["objection", "objecion"]) ||
-    c.objecion_principal ||
-    "Sin objeción registrada"
+  // 5. Objecion: (Fathom + CRM)
+  let objecion = f.objecion || ""
+  if (!objecion || objecion === "Sin objeción registrada") {
+    objecion =
+      extractSectionText(textFathom, ["objection", "objections", "concerns", "objecion", "freno", "duda"]) ||
+      extractSectionText(textIA, ["objecion", "freno", "duda"]) ||
+      c.objecion_principal ||
+      "Sin objeción registrada"
+  }
 
-  // 6. Porque no CERRO: (que lo saque del fathom)
+  // 6. Porque no CERRO: (Fathom + CRM)
   const esCierre = c.resultado === "CIERRE" || c.resultado === "FEE"
-  const porqueNoCerro = esCierre
-    ? "N/A (La llamada cerró exitosamente)"
-    : (f.porque_no_cerro ||
-       extractSectionText(textIA, ["porque no cerro", "por que no cerro", "motivo no cierre", "why not bought"]) ||
-       extractSectionText(textFathom, ["why not bought", "reason not closed", "no cerro"]) ||
-       c.motivo_real ||
-       c.objecion_principal ||
-       "No cerrada sin motivo detallado")
+  let porqueNoCerro = ""
+  if (esCierre) {
+    porqueNoCerro = "N/A (La llamada cerró exitosamente)"
+  } else {
+    porqueNoCerro = f.porque_no_cerro || ""
+    if (!porqueNoCerro || porqueNoCerro === "No cerrada sin motivo detallado") {
+      porqueNoCerro =
+        extractSectionText(textFathom, ["why not bought", "reason not closed", "no cerro", "next steps"]) ||
+        extractSectionText(textIA, ["porque no cerro", "por que no cerro", "motivo no cierre", "why not bought"]) ||
+        c.motivo_real ||
+        c.objecion_principal ||
+        "No cerrada sin motivo detallado"
+    }
+  }
 
-  // 7. Motivo de CIERRE: (que lo saque del fathom)
-  const motivoCierre = !esCierre
-    ? "N/A (No cerró en esta llamada)"
-    : (f.motivo_cierre ||
-       extractSectionText(textIA, ["motivo de cierre", "motivo cierre", "why bought", "por que compro"]) ||
-       extractSectionText(textFathom, ["why bought", "cierre"]) ||
-       (c.cash_d1 > 0 ? `Cierre confirmado con cobro D1 de $${c.cash_d1} USD` : "Propuesta y claridad en el modelo"))
+  // 7. Motivo de CIERRE: (Fathom + CRM)
+  let motivoCierre = ""
+  if (!esCierre) {
+    motivoCierre = "N/A (No cerró en esta llamada)"
+  } else {
+    motivoCierre = f.motivo_cierre || ""
+    if (!motivoCierre) {
+      motivoCierre =
+        extractSectionText(textFathom, ["why bought", "cierre", "outcome"]) ||
+        extractSectionText(textIA, ["motivo de cierre", "motivo cierre", "why bought", "por que compro"]) ||
+        (c.cash_d1 > 0 ? `Cierre confirmado con cobro D1 de ${c.cash_d1} USD` : "Propuesta y claridad en el modelo")
+    }
+  }
 
-  // 8. Resumen de la llamada: (que lo saque del fathom)
+  // 8. Resumen de la llamada: (PRIORIDAD AL SUMMARY REAL DE FATHOM)
   const resumenLlamada =
-    f.resumen_llamada ||
+    (textFathom && textFathom.trim().length > 20 ? textFathom.trim() : null) ||
+    (f.resumen_llamada && f.resumen_llamada.trim().length > 20 ? f.resumen_llamada.trim() : null) ||
     textIA ||
-    textFathom ||
     textChat ||
     `Llamada de closing con ${c.closer}. Resultado: ${c.resultado}. Calificación: "${califCRM}". Lead: ${c.nombre}.`
 

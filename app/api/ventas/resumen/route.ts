@@ -62,6 +62,87 @@ function parseFathomText(summary?: string | null, transcript?: string | null): F
   return diag
 }
 
+
+function parseFathomMarkdown(text?: string | null): {
+  summary: string
+  pain_points: string[]
+  goals: string[]
+  objections: string[]
+  situation: string
+  next_steps: string[]
+} {
+  const res = {
+    summary: "",
+    pain_points: [] as string[],
+    goals: [] as string[],
+    objections: [] as string[],
+    situation: "",
+    next_steps: [] as string[],
+  }
+  if (!text) return res
+
+  const lines = text.split("\n")
+  let currentSec = ""
+  const summaryLines: string[] = []
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+
+    if (/^#+\s+(?:summary|resumen|overview)/i.test(trimmed)) {
+      currentSec = "summary"
+      continue
+    } else if (/^#+\s+(?:pain\s*points?|challenges?|problemas?|dolores?)/i.test(trimmed)) {
+      currentSec = "pain_points"
+      continue
+    } else if (/^#+\s+(?:goals?|desired\s*outcomes?|objetivos?|metas?|deseos?)/i.test(trimmed)) {
+      currentSec = "goals"
+      continue
+    } else if (/^#+\s+(?:objections?|concerns?|objecion(?:es)?|frenos?)/i.test(trimmed)) {
+      currentSec = "objections"
+      continue
+    } else if (/^#+\s+(?:next\s*steps?|action\s*items?|pr[oó]ximos\s*pasos?)/i.test(trimmed)) {
+      currentSec = "next_steps"
+      continue
+    } else if (/^#+\s+(?:situation|situaci[oó]n|contexto|background)/i.test(trimmed)) {
+      currentSec = "situation"
+      continue
+    } else if (/^#+\s+/i.test(trimmed)) {
+      currentSec = "other"
+    }
+
+    const cleanBullet = trimmed.replace(/^[-*•\d.]+\s*/, "").trim()
+    const cleanTag = cleanBullet.replace(/^\*\*([^*]+)\*\*[:\s-]*/, "$1: ").trim()
+
+    if (/^(?:current\s*situation|situaci[oó]n\s*actual|perfil|background|situaci[oó]n)[:\s-]/i.test(cleanTag)) {
+      res.situation = cleanTag.replace(/^(?:current\s*situation|situaci[oó]n\s*actual|perfil|background|situaci[oó]n)[:\s-]+/i, "").trim()
+    } else if (/^(?:goal|goals|desired\s*outcome|desired\s*outcomes|objetivo|objetivos|meta|metas|deseo|deseos)[:\s-]/i.test(cleanTag)) {
+      res.goals.push(cleanTag.replace(/^(?:goal|goals|desired\s*outcome|desired\s*outcomes|objetivo|objetivos|meta|metas|deseo|deseos)[:\s-]+/i, "").trim())
+    } else if (/^(?:pain\s*point|pain\s*points|dolor|dolores|problema|problemas|desaf[ií]o|frustraci[oó]n)[:\s-]/i.test(cleanTag)) {
+      res.pain_points.push(cleanTag.replace(/^(?:pain\s*point|pain\s*points|dolor|dolores|problema|problemas|desaf[ií]o|frustraci[oó]n)[:\s-]+/i, "").trim())
+    } else if (/^(?:objection|objections|objeci[oó]n|objeciones|freno|frenos|duda|dudas|concern|concerns)[:\s-]/i.test(cleanTag)) {
+      res.objections.push(cleanTag.replace(/^(?:objection|objections|objeci[oó]n|objeciones|freno|frenos|duda|dudas|concern|concerns)[:\s-]+/i, "").trim())
+    } else if (/^(?:next\s*step|next\s*steps|pr[oó]ximo\s*paso|pr[oó]ximos\s*pasos|acuerdo|acuerdos)[:\s-]/i.test(cleanTag)) {
+      res.next_steps.push(cleanTag.replace(/^(?:next\s*step|next\s*steps|pr[oó]ximo\s*paso|pr[oó]ximos\s*pasos|acuerdo|acuerdos)[:\s-]+/i, "").trim())
+    } else if (currentSec === "pain_points") {
+      res.pain_points.push(cleanBullet.replace(/^\*\*|\*\*$/g, ""))
+    } else if (currentSec === "goals") {
+      res.goals.push(cleanBullet.replace(/^\*\*|\*\*$/g, ""))
+    } else if (currentSec === "objections") {
+      res.objections.push(cleanBullet.replace(/^\*\*|\*\*$/g, ""))
+    } else if (currentSec === "next_steps") {
+      res.next_steps.push(cleanBullet.replace(/^\*\*|\*\*$/g, ""))
+    } else if (currentSec === "situation" && !res.situation) {
+      res.situation = cleanBullet.replace(/^\*\*|\*\*$/g, "")
+    } else if (currentSec === "summary") {
+      summaryLines.push(trimmed)
+    }
+  }
+
+  res.summary = summaryLines.join("\n").trim()
+  return res
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -256,33 +337,78 @@ export async function GET(request: NextRequest) {
 
     // Consultamos grabaciones Fathom enlazadas
     let callRecords: Record<string, any> = {}
+    let cRecsWindowList: any[] = []
     if (agendaIds.length > 0) {
       const personIds = agendaList.map((a: any) => a.person_id).filter(Boolean)
+      const fathomUrls = agendaList.map((a: any) => a.link_fathom).filter(Boolean)
+
+      // 1. Por agenda_id
       const { data: cRecs } = await sb
         .from("crm_call_records")
-        .select("agenda_id, person_id, fathom_summary, transcript, trace_analysis, fathom_url")
+        .select("id, agenda_id, person_id, fathom_summary, transcript, trace_analysis, fathom_url, title, participants, occurred_at")
         .in("agenda_id", agendaIds)
 
       if (cRecs) {
         cRecs.forEach((r: any) => {
           if (r.agenda_id) callRecords[r.agenda_id] = r
           if (r.person_id) callRecords[r.person_id] = r
+          if (r.fathom_url) callRecords[r.fathom_url] = r
         })
       }
 
-      // Si quedaron registros sin agenda_id directo, buscar por person_id
+      // 2. Por person_id
       if (personIds.length > 0) {
         const { data: cRecsPersons } = await sb
           .from("crm_call_records")
-          .select("agenda_id, person_id, fathom_summary, transcript, trace_analysis, fathom_url")
+          .select("id, agenda_id, person_id, fathom_summary, transcript, trace_analysis, fathom_url, title, participants, occurred_at")
           .in("person_id", personIds)
 
         if (cRecsPersons) {
           cRecsPersons.forEach((r: any) => {
             if (r.person_id && !callRecords[r.person_id]) callRecords[r.person_id] = r
             if (r.agenda_id && !callRecords[r.agenda_id]) callRecords[r.agenda_id] = r
+            if (r.fathom_url && !callRecords[r.fathom_url]) callRecords[r.fathom_url] = r
           })
         }
+      }
+
+      // 3. Por fathom_url (de los links directos guardados en las agendas)
+      if (fathomUrls.length > 0) {
+        const { data: cRecsUrls } = await sb
+          .from("crm_call_records")
+          .select("id, agenda_id, person_id, fathom_summary, transcript, trace_analysis, fathom_url, title, participants, occurred_at")
+          .in("fathom_url", fathomUrls)
+
+        if (cRecsUrls) {
+          cRecsUrls.forEach((r: any) => {
+            if (r.fathom_url) callRecords[r.fathom_url] = r
+            if (r.agenda_id && !callRecords[r.agenda_id]) callRecords[r.agenda_id] = r
+            if (r.person_id && !callRecords[r.person_id]) callRecords[r.person_id] = r
+          })
+        }
+      }
+
+      // 4. Por ventana de fechas (con margen de 1 día antes y después por husos horarios)
+      const dDesde = new Date(fechaDesde)
+      dDesde.setDate(dDesde.getDate() - 1)
+      const dHasta = new Date(fechaHasta)
+      dHasta.setDate(dHasta.getDate() + 1)
+      const fmtIsoDate = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+
+      const { data: cRecsWindow } = await sb
+        .from("crm_call_records")
+        .select("id, agenda_id, person_id, fathom_summary, transcript, trace_analysis, fathom_url, title, participants, occurred_at")
+        .gte("occurred_at", `${fmtIsoDate(dDesde)}T00:00:00`)
+        .lte("occurred_at", `${fmtIsoDate(dHasta)}T23:59:59`)
+
+      if (cRecsWindow) {
+        cRecsWindowList = cRecsWindow
+        cRecsWindow.forEach((r: any) => {
+          if (r.agenda_id && !callRecords[r.agenda_id]) callRecords[r.agenda_id] = r
+          if (r.person_id && !callRecords[r.person_id]) callRecords[r.person_id] = r
+          if (r.fathom_url && !callRecords[r.fathom_url]) callRecords[r.fathom_url] = r
+        })
       }
     }
 
@@ -427,49 +553,160 @@ export async function GET(request: NextRequest) {
         angulosCalificados[angKey] = (angulosCalificados[angKey] || 0) + 1
       }
 
-      // Diagnóstico Fathom: cruza crm_call_records o a.ia_analisis directamente
-      const fathomData = callRecords[a.id] || (a.person_id ? callRecords[a.person_id] : null)
+      // Diagnóstico Fathom: cruza crm_call_records por ID, person_id, link_fathom o coincidencia de nombre
+      let fathomData = callRecords[a.id] || (a.person_id ? callRecords[a.person_id] : null)
+      if (!fathomData && a.link_fathom) {
+        fathomData = callRecords[a.link_fathom]
+        if (!fathomData && cRecsWindowList.length > 0) {
+          const normAUrl = (a.link_fathom || "").replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase()
+          fathomData = cRecsWindowList.find((r: any) => {
+            const rUrl = (r.fathom_url || "").replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase()
+            return rUrl && (rUrl === normAUrl || normAUrl.includes(rUrl) || rUrl.includes(normAUrl))
+          })
+        }
+      }
+      if (!fathomData && cRecsWindowList.length > 0 && a.nombre) {
+        const aNorm = normName(a.nombre)
+        if (aNorm.length >= 4) {
+          fathomData = cRecsWindowList.find((r: any) => {
+            const tNorm = normName(r.title)
+            if (tNorm.includes(aNorm) || aNorm.includes(tNorm)) return true
+            if (Array.isArray(r.participants)) {
+              return r.participants.some((p: any) => {
+                const pNorm = normName(p?.name || p?.email)
+                return pNorm && (pNorm.includes(aNorm) || aNorm.includes(pNorm))
+              })
+            }
+            return false
+          })
+        }
+      }
+
       const fSummary = fathomData?.fathom_summary || null
       const fTranscript = fathomData?.transcript || null
       const fTrace = fathomData?.trace_analysis || null
       const fUrl = fathomData?.fathom_url || a.link_fathom || null
       const fDiag = parseFathomText(fSummary || a.ia_analisis, fTranscript)
+      const fParsed = parseFathomMarkdown(fSummary || a.ia_analisis)
 
-      // Extracción estructurada de 8 campos solicitados
+      // Extracción estructurada y enriquecida de los 8 campos solicitados (CRM + FATHOM)
       const califLetra = (a.calificacion || a.lead_score || "B").replace(/LEAD\s*/i, "").trim().slice(0, 1).toUpperCase() || "B"
       const esCerrado = resComercial === "CIERRE" || resComercial === "FEE"
+
+      // 1. Situación actual: CRM base + Fathom
+      let situacionActualFinal = ""
+      const baseOcupacion = a.ocupacion ? `${a.ocupacion}${a.problema_actual ? ` (Problema: ${a.problema_actual})` : ""}` : ""
+      const fathomSit = fTrace?.situacion || fParsed.situation || ""
+      if (baseOcupacion && fathomSit && !baseOcupacion.toLowerCase().includes(fathomSit.toLowerCase().slice(0, 20))) {
+        situacionActualFinal = `${baseOcupacion} — Fathom: ${fathomSit}`
+      } else {
+        situacionActualFinal = baseOcupacion || fathomSit || fDiag.urgencia || "No registrada en la llamada"
+      }
+
+      // 2. Situación deseada: Fathom (metas/goals) + CRM
+      let situacionDeseadaFinal = ""
+      if (Array.isArray(fTrace?.desired_outcomes) && fTrace.desired_outcomes.length > 0) {
+        situacionDeseadaFinal = fTrace.desired_outcomes.join("; ")
+      } else if (fParsed.goals && fParsed.goals.length > 0) {
+        situacionDeseadaFinal = fParsed.goals.join("; ")
+      } else if (fDiag.deseo_principal) {
+        situacionDeseadaFinal = fDiag.deseo_principal
+      } else if (a.motivo_urgencia) {
+        situacionDeseadaFinal = a.motivo_urgencia
+      } else if (a.problema_actual && /quiere|vivir de|ganar|libertad|extra/i.test(a.problema_actual)) {
+        const m = a.problema_actual.match(/(?:quiere|busca|desea)\s+([^.]+)/i)
+        if (m) situacionDeseadaFinal = `Quiere ${m[1].trim()}`
+      }
+      if (!situacionDeseadaFinal) {
+        situacionDeseadaFinal = "No especificada en la llamada"
+      }
+
+      // 3. Dolor o Problema: CRM + Fathom (dolores detectados)
+      let dolorProblemaFinal = ""
+      const crmProblema = a.problema_actual || ""
+      const fathomPains = [
+        ...(Array.isArray(fTrace?.pain_points) ? fTrace.pain_points : []),
+        ...(Array.isArray(fParsed.pain_points) ? fParsed.pain_points : [])
+      ].filter(Boolean)
+      const extraPains = fathomPains.filter((p: string) => !crmProblema.toLowerCase().includes(p.toLowerCase().slice(0, 15)))
+      if (crmProblema && extraPains.length > 0) {
+        dolorProblemaFinal = `${crmProblema} | Fathom: ${extraPains.slice(0, 2).join("; ")}`
+      } else if (crmProblema) {
+        dolorProblemaFinal = crmProblema
+      } else if (fathomPains.length > 0) {
+        dolorProblemaFinal = fathomPains.join("; ")
+      } else {
+        dolorProblemaFinal = fDiag.dolor_principal || "No detectado"
+      }
+
+      // 4. Objeción: CRM + Fathom (frenos/dudas)
+      let objecionFinal = ""
+      const crmObjecion = a.motivo_no_cierre || ""
+      const fathomObjs = [
+        ...(Array.isArray(fTrace?.objections) ? fTrace.objections : []),
+        ...(Array.isArray(fParsed.objections) ? fParsed.objections : [])
+      ].filter(Boolean)
+      const extraObjs = fathomObjs.filter((o: string) => !crmObjecion.toLowerCase().includes(o.toLowerCase().slice(0, 15)))
+      if (crmObjecion && extraObjs.length > 0) {
+        objecionFinal = `${crmObjecion} | Fathom: ${extraObjs.slice(0, 2).join("; ")}`
+      } else if (crmObjecion) {
+        objecionFinal = crmObjecion
+      } else if (fathomObjs.length > 0) {
+        objecionFinal = fathomObjs.join("; ")
+      } else {
+        objecionFinal = fDiag.oferta_interes || "Sin objeción registrada"
+      }
+
+      // 5. Por qué no cerró: CRM + Fathom
+      let porqueNoCerroFinal = ""
+      if (esCerrado) {
+        porqueNoCerroFinal = "N/A (Llamada cerrada exitosamente)"
+      } else {
+        const crmMotivo = a.motivo_no_cierre || ""
+        const fathomWhyNot = fTrace?.why_not_bought || ""
+        const nextSteps = fParsed.next_steps?.[0] || ""
+        if (crmMotivo && fathomWhyNot && !crmMotivo.toLowerCase().includes(fathomWhyNot.toLowerCase().slice(0, 15))) {
+          porqueNoCerroFinal = `${crmMotivo} (Fathom: ${fathomWhyNot})`
+        } else if (crmMotivo) {
+          porqueNoCerroFinal = crmMotivo
+        } else if (fathomWhyNot) {
+          porqueNoCerroFinal = fathomWhyNot
+        } else if (nextSteps) {
+          porqueNoCerroFinal = `No cerrada — Siguiente paso: ${nextSteps}`
+        } else {
+          porqueNoCerroFinal = fDiag.motivo_cierre_no_cierre || "No cerrada sin motivo detallado"
+        }
+      }
+
+      // 6. Motivo de cierre: CRM + Fathom
+      let motivoCierreFinal = ""
+      if (!esCerrado) {
+        motivoCierreFinal = "N/A (No cerró en esta llamada)"
+      } else {
+        motivoCierreFinal = fTrace?.why_bought || (cashLead > 0 ? `Cierre confirmado con cobro D1 de ${cashLead} USD` : "Propuesta y claridad en el modelo")
+      }
+
+      // 7. Resumen de la llamada: PRIORIDAD AL SUMMARY REAL DE FATHOM
+      let resumenLlamadaFinal = ""
+      if (fSummary && fSummary.trim().length > 20) {
+        resumenLlamadaFinal = fSummary.trim()
+      } else if (fTrace?.analisis && fTrace.analisis.trim().length > 20) {
+        resumenLlamadaFinal = fTrace.analisis.trim()
+      } else if (a.ia_analisis && a.ia_analisis.trim().length > 20) {
+        resumenLlamadaFinal = a.ia_analisis.trim()
+      } else {
+        resumenLlamadaFinal = `Llamada de closing con ${a.closer || "Nahuel"}. Resultado: ${resComercial}. Lead: ${a.nombre || "Sin nombre"}.`
+      }
+
       const fLeadDetalle = {
-        situacion_actual:
-          fTrace?.situacion ||
-          (a.ocupacion ? `${a.ocupacion}${a.problema_actual ? ` (Problema: ${a.problema_actual})` : ""}` : undefined) ||
-          fDiag.urgencia ||
-          "No registrada en la llamada",
+        situacion_actual: situacionActualFinal,
         calificacion: califLetra,
-        situacion_deseada:
-          (Array.isArray(fTrace?.desired_outcomes) && fTrace.desired_outcomes.length > 0 ? fTrace.desired_outcomes.join("; ") : null) ||
-          fDiag.deseo_principal ||
-          "No especificada",
-        dolor_problema:
-          (Array.isArray(fTrace?.pain_points) && fTrace.pain_points.length > 0 ? fTrace.pain_points.join("; ") : null) ||
-          a.problema_actual ||
-          fDiag.dolor_principal ||
-          "No detectado",
-        objecion:
-          (Array.isArray(fTrace?.objections) && fTrace.objections.length > 0 ? fTrace.objections.join("; ") : null) ||
-          a.motivo_no_cierre ||
-          fDiag.oferta_interes ||
-          "Sin objeción registrada",
-        porque_no_cerro: esCerrado
-          ? "N/A (Llamada cerrada exitosamente)"
-          : (fTrace?.why_not_bought || a.motivo_no_cierre || fDiag.motivo_cierre_no_cierre || "No cerrada sin motivo detallado"),
-        motivo_cierre: !esCerrado
-          ? "N/A (No cerró en esta llamada)"
-          : (fTrace?.why_bought || (cashLead > 0 ? `Cierre confirmado con cobro D1 de ${cashLead} USD` : "Propuesta y claridad en el modelo")),
-        resumen_llamada:
-          fTrace?.analisis ||
-          fSummary ||
-          a.ia_analisis ||
-          `Llamada de closing con ${a.closer || "Nahuel"}. Resultado: ${resComercial}. Lead: ${a.nombre || "Sin nombre"}.`,
+        situacion_deseada: situacionDeseadaFinal,
+        dolor_problema: dolorProblemaFinal,
+        objecion: objecionFinal,
+        porque_no_cerro: porqueNoCerroFinal,
+        motivo_cierre: motivoCierreFinal,
+        resumen_llamada: resumenLlamadaFinal,
         link_fathom: fUrl,
       }
 
@@ -518,6 +755,9 @@ export async function GET(request: NextRequest) {
         fathom_lead: fLeadDetalle,
         link_fathom: fUrl,
         ia_analisis: a.ia_analisis || fTrace?.analisis || fSummary || null,
+        fathom_summary: fSummary || null,
+        transcript: fTranscript || null,
+        trace_analysis: fTrace || null,
         resumen_chat: a.resumen_chat || null,
         calificacion: califLetra,
       }
