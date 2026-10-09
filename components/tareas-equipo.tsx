@@ -154,7 +154,13 @@ export function TareasEquipo() {
         title={admin ? "El equipo" : "Tus tareas"}
         sub={admin ? "Lo que tiene que hacer cada uno hoy y quién lo está haciendo." : "Lo que te toca hoy. Tocá el círculo para pasarla a en progreso y otra vez para completarla."}
         right={admin ? (
-          <Button size="sm" className="gap-1" onClick={() => setCreando((v) => !v)}>{creando ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}{creando ? "Cerrar" : "Nueva tarea"}</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Resumen de la reunión de socios del 09/10/2026 (artifact de Claude). Solo lo ven los CEO. */}
+            <Button asChild size="sm" variant="outline" className="gap-1">
+              <a href="https://claude.ai/artifact/BbF75spsgZUbMrNktRyHpU" target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3.5 w-3.5" />Ver resumen de meeting de hoy</a>
+            </Button>
+            <Button size="sm" className="gap-1" onClick={() => setCreando((v) => !v)}>{creando ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}{creando ? "Cerrar" : "Nueva tarea"}</Button>
+          </div>
         ) : undefined}
       />
 
