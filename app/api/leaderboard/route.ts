@@ -137,6 +137,8 @@ export async function GET(request: Request) {
     const [year, mon] = month.split("-").map(Number)
     const start = `${month}-01`
     const end = `${month}-${String(new Date(year, mon, 0).getDate()).padStart(2, "0")}`
+    // Límite superior exclusivo para las agendas: con `lte(end)` el timestamp 'YYYY-MM-31' es la medianoche y se perdía el último día.
+    const nextStart = `${mon === 12 ? year + 1 : year}-${String(mon === 12 ? 1 : mon + 1).padStart(2, "0")}-01`
 
     const sb = getSupabase()
 
@@ -152,12 +154,19 @@ export async function GET(request: Request) {
       { data: agendas, error: aErr },
       { data: strikesData },
       { data: csmMembers },
+      { data: agendasLlamada, error: alErr },
     ] = await Promise.all([
-      sb.from("agendas").select("id,nombre,closer,setter,show,cerro,calificacion,estado,fecha_agenda").or("estado.is.null,estado.neq.Archivada manualmente").gte("fecha_agenda", start).lte("fecha_agenda", end),
+      // Setters: agendas por fecha de RESERVA (su trabajo es agendar en el mes).
+      sb.from("agendas").select("id,nombre,closer,setter,show,cerro,calificacion,estado,fecha_agenda").or("estado.is.null,estado.neq.Archivada manualmente").gte("fecha_agenda", start).lt("fecha_agenda", nextStart),
       sb.from("strikes").select("nombre,count,updated_at"),
       // El CSM sale de team_members (rol "CSM"): su cash cuenta como Back-End
       // con comisión flat, no entra al ranking de closers.
       sb.from("team_members").select("nombre").eq("rol", "CSM").eq("estado", "aprobado"),
+      // Closers: llamadas por fecha de LLAMADA (pedido de Alex, 09/10/2026: el leaderboard mostraba 18 presentadas en
+      // octubre cuando hubo 25, porque las reservadas a fines de septiembre caían en septiembre).
+      sb.from("agendas").select("id,nombre,closer,setter,show,cerro,calificacion,estado,fecha_agenda,fecha_closer")
+        .or("estado.is.null,estado.neq.Archivada manualmente")
+        .or(`and(fecha_closer.gte.${start},fecha_closer.lt.${nextStart}),and(fecha_closer.is.null,fecha_agenda.gte.${start},fecha_agenda.lt.${nextStart})`),
     ])
     const CSM_NOMBRES = new Set((csmMembers || []).map(m => canonical(m.nombre || "")).filter(Boolean))
     const { error: pErr } = pagosRes
@@ -167,6 +176,7 @@ export async function GET(request: Request) {
     }))
     if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 })
     if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 })
+    if (alErr) return NextResponse.json({ error: alErr.message }, { status: 500 })
 
     // La ventana de comisión del setter se ancla al primer pago FE histórico
     // de cada cliente, no al tipo escrito manualmente en un pago posterior.
@@ -378,10 +388,13 @@ export async function GET(request: Request) {
 
     const CALIFS_AB = new Set(["S", "A", "B", "C", "LEAD A", "LEAD B", "LEAD C"])  // EXPOSURE: A, B y C califican; D no
 
-    for (const ag of agendas || []) {
+    const ahoraMs = Date.now()
+    for (const ag of agendasLlamada || []) {
       let closerNorm = canonical(ag.closer || "")
       if (closerNorm.toLowerCase() === "exposure") closerNorm = "Nahuel"
-      const setter = canonical(ag.setter || "")
+      // Las llamadas que todavía no pasaron no cuentan para el show up del closer.
+      const cuando = Date.parse(`${String(ag.fecha_closer || ag.fecha_agenda || "").replace(" ", "T")}Z`)
+      if (Number.isFinite(cuando) && cuando > ahoraMs && !ag.show) continue
 
       const agItem: DetalleLlamadaCloser = {
         id: (ag as any).id,
@@ -394,8 +407,6 @@ export async function GET(request: Request) {
         closer: closerNorm || null,
         setter: (ag as any).setter || null,
       }
-      teamDetallesAgendas.push(agItem)
-
       if (isRealMember(closerNorm)) {
         if (!closerMap.has(closerNorm)) closerMap.set(closerNorm, { cc_nuevo: 0, cc_total: 0, commission_base: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, unidades: 0, fees: 0, llamadas: 0, cerradas: 0, total_ag: 0, pres_ab: 0, cerr_ab: 0, detalles_pagos: [], detalles_llamadas: [] })
         const c = closerMap.get(closerNorm)!
@@ -410,6 +421,23 @@ export async function GET(request: Request) {
         }
         c.detalles_llamadas.push(agItem)
       }
+    }
+
+    for (const ag of agendas || []) {
+      let closerEquipo = canonical(ag.closer || "")
+      if (closerEquipo.toLowerCase() === "exposure") closerEquipo = "Nahuel"
+      const setter = canonical(ag.setter || "")
+      teamDetallesAgendas.push({
+        id: (ag as any).id,
+        nombre: (ag as any).nombre || (ag as any).cliente || "Lead",
+        fecha_agenda: (ag as any).fecha_agenda || null,
+        show: Boolean(ag.show),
+        cerro: Boolean(ag.cerro),
+        calificacion: ag.calificacion || null,
+        estado: ag.estado || null,
+        closer: closerEquipo || null,
+        setter: (ag as any).setter || null,
+      })
 
       if (isRealMember(setter)) {
         if (!setterMap.has(setter)) setterMap.set(setter, { cc_nuevo: 0, cc_total: 0, cc_ponderado: 0, feccu: 0, feccpp: 0, feccpp_excluido: 0, unidades: 0, fees: 0, agendas: 0, agendas_ab: 0, shows: 0, detalles_pagos: [], detalles_agendas: [] })

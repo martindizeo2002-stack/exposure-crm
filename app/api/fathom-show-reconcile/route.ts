@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { createSupabaseServer } from "@/lib/supabase-server"
+import { containsFirstName, containsFullName, matchReason, mentionExcerpt, ms, scheduledUtcMs } from "@/lib/fathom-cruce"
 
 export const maxDuration = 60
 
@@ -18,93 +19,6 @@ async function canRun(request: Request) {
   const authorization = request.headers.get("authorization")
   if (cronSecret && authorization === `Bearer ${cronSecret}`) return true
   return isCeo()
-}
-
-function ms(value: string | null | undefined) {
-  const parsed = value ? Date.parse(value) : NaN
-  return Number.isFinite(parsed) ? parsed : NaN
-}
-
-// `fecha_closer` es `timestamp` sin zona y guarda UTC, no hora local de Argentina.
-// Verificado el 14/09/2026 contra las agendas ya conciliadas: la diferencia con el
-// occurred_at de Fathom es 0.00 h en la mayoría. Antes se le sumaban 3 h y eso corría
-// todas las agendas fuera de la ventana horaria, así que no cruzaba ninguna.
-function scheduledUtcMs(value: string | null | undefined) {
-  const raw = String(value || "").trim()
-  if (!raw) return NaN
-  const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(raw) ? raw : `${raw.replace(" ", "T")}Z`
-  return ms(iso)
-}
-
-function norm(value: unknown) {
-  return String(value || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
-}
-
-function urlKey(value: unknown) {
-  const raw = String(value || "").trim()
-  if (!raw) return ""
-  try {
-    const url = new URL(raw)
-    url.search = ""
-    url.hash = ""
-    return `${url.hostname}${url.pathname}`.replace(/\/+$/, "").toLowerCase()
-  } catch { return raw.replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase() }
-}
-
-function externalNames(participants: unknown) {
-  if (!Array.isArray(participants)) return []
-  return participants.filter((item: any) => item?.is_external !== false).map((item: any) => norm(item?.name)).filter(Boolean)
-}
-
-function containsFullName(haystack: unknown, name: unknown) {
-  const needle = norm(name)
-  if (needle.length < 5) return false
-  const words = needle.split(" ").filter((word) => word.length >= 2)
-  if (words.length < 2) return false
-  const text = ` ${norm(haystack)} `
-  return text.includes(` ${needle} `) || words.every((word) => text.includes(` ${word} `))
-}
-
-function containsFirstName(haystack: unknown, name: unknown) {
-  const first = norm(name).split(" ").find((word) => word.length >= 3)
-  return Boolean(first && ` ${norm(haystack)} `.includes(` ${first} `))
-}
-
-// Fathom abrevia el apellido en el titulo ("Leonardo R X Cristian" por "Leonardo Ricaldi"),
-// asi que el nombre de pila es a veces lo unico que hay. Pide 4 letras para no cruzar por "ana" o "luz".
-function containsFirstNameStrict(haystack: unknown, name: unknown) {
-  const first = norm(name).split(" ").find((word) => word.length >= 4)
-  return Boolean(first && ` ${norm(haystack)} `.includes(` ${first} `))
-}
-
-const HORA = 60 * 60 * 1000
-
-// Por que esta grabacion corresponde a esta agenda, o "" si no corresponde. Una sola funcion
-// para las dos direcciones del cruce (agenda -> call y call -> agenda), asi no pueden divergir.
-// Los identificadores fuertes valen dentro de las 24 h; los cruces por nombre exigen cercania
-// horaria, porque un nombre repetido en otra llamada marcaria un "se presento" falso.
-function matchReason(agenda: { id: unknown; nombre: unknown; person_id: unknown; link_fathom: unknown }, call: any, scheduled: number) {
-  if (String(call.transcript || "").length < 200) return ""
-  if (call.call_type !== "sales") return ""
-  const delta = Math.abs(ms(call.occurred_at) - scheduled)
-  if (!Number.isFinite(delta) || delta > 24 * HORA) return ""
-  if (call.agenda_id && call.agenda_id === agenda.id) return "agenda_id"
-  if (urlKey(agenda.link_fathom) && urlKey(agenda.link_fathom) === urlKey(call.fathom_url)) return "link_fathom"
-  if (agenda.person_id && call.person_id === agenda.person_id && call.needs_review === false && Number(call.match_confidence || 0) >= 0.9) return "person_id"
-  if (externalNames(call.participants).includes(norm(agenda.nombre))) return "participant_name"
-  if (delta <= 3 * HORA && containsFullName(call.title, agenda.nombre)) return "title_name"
-  if (delta <= 3 * HORA && containsFullName(call.transcript, agenda.nombre)) return "transcript_name"
-  if (delta <= 1.5 * HORA && containsFirstNameStrict(call.title, agenda.nombre)) return "title_first_name"
-  return ""
-}
-
-function mentionExcerpt(haystack: unknown, name: unknown) {
-  const text = String(haystack || "")
-  const first = String(name || "").trim().split(/\s+/).find((word) => word.length >= 3)
-  if (!first) return ""
-  const position = text.toLocaleLowerCase("es").indexOf(first.toLocaleLowerCase("es"))
-  if (position < 0) return ""
-  return text.slice(Math.max(0, position - 140), Math.min(text.length, position + 260)).replace(/\s+/g, " ").trim()
 }
 
 async function runReconcile(request: Request) {
@@ -168,8 +82,8 @@ async function runReconcile(request: Request) {
         event_type: "show_reconciled",
         occurred_at: new Date().toISOString(),
         source: "fathom",
-        source_table: "agendas",
-        source_id: String(proposal.agenda.id),
+        source_record_type: "agendas",
+        source_record_id: String(proposal.agenda.id),
         title: "Show reconciliado desde Fathom",
         metadata: {
           previous_show: null,
