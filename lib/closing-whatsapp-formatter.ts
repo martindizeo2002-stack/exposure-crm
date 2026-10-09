@@ -1,5 +1,17 @@
 import type { MacroArquetipo } from "./arquetipos-closing"
 
+export type FathomResumenLead = {
+  situacion_actual?: string
+  calificacion?: string
+  situacion_deseada?: string
+  dolor_problema?: string
+  objecion?: string
+  porque_no_cerro?: string
+  motivo_cierre?: string
+  resumen_llamada?: string
+  link_fathom?: string | null
+}
+
 export type FathomDiagnostico = {
   mencion_alex?: string
   contenido_recuerda?: string
@@ -40,6 +52,11 @@ export type CallDetalle = {
   motivo_real?: string
   siguiente_paso?: string
   fathom?: FathomDiagnostico
+  fathom_lead?: FathomResumenLead
+  link_fathom?: string | null
+  ia_analisis?: string | null
+  resumen_chat?: string | null
+  calificacion?: string | null
 }
 
 export type MetricasClosing = {

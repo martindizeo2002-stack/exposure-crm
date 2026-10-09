@@ -19,7 +19,7 @@ import { Calendar as CalendarIcon,
   RefreshCw,
   Award,
   Pencil,
-  Loader2, ArrowUpRight,
+  Loader2, ArrowUpRight, ExternalLink,
   Search,
   X,
   CalendarDays,
@@ -55,6 +55,112 @@ const MOTIVOS_NO_CIERRE_CRM = [
   "No tenia dinero ni apoyo",
   "No tenia urgencia"
 ]
+
+
+function extractSectionText(text: string | null | undefined, keywords: string[]): string | null {
+  if (!text) return null
+  const lines = text.split("\n")
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    const lineLow = line.toLowerCase()
+    for (const kw of keywords) {
+      if (lineLow.includes(kw)) {
+        const cleaned = line.replace(/^[-*•#\d.:]+\s*/, "").replace(new RegExp(`^${kw}[:\\s-]*`, "i"), "").trim()
+        if (cleaned.length > 3) return cleaned
+        if (i + 1 < lines.length && lines[i + 1].trim().length > 3) {
+          return lines[i + 1].trim().replace(/^[-*•#\d.:]+\s*/, "")
+        }
+      }
+    }
+  }
+  return null
+}
+
+function getDiagnosticoTextoLead(c: CallDetalle | null | undefined): string {
+  if (!c) return "No hay ningún lead seleccionado en el período activo."
+
+  const f = c.fathom_lead || {}
+  const textIA = (c as any).ia_analisis || ""
+  const textFathom = (c as any).fathom_summary || ""
+  const textChat = (c as any).resumen_chat || ""
+
+  // 1. Situacion actual del lead: (que lo saque del fathom)
+  const situacionActual =
+    f.situacion_actual ||
+    extractSectionText(textIA, ["situacion actual", "situacion", "perfil", "ocupacion"]) ||
+    extractSectionText(textFathom, ["situacion actual", "situacion", "current situation"]) ||
+    c.subarquetipo ||
+    c.arquetipo_macro ||
+    "No registrada en la llamada"
+
+  // 2. Calificacion del lead: \"A-B-C-D\" (que lo saque del crm)
+  const califRaw = (c.calificacion || c.lead_score || "B").replace(/LEAD\s*/i, "").trim().slice(0, 1).toUpperCase()
+  const califCRM = ["A", "B", "C", "D"].includes(califRaw) ? califRaw : (c.es_calificado ? "A" : "C")
+
+  // 3. Situacion deseada: (que lo saque del fathom)
+  const situacionDeseada =
+    f.situacion_deseada ||
+    extractSectionText(textIA, ["situacion deseada", "deseo", "objetivo", "meta"]) ||
+    extractSectionText(textFathom, ["desired outcome", "goal", "deseo", "objetivo"]) ||
+    c.fathom?.deseo_principal ||
+    "No especificada en la grabación"
+
+  // 4. Dolor o Problema: (que lo saque del fathom)
+  const dolorProblema =
+    f.dolor_problema ||
+    extractSectionText(textIA, ["dolor", "problema", "pain point", "freno"]) ||
+    extractSectionText(textFathom, ["pain point", "dolor", "problema"]) ||
+    c.porque_agendo ||
+    c.fathom?.dolor_principal ||
+    "No detectado"
+
+  // 5. Objecion: (que lo saque del fathom)
+  const objecion =
+    f.objecion ||
+    extractSectionText(textIA, ["objecion", "freno", "duda"]) ||
+    extractSectionText(textFathom, ["objection", "objecion"]) ||
+    c.objecion_principal ||
+    "Sin objeción registrada"
+
+  // 6. Porque no CERRO: (que lo saque del fathom)
+  const esCierre = c.resultado === "CIERRE" || c.resultado === "FEE"
+  const porqueNoCerro = esCierre
+    ? "N/A (La llamada cerró exitosamente)"
+    : (f.porque_no_cerro ||
+       extractSectionText(textIA, ["porque no cerro", "por que no cerro", "motivo no cierre", "why not bought"]) ||
+       extractSectionText(textFathom, ["why not bought", "reason not closed", "no cerro"]) ||
+       c.motivo_real ||
+       c.objecion_principal ||
+       "No cerrada sin motivo detallado")
+
+  // 7. Motivo de CIERRE: (que lo saque del fathom)
+  const motivoCierre = !esCierre
+    ? "N/A (No cerró en esta llamada)"
+    : (f.motivo_cierre ||
+       extractSectionText(textIA, ["motivo de cierre", "motivo cierre", "why bought", "por que compro"]) ||
+       extractSectionText(textFathom, ["why bought", "cierre"]) ||
+       (c.cash_d1 > 0 ? `Cierre confirmado con cobro D1 de $${c.cash_d1} USD` : "Propuesta y claridad en el modelo"))
+
+  // 8. Resumen de la llamada: (que lo saque del fathom)
+  const resumenLlamada =
+    f.resumen_llamada ||
+    textIA ||
+    textFathom ||
+    textChat ||
+    `Llamada de closing con ${c.closer}. Resultado: ${c.resultado}. Calificación: "${califCRM}". Lead: ${c.nombre}.`
+
+  return [
+    `Situacion actual del lead: ${situacionActual}`,
+    `Calificacion del lead: "${califCRM}"`,
+    `Situacion deseada: ${situacionDeseada}`,
+    `Dolor o Problema: ${dolorProblema}`,
+    `Objecion: ${objecion}`,
+    `Porque no CERRO: ${porqueNoCerro}`,
+    `Motivo de CIERRE: ${motivoCierre}`,
+    `Resumen de la llamada: ${resumenLlamada}`,
+  ].join("\n\n")
+}
+
 
 function hoyIso() {
   const d = new Date()
@@ -133,6 +239,11 @@ export default function ResumenVentasPage() {
   // Auditoría interactiva de métricas
   const [globoBuscadorAbierto, setGloboBuscadorAbierto] = useState(false)
   const [metricaAuditoriaKey, setMetricaAuditoriaKey] = useState<string | null>(null)
+
+  // Cuadro de Resumen de Llamada por Lead (Fathom + CRM)
+  const [leadFathomId, setLeadFathomId] = useState<string | number | null>(null)
+  const [filtroLeadFathom, setFiltroLeadFathom] = useState("")
+  const [copiadoFathom, setCopiadoFathom] = useState(false)
 
   // Shortcut Ctrl+K / Cmd+K para abrir el Globo Buscador
   useEffect(() => {
@@ -411,7 +522,15 @@ export default function ResumenVentasPage() {
   const [loadingHistorico, setLoadingHistorico] = useState(false)
 
   // Cargar datos
-  const cargarResumen = async () => {
+  const recargarResumen = async () => {
+    toast.loading("Recargando datos de ventas...", { id: "recargar-resumen" })
+    await cargarResumen(true)
+    toast.success("¡Datos actualizados con éxito!", { id: "recargar-resumen" })
+  }
+
+  // Cargar datos
+  const cargarResumen = async (forzar: boolean | any = false) => {
+    const esForzado = typeof forzar === "boolean" ? forzar : false
     try {
       setLoading(true)
       const params = new URLSearchParams({
@@ -421,6 +540,7 @@ export default function ResumenVentasPage() {
         modo,
       })
 
+      if (esForzado) params.append("_t", Date.now().toString())
       const res = await fetch(`/api/ventas/resumen?${params.toString()}`)
       const json = await res.json()
 
@@ -535,6 +655,33 @@ export default function ResumenVentasPage() {
     })
   }, [calls])
 
+  const leadSeleccionado = useMemo(() => {
+    if (leadFathomId) {
+      const found = callsUnicas.find((c) => String(c.agenda_id || c.nombre) === String(leadFathomId))
+      if (found) return found
+    }
+    return callsUnicas[0] || null
+  }, [callsUnicas, leadFathomId])
+
+  const leadsFiltradosSelector = useMemo(() => {
+    const q = filtroLeadFathom.toLowerCase().trim()
+    if (!q) return callsUnicas
+    return callsUnicas.filter((c) =>
+      (c.nombre || "").toLowerCase().includes(q) ||
+      (c.closer || "").toLowerCase().includes(q) ||
+      (c.resultado || "").toLowerCase().includes(q)
+    )
+  }, [callsUnicas, filtroLeadFathom])
+
+  const copiarDiagnosticoFathom = () => {
+    if (!leadSeleccionado) return
+    const texto = getDiagnosticoTextoLead(leadSeleccionado)
+    navigator.clipboard.writeText(texto)
+    setCopiadoFathom(true)
+    toast.success(`¡Resumen de ${leadSeleccionado.nombre} copiado al portapapeles!`)
+    setTimeout(() => setCopiadoFathom(false), 2000)
+  }
+
   const callsFiltradas = callsUnicas.filter((c) => {
     if (filtroResultado === "todos") return true
     if (filtroResultado === "cierres") return c.resultado === "CIERRE" || c.resultado === "FEE"
@@ -617,7 +764,7 @@ export default function ResumenVentasPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={cargarResumen}
+                onClick={() => recargarResumen()}
                 disabled={loading}
                 className="h-8 text-xs text-muted-foreground hover:text-white"
               >
@@ -1523,10 +1670,22 @@ export default function ResumenVentasPage() {
                 <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400">
                   Preview para WhatsApp
                 </h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={copiarWhatsApp}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={recargarResumen}
+                    disabled={loading}
+                    className="h-8 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-xs flex items-center gap-1.5"
+                    title="Recargar datos del reporte WhatsApp"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+                    <span>Recargar</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copiarWhatsApp}
                   disabled={!textoWhatsapp || loading}
                   className="h-8 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-xs"
                 >
@@ -1534,8 +1693,9 @@ export default function ResumenVentasPage() {
                   {copiado ? "Copiado!" : "Copiar"}
                 </Button>
               </div>
+            </div>
 
-              <Card className="border-white/10 bg-zinc-950 p-4 font-mono text-xs">
+            <Card className="border-white/10 bg-zinc-950 p-4 font-mono text-xs">
                 <textarea
                   readOnly
                   value={textoWhatsapp}
@@ -1543,6 +1703,114 @@ export default function ResumenVentasPage() {
                   className="w-full resize-none bg-transparent font-mono text-xs text-zinc-200 outline-none"
                 />
               </Card>
+              {/* Cuadro 2: Resumen de Llamada por Lead (Fathom + CRM) - Mismo Tamaño */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                      <span>🎙️ Resumen de Llamada por Lead</span>
+                      <span className="text-[11px] font-normal text-zinc-400 font-sans">
+                        (Fathom + CRM)
+                      </span>
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {leadSeleccionado?.link_fathom && (
+                      <a
+                        href={leadSeleccionado.link_fathom}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-xs transition-all font-sans font-medium"
+                        title="Ver grabación en Fathom"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        <span>Fathom</span>
+                      </a>
+                    )}
+                    {leadSeleccionado && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => abrirEdicionLead(leadSeleccionado)}
+                        className="h-8 border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 text-xs font-sans font-medium"
+                        title="Abrir ficha del lead"
+                      >
+                        <Pencil className="mr-1 h-3 w-3 text-zinc-400" />
+                        <span>Ficha</span>
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={copiarDiagnosticoFathom}
+                      disabled={!leadSeleccionado}
+                      className="h-8 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-xs font-sans font-medium"
+                    >
+                      {copiadoFathom ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
+                      {copiadoFathom ? "Copiado!" : "Copiar"}
+                    </Button>
+                  </div>
+                </div>
+
+                <Card className="border-white/10 bg-zinc-950 p-4 font-mono text-xs space-y-3">
+                  {/* Buscador y Selector de Lead del Período (Solo permite seleccionar de a 1 lead) */}
+                  <div className="space-y-2 pb-2 border-b border-white/10 font-sans">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-zinc-400 text-xs font-semibold flex items-center gap-1">
+                        <Search className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>Seleccionar lead del período ({callsUnicas.length}):</span>
+                      </Label>
+                      {leadSeleccionado && (
+                        <span className="text-[10px] text-zinc-400">
+                          1 lead seleccionado: <strong className="text-emerald-300">{leadSeleccionado.nombre}</strong>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                      <div className="sm:col-span-5">
+                        <Input
+                          placeholder="Filtrar por nombre o closer..."
+                          value={filtroLeadFathom}
+                          onChange={(e) => setFiltroLeadFathom(e.target.value)}
+                          className="h-8 bg-zinc-900 border-white/10 text-xs text-white placeholder:text-zinc-500"
+                        />
+                      </div>
+                      <div className="sm:col-span-7">
+                        <Select
+                          value={String(leadSeleccionado?.agenda_id || leadSeleccionado?.nombre || "")}
+                          onValueChange={(val) => setLeadFathomId(val)}
+                        >
+                          <SelectTrigger className="h-8 bg-zinc-900 border-white/10 text-xs text-white">
+                            <SelectValue placeholder="Elegí 1 lead del período..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-900 border-white/10 text-white max-h-60">
+                            {leadsFiltradosSelector.length === 0 ? (
+                              <div className="p-2 text-xs text-zinc-500">No hay leads que coincidan</div>
+                            ) : (
+                              leadsFiltradosSelector.map((c) => (
+                                <SelectItem key={c.agenda_id || c.nombre} value={String(c.agenda_id || c.nombre)}>
+                                  {c.nombre} · {c.closer} ({c.resultado}) [Calif: {c.calificacion || c.lead_score || "S/D"}]
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Diagnóstico Formateado en el Cuadro (Mismo tamaño que el cuadro de WhatsApp) */}
+                  <textarea
+                    readOnly
+                    value={getDiagnosticoTextoLead(leadSeleccionado)}
+                    rows={26}
+                    className="w-full resize-none bg-transparent font-mono text-xs text-zinc-200 outline-none leading-relaxed"
+                  />
+                </Card>
+              </div>
             </div>
           </div>
         </TabsContent>

@@ -255,17 +255,34 @@ export async function GET(request: NextRequest) {
       .lte("fecha", fechaHasta)
 
     // Consultamos grabaciones Fathom enlazadas
-    let callRecords: Record<string, { summary?: string; transcript?: string }> = {}
+    let callRecords: Record<string, any> = {}
     if (agendaIds.length > 0) {
+      const personIds = agendaList.map((a: any) => a.person_id).filter(Boolean)
       const { data: cRecs } = await sb
         .from("crm_call_records")
-        .select("agenda_id, summary, transcript")
+        .select("agenda_id, person_id, fathom_summary, transcript, trace_analysis, fathom_url")
         .in("agenda_id", agendaIds)
 
       if (cRecs) {
         cRecs.forEach((r: any) => {
           if (r.agenda_id) callRecords[r.agenda_id] = r
+          if (r.person_id) callRecords[r.person_id] = r
         })
+      }
+
+      // Si quedaron registros sin agenda_id directo, buscar por person_id
+      if (personIds.length > 0) {
+        const { data: cRecsPersons } = await sb
+          .from("crm_call_records")
+          .select("agenda_id, person_id, fathom_summary, transcript, trace_analysis, fathom_url")
+          .in("person_id", personIds)
+
+        if (cRecsPersons) {
+          cRecsPersons.forEach((r: any) => {
+            if (r.person_id && !callRecords[r.person_id]) callRecords[r.person_id] = r
+            if (r.agenda_id && !callRecords[r.agenda_id]) callRecords[r.agenda_id] = r
+          })
+        }
       }
     }
 
@@ -411,8 +428,50 @@ export async function GET(request: NextRequest) {
       }
 
       // Diagnóstico Fathom: cruza crm_call_records o a.ia_analisis directamente
-      const fathomData = callRecords[a.id]
-      const fDiag = parseFathomText(fathomData?.summary || a.ia_analisis, fathomData?.transcript)
+      const fathomData = callRecords[a.id] || (a.person_id ? callRecords[a.person_id] : null)
+      const fSummary = fathomData?.fathom_summary || null
+      const fTranscript = fathomData?.transcript || null
+      const fTrace = fathomData?.trace_analysis || null
+      const fUrl = fathomData?.fathom_url || a.link_fathom || null
+      const fDiag = parseFathomText(fSummary || a.ia_analisis, fTranscript)
+
+      // Extracción estructurada de 8 campos solicitados
+      const califLetra = (a.calificacion || a.lead_score || "B").replace(/LEAD\s*/i, "").trim().slice(0, 1).toUpperCase() || "B"
+      const esCerrado = resComercial === "CIERRE" || resComercial === "FEE"
+      const fLeadDetalle = {
+        situacion_actual:
+          fTrace?.situacion ||
+          (a.ocupacion ? `${a.ocupacion}${a.problema_actual ? ` (Problema: ${a.problema_actual})` : ""}` : undefined) ||
+          fDiag.urgencia ||
+          "No registrada en la llamada",
+        calificacion: califLetra,
+        situacion_deseada:
+          (Array.isArray(fTrace?.desired_outcomes) && fTrace.desired_outcomes.length > 0 ? fTrace.desired_outcomes.join("; ") : null) ||
+          fDiag.deseo_principal ||
+          "No especificada",
+        dolor_problema:
+          (Array.isArray(fTrace?.pain_points) && fTrace.pain_points.length > 0 ? fTrace.pain_points.join("; ") : null) ||
+          a.problema_actual ||
+          fDiag.dolor_principal ||
+          "No detectado",
+        objecion:
+          (Array.isArray(fTrace?.objections) && fTrace.objections.length > 0 ? fTrace.objections.join("; ") : null) ||
+          a.motivo_no_cierre ||
+          fDiag.oferta_interes ||
+          "Sin objeción registrada",
+        porque_no_cerro: esCerrado
+          ? "N/A (Llamada cerrada exitosamente)"
+          : (fTrace?.why_not_bought || a.motivo_no_cierre || fDiag.motivo_cierre_no_cierre || "No cerrada sin motivo detallado"),
+        motivo_cierre: !esCerrado
+          ? "N/A (No cerró en esta llamada)"
+          : (fTrace?.why_bought || (cashLead > 0 ? `Cierre confirmado con cobro D1 de ${cashLead} USD` : "Propuesta y claridad en el modelo")),
+        resumen_llamada:
+          fTrace?.analisis ||
+          fSummary ||
+          a.ia_analisis ||
+          `Llamada de closing con ${a.closer || "Nahuel"}. Resultado: ${resComercial}. Lead: ${a.nombre || "Sin nombre"}.`,
+        link_fathom: fUrl,
+      }
 
       // Atribución de ESA agenda limpia y separada:
       // 1. Origen: canal base (limpiando si viniera con comas o concatenaciones)
@@ -456,6 +515,11 @@ export async function GET(request: NextRequest) {
         motivo_real: a.motivo_no_cierre || (resComercial === "CIERRE" ? "Propuesta y claridad en el modelo" : ""),
         siguiente_paso: resComercial === "CIERRE" ? "Onboarding" : (a.estado || "Seguimiento"),
         fathom: fDiag,
+        fathom_lead: fLeadDetalle,
+        link_fathom: fUrl,
+        ia_analisis: a.ia_analisis || fTrace?.analisis || fSummary || null,
+        resumen_chat: a.resumen_chat || null,
+        calificacion: califLetra,
       }
     })
 
