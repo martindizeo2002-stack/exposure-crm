@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
-import { BarChart3 } from "lucide-react"
+import { BarChart3, Globe, Target, Flame, TrendingUp, Users, CheckCircle2, Megaphone, Search, Award, Sparkles, PhoneCall, HelpCircle } from "lucide-react"
 import { CrmPageIntro } from "@/components/crm-ui"
 
 const MESES_DISPONIBLES = [
@@ -89,6 +89,63 @@ interface MetricasData {
     por_fuente: Array<{ nombre: string; cantidad: number }>
     por_manychat?: Array<{ nombre: string; cantidad: number }>
   }
+  trazabilidad?: {
+    llamadas_calificadas: {
+      total_programadas: number
+      calificadas_programadas: number
+      pct_calificadas_programadas: number | null
+      presentadas_total: number
+      calificadas_presentadas: number
+      pct_show_calificadas: number | null
+      cierres_calificados: number
+      tc_calificadas_pct: number | null
+    }
+    paises: Array<{
+      pais: string
+      codigo: string
+      bandera: string
+      leads: number
+      pct_leads: number
+      presentadas: number
+      ventas: number
+      tc_pct: number | null
+      cash_collected: number
+    }>
+    arquetipos: {
+      ranking_llegada: Array<{
+        macro: string
+        leads: number
+        pct_total: number
+        subarquetipos_top: Array<{ nombre: string; cantidad: number }>
+      }>
+      show_rate: Array<{
+        macro: string
+        programadas: number
+        presentadas: number
+        show_rate_pct: number | null
+      }>
+      cierres: Array<{
+        macro: string
+        presentadas: number
+        cierres: number
+        tc_pct: number | null
+        cash_collected: number
+      }>
+    }
+    anuncios: Array<{
+      anuncio: string
+      leads: number
+      calificados: number
+      pct_calificados: number | null
+      calificacion_desglose: { S: number; A: number; B: number; C: number; D: number; sin_scoring: number }
+      arquetipos_desglose: Record<string, number>
+      arquetipo_principal: string
+      presentadas: number
+      cierres: number
+      tc_pct: number | null
+      cash_collected: number
+    }>
+  }
 }
 
 const fmt$ = (n: number | null) => n === null || n === undefined ? "—"
@@ -129,7 +186,9 @@ export default function MetricasPage() {
   const [error, setError] = useState<string | null>(null)
   const [editingManual, setEditingManual] = useState<EditingManual>(null)
   const [savingConv, setSavingConv] = useState(false)
-  const [tab, setTab] = useState<"general" | "volumen">("general")
+  const [tab, setTab] = useState<"general" | "trazabilidad" | "volumen">("general")
+  const [filtroPais, setFiltroPais] = useState("")
+  const [filtroAnuncio, setFiltroAnuncio] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
   const [detail, setDetail] = useState<{ key: string; label: string } | null>(null)
   const [detailRows, setDetailRows] = useState<any[] | null>(null)
@@ -667,6 +726,389 @@ export default function MetricasPage() {
             )}
           </section>
 
+        </div>
+      )}
+
+
+      {data && !loading && tab === "trazabilidad" && (
+        <div className="space-y-8 animate-in fade-in-50 duration-300">
+          {/* BANNER KPI: TRAZABILIDAD GENERAL */}
+          {data.trazabilidad?.llamadas_calificadas && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-4 shadow-sm">
+                <div className="flex items-center justify-between text-xs font-semibold text-emerald-400">
+                  <span>Llamadas Calificadas</span>
+                  <Target className="h-4 w-4 opacity-80" />
+                </div>
+                <div className="mt-2 text-2xl font-black text-white sm:text-3xl">
+                  {data.trazabilidad.llamadas_calificadas.calificadas_programadas}
+                </div>
+                <div className="mt-1 text-xs text-zinc-400">
+                  de {data.trazabilidad.llamadas_calificadas.total_programadas} calls ({fmtPct(data.trazabilidad.llamadas_calificadas.pct_calificadas_programadas)})
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-4 shadow-sm">
+                <div className="flex items-center justify-between text-xs font-semibold text-cyan-400">
+                  <span>Show Rate Calif.</span>
+                  <PhoneCall className="h-4 w-4 opacity-80" />
+                </div>
+                <div className="mt-2 text-2xl font-black text-white sm:text-3xl">
+                  {fmtPct(data.trazabilidad.llamadas_calificadas.pct_show_calificadas)}
+                </div>
+                <div className="mt-1 text-xs text-zinc-400">
+                  {data.trazabilidad.llamadas_calificadas.calificadas_presentadas} de {data.trazabilidad.llamadas_calificadas.calificadas_programadas} presentadas
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-violet-500/30 bg-violet-950/20 p-4 shadow-sm">
+                <div className="flex items-center justify-between text-xs font-semibold text-violet-400">
+                  <span>Cierres Calificados</span>
+                  <CheckCircle2 className="h-4 w-4 opacity-80" />
+                </div>
+                <div className="mt-2 text-2xl font-black text-white sm:text-3xl">
+                  {data.trazabilidad.llamadas_calificadas.cierres_calificados}
+                </div>
+                <div className="mt-1 text-xs text-zinc-400">
+                  TC s/Calif: {fmtPct(data.trazabilidad.llamadas_calificadas.tc_calificadas_pct)}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-4 shadow-sm">
+                <div className="flex items-center justify-between text-xs font-semibold text-amber-400">
+                  <span>Países Activos</span>
+                  <Globe className="h-4 w-4 opacity-80" />
+                </div>
+                <div className="mt-2 text-2xl font-black text-white sm:text-3xl">
+                  {data.trazabilidad.paises?.filter(p => p.leads > 0).length || 0}
+                </div>
+                <div className="mt-1 text-xs text-zinc-400">
+                  {data.trazabilidad.paises?.find(p => p.leads > 0)?.bandera} Top: {data.trazabilidad.paises?.find(p => p.leads > 0)?.pais || "—"}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 1. DE QUÉ PAÍS ESTÁN VINIENDO LAS VENTAS Y LOS LEADS */}
+          <section className="rounded-2xl border border-white/10 bg-zinc-950/40 p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-emerald-400" />
+                  De qué País están Viniendo las Ventas y los Leads
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Distribución geográfica por prefijo telefónico y trazabilidad de origen en la llamada.
+                </p>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar país..."
+                  value={filtroPais}
+                  onChange={(e) => setFiltroPais(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-white/5 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-white/10 text-zinc-400 uppercase tracking-wider text-[11px]">
+                    <th className="py-2.5 px-3">País</th>
+                    <th className="py-2.5 px-3 text-right">Leads</th>
+                    <th className="py-2.5 px-3 text-right">% Leads</th>
+                    <th className="py-2.5 px-3 text-right">Presentadas</th>
+                    <th className="py-2.5 px-3 text-right">Ventas</th>
+                    <th className="py-2.5 px-3 text-right">TC (%)</th>
+                    <th className="py-2.5 px-3 text-right">Cash Recaudado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {data.trazabilidad?.paises
+                    ?.filter(p => !filtroPais || p.pais.toLowerCase().includes(filtroPais.toLowerCase()))
+                    .map((p, idx) => (
+                      <tr key={p.pais} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-2.5 px-3 font-medium text-white flex items-center gap-2">
+                          <span className="text-base">{p.bandera}</span>
+                          <span>{p.pais}</span>
+                          {idx === 0 && <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">Top Leads</span>}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-zinc-200">{p.leads}</td>
+                        <td className="py-2.5 px-3 text-right text-zinc-400">{fmtPct(p.pct_leads)}</td>
+                        <td className="py-2.5 px-3 text-right text-zinc-300">{p.presentadas}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-emerald-400">{p.ventas}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-cyan-300">
+                          {p.tc_pct !== null ? fmtPct(p.tc_pct) : "—"}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-amber-300">
+                          {p.cash_collected > 0 ? fmt$(p.cash_collected) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  {(!data.trazabilidad?.paises || data.trazabilidad.paises.length === 0) && (
+                    <tr>
+                      <td colSpan={7} className="py-6 text-center text-zinc-500">
+                        Sin datos geográficos para el período seleccionado.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* 2. QUÉ ARQUETIPO ESTÁ LLEGANDO MÁS Y SUBARQUETIPOS */}
+          <section className="rounded-2xl border border-white/10 bg-zinc-950/40 p-5 shadow-sm">
+            <div className="pb-3 border-b border-white/10">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Users className="h-4 w-4 text-cyan-400" />
+                Qué Arquetipo está Llegando Más y Subarquetipos Reales
+              </h3>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Clasificación canónica oficial del CRM Exposure OS y desglose de ocupaciones declaradas.
+              </p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {data.trazabilidad?.arquetipos.ranking_llegada.map((arq, idx) => (
+                <div key={arq.macro} className="rounded-xl border border-white/10 bg-zinc-900/40 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-zinc-300">{arq.macro}</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-zinc-300">
+                      #{idx + 1}
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black text-white">{arq.leads}</span>
+                    <span className="text-xs text-zinc-400">leads ({fmtPct(arq.pct_total)})</span>
+                  </div>
+
+                  <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-cyan-500 h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(100, arq.pct_total || 0)}%` }}
+                    />
+                  </div>
+
+                  {arq.subarquetipos_top && arq.subarquetipos_top.length > 0 ? (
+                    <div className="pt-2 border-t border-white/5 space-y-1">
+                      <p className="text-[11px] font-semibold text-zinc-400">Subarquetipos detectados:</p>
+                      <div className="space-y-1">
+                        {arq.subarquetipos_top.map(sub => (
+                          <div key={sub.nombre} className="flex justify-between text-[11px] text-zinc-300">
+                            <span className="truncate pr-2">• {sub.nombre}</span>
+                            <span className="font-mono text-zinc-400 shrink-0">{sub.cantidad}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-zinc-500 italic pt-2 border-t border-white/5">
+                      Sin subarquetipos específicos cargados
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* 3. SHOW RATE POR ARQUETIPO & QUÉ ARQUETIPO SE CIERRA MÁS */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* SHOW RATE POR ARQUETIPO */}
+            <section className="rounded-2xl border border-white/10 bg-zinc-950/40 p-5 shadow-sm space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <PhoneCall className="h-4 w-4 text-violet-400" />
+                  Qué % de Show Rate tiene cada Arquetipo
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Tasa de asistencia a llamada según el perfil del lead.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-white/10 text-zinc-400 uppercase tracking-wider text-[11px]">
+                      <th className="py-2 px-3">Arquetipo</th>
+                      <th className="py-2 px-3 text-right">Programadas</th>
+                      <th className="py-2 px-3 text-right">Presentadas</th>
+                      <th className="py-2 px-3 text-right">Show Rate (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {data.trazabilidad?.arquetipos.show_rate.map((st) => (
+                      <tr key={st.macro} className="hover:bg-white/[0.02]">
+                        <td className="py-2.5 px-3 font-semibold text-white">{st.macro}</td>
+                        <td className="py-2.5 px-3 text-right text-zinc-300">{st.programadas}</td>
+                        <td className="py-2.5 px-3 text-right text-zinc-300 font-bold">{st.presentadas}</td>
+                        <td className="py-2.5 px-3 text-right font-black text-cyan-300">
+                          {st.show_rate_pct !== null ? fmtPct(st.show_rate_pct) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* QUÉ ARQUETIPO SE CIERRA MÁS */}
+            <section className="rounded-2xl border border-white/10 bg-zinc-950/40 p-5 shadow-sm space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-amber-400" />
+                  Qué Arquetipo se Cierra Más & Facturación
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Tasa de conversión sobre llamadas presentadas y volumen de cobro en USD.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-white/10 text-zinc-400 uppercase tracking-wider text-[11px]">
+                      <th className="py-2 px-3">Arquetipo</th>
+                      <th className="py-2 px-3 text-right">Presentadas</th>
+                      <th className="py-2 px-3 text-right">Cierres</th>
+                      <th className="py-2 px-3 text-right">TC (%)</th>
+                      <th className="py-2 px-3 text-right">Cash Recaudado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {data.trazabilidad?.arquetipos.cierres.map((cl, idx) => (
+                      <tr key={cl.macro} className="hover:bg-white/[0.02]">
+                        <td className="py-2.5 px-3 font-semibold text-white flex items-center gap-1.5">
+                          {idx === 0 && <Award className="h-3.5 w-3.5 text-amber-400 shrink-0" />}
+                          <span>{cl.macro}</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-zinc-300">{cl.presentadas}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-emerald-400">{cl.cierres}</td>
+                        <td className="py-2.5 px-3 text-right font-black text-amber-300">
+                          {cl.tc_pct !== null ? fmtPct(cl.tc_pct) : "—"}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-emerald-300">
+                          {cl.cash_collected > 0 ? fmt$(cl.cash_collected) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          {/* 4. DE QUÉ ANUNCIO ESTÁN LLEGANDO LOS LEADS Y QUÉ TIPO DE LEADS */}
+          <section className="rounded-2xl border border-white/10 bg-zinc-950/40 p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Megaphone className="h-4 w-4 text-fuchsia-400" />
+                  De qué Anuncio están Llegando los Leads y Qué Tipo de Leads
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Trazabilidad por Pieza / Creativo / Recurso: perfil de scoring y arquetipo predominante.
+                </p>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar anuncio o recurso..."
+                  value={filtroAnuncio}
+                  onChange={(e) => setFiltroAnuncio(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-white/5 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-fuchsia-500/50"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-white/10 text-zinc-400 uppercase tracking-wider text-[11px]">
+                    <th className="py-2.5 px-3">Anuncio / Recurso</th>
+                    <th className="py-2.5 px-3 text-right">Leads</th>
+                    <th className="py-2.5 px-3 text-right">Calificados</th>
+                    <th className="py-2.5 px-3 text-center">Tipo de Leads (Scoring)</th>
+                    <th className="py-2.5 px-3 text-center">Arquetipo Mayoritario</th>
+                    <th className="py-2.5 px-3 text-right">Presentadas</th>
+                    <th className="py-2.5 px-3 text-right">Cierres</th>
+                    <th className="py-2.5 px-3 text-right">TC (%)</th>
+                    <th className="py-2.5 px-3 text-right">Cash</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {data.trazabilidad?.anuncios
+                    ?.filter(a => !filtroAnuncio || a.anuncio.toLowerCase().includes(filtroAnuncio.toLowerCase()))
+                    .map((ad) => (
+                      <tr key={ad.anuncio} className="hover:bg-white/[0.02]">
+                        <td className="py-2.5 px-3 font-semibold text-white max-w-[240px] truncate" title={ad.anuncio}>
+                          {ad.anuncio}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-zinc-200">{ad.leads}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          <span className="font-bold text-emerald-400">{ad.calificados}</span>{" "}
+                          <span className="text-[11px] text-zinc-400">({fmtPct(ad.pct_calificados)})</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="inline-flex items-center gap-1 font-mono text-[10px]">
+                            {ad.calificacion_desglose.A > 0 && (
+                              <span className="bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded">
+                                A:{ad.calificacion_desglose.A}
+                              </span>
+                            )}
+                            {ad.calificacion_desglose.B > 0 && (
+                              <span className="bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded">
+                                B:{ad.calificacion_desglose.B}
+                              </span>
+                            )}
+                            {ad.calificacion_desglose.C > 0 && (
+                              <span className="bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded">
+                                C:{ad.calificacion_desglose.C}
+                              </span>
+                            )}
+                            {ad.calificacion_desglose.D > 0 && (
+                              <span className="bg-rose-500/20 text-rose-300 px-1 py-0.5 rounded">
+                                D:{ad.calificacion_desglose.D}
+                              </span>
+                            )}
+                            {ad.calificacion_desglose.sin_scoring > 0 && (
+                              <span className="bg-zinc-800 text-zinc-400 px-1 py-0.5 rounded">
+                                S/S:{ad.calificacion_desglose.sin_scoring}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-white/5 border border-white/10 text-zinc-300">
+                            {ad.arquetipo_principal}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-zinc-300">{ad.presentadas}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-emerald-400">{ad.cierres}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-cyan-300">
+                          {ad.tc_pct !== null ? fmtPct(ad.tc_pct) : "—"}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-amber-300">
+                          {ad.cash_collected > 0 ? fmt$(ad.cash_collected) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  {(!data.trazabilidad?.anuncios || data.trazabilidad.anuncios.length === 0) && (
+                    <tr>
+                      <td colSpan={9} className="py-6 text-center text-zinc-500">
+                        Sin datos de anuncios para el período seleccionado.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       )}
 

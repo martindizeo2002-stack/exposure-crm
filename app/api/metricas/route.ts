@@ -1,3 +1,4 @@
+import { leerArquetipoCrm, esAgendaCalificada, type MacroArquetipo } from "@/lib/arquetipos-closing"
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { getMetaSpend } from "@/lib/meta-spend"
@@ -99,6 +100,63 @@ function getDateRange(mes: string, weekIdx: number): { start: string; end: strin
 
 // iClosed persiste fecha_agenda en UTC sin sufijo de zona. Los cortes de las
 // semanas comerciales se interpretan en Argentina (UTC-3), no a medianoche UTC.
+
+function detectarPais(telefono?: string | null, textoExtra?: string | null) {
+  const t = String(telefono || "").replace(/\D/g, "")
+  const extra = String(textoExtra || "").toLowerCase()
+
+  if (extra.includes("argentina")) return { pais: "Argentina", codigo: "AR", bandera: "🇦🇷" }
+  if (extra.includes("chile")) return { pais: "Chile", codigo: "CL", bandera: "🇨🇱" }
+  if (extra.includes("mexico") || extra.includes("méxico")) return { pais: "México", codigo: "MX", bandera: "🇲🇽" }
+  if (extra.includes("colombia")) return { pais: "Colombia", codigo: "CO", bandera: "🇨🇴" }
+  if (extra.includes("españa") || extra.includes("espana") || extra.includes("spain")) return { pais: "España", codigo: "ES", bandera: "🇪🇸" }
+  if (extra.includes("uruguay")) return { pais: "Uruguay", codigo: "UY", bandera: "🇺🇾" }
+  if (extra.includes("peru") || extra.includes("perú")) return { pais: "Perú", codigo: "PE", bandera: "🇵🇪" }
+  if (extra.includes("ecuador")) return { pais: "Ecuador", codigo: "EC", bandera: "🇪🇨" }
+  if (extra.includes("paraguay")) return { pais: "Paraguay", codigo: "PY", bandera: "🇵🇾" }
+  if (extra.includes("bolivia")) return { pais: "Bolivia", codigo: "BO", bandera: "🇧🇴" }
+
+  if (!t || t.length < 7) return { pais: "Sin país identificado", codigo: "OTRO", bandera: "🌐" }
+
+  if (t.startsWith("54")) return { pais: "Argentina", codigo: "AR", bandera: "🇦🇷" }
+  if (t.startsWith("56")) return { pais: "Chile", codigo: "CL", bandera: "🇨🇱" }
+  if (t.startsWith("52")) return { pais: "México", codigo: "MX", bandera: "🇲🇽" }
+  if (t.startsWith("57")) return { pais: "Colombia", codigo: "CO", bandera: "🇨🇴" }
+  if (t.startsWith("34")) return { pais: "España", codigo: "ES", bandera: "🇪🇸" }
+  if (t.startsWith("598")) return { pais: "Uruguay", codigo: "UY", bandera: "🇺🇾" }
+  if (t.startsWith("51")) return { pais: "Perú", codigo: "PE", bandera: "🇵🇪" }
+  if (t.startsWith("593")) return { pais: "Ecuador", codigo: "EC", bandera: "🇪🇨" }
+  if (t.startsWith("595")) return { pais: "Paraguay", codigo: "PY", bandera: "🇵🇾" }
+  if (t.startsWith("591")) return { pais: "Bolivia", codigo: "BO", bandera: "🇧🇴" }
+  if (t.startsWith("58")) return { pais: "Venezuela", codigo: "VE", bandera: "🇻🇪" }
+  if (t.startsWith("506")) return { pais: "Costa Rica", codigo: "CR", bandera: "🇨🇷" }
+  if (t.startsWith("507")) return { pais: "Panamá", codigo: "PA", bandera: "🇵🇦" }
+  if (t.startsWith("502")) return { pais: "Guatemala", codigo: "GT", bandera: "🇬🇹" }
+  if (t.startsWith("503")) return { pais: "El Salvador", codigo: "SV", bandera: "🇸🇻" }
+  if (t.startsWith("504")) return { pais: "Honduras", codigo: "HN", bandera: "🇭🇳" }
+  if (t.startsWith("505")) return { pais: "Nicaragua", codigo: "NI", bandera: "🇳🇮" }
+  if (t.startsWith("55")) return { pais: "Brasil", codigo: "BR", bandera: "🇧🇷" }
+  if (t.startsWith("1")) {
+    if (t.startsWith("1809") || t.startsWith("1829") || t.startsWith("1849")) {
+      return { pais: "República Dominicana", codigo: "DO", bandera: "🇩🇴" }
+    }
+    if (t.startsWith("1787") || t.startsWith("1939")) {
+      return { pais: "Puerto Rico", codigo: "PR", bandera: "🇵🇷" }
+    }
+    return { pais: "Estados Unidos", codigo: "US", bandera: "🇺🇸" }
+  }
+  if (t.startsWith("44")) return { pais: "Reino Unido", codigo: "GB", bandera: "🇬🇧" }
+  if (t.startsWith("49")) return { pais: "Alemania", codigo: "DE", bandera: "🇩🇪" }
+  if (t.startsWith("39")) return { pais: "Italia", codigo: "IT", bandera: "🇮🇹" }
+  if (t.startsWith("33")) return { pais: "Francia", codigo: "FR", bandera: "🇫🇷" }
+
+  if ((t.startsWith("11") || t.startsWith("15") || t.startsWith("911")) && t.length === 10) {
+    return { pais: "Argentina", codigo: "AR", bandera: "🇦🇷" }
+  }
+
+  return { pais: "Otros países", codigo: "OTRO", bandera: "🌍" }
+}
+
 function argentinaAgendaBoundary(date: string, end = false): string {
   return new Date(`${date}T${end ? "23:59:59" : "00:00:00"}-03:00`).toISOString().slice(0, 19)
 }
@@ -140,7 +198,7 @@ export async function GET(request: Request) {
         .gte("created_at", `${start}T00:00:00`)
         .lte("created_at", `${end}T23:59:59.999`),
       sb.from("agendas")
-        .select("id,person_id,telefono,cuenta,fuente,closer,setter,show,estado,calificacion,fecha_closer,created_at,call_confirmer,calificaba_realmente")
+        .select("id,person_id,nombre,telefono,cuenta,fuente,closer,setter,show,cerro,estado,calificacion,lead_score,lead_score_grade,fecha_closer,created_at,call_confirmer,calificaba_realmente,ocupacion,recurso,angulo_entrada,manychat,campaign_id,ad_id,creative_id,motivo_no_cierre")
         .or("estado.is.null,estado.neq.Archivada manualmente")
         .gte("fecha_closer", `${start}T00:00:00`)
         .lte("fecha_closer", `${end}T23:59:59`),
@@ -502,8 +560,236 @@ export async function GET(request: Request) {
       por_manychat: tally(aBySetterFecha as Row[], "manychat", { emptyLabel: "No se le envió" }),
     }
 
+    // ==========================================
+    // TRAZABILIDAD COMERCIAL DETALLADA (6 PUNTOS)
+    // ==========================================
+    // 1. Cuántas llamadas calificadas vamos
+    const totalProgTraz = a.length
+    const califProgTraz = a.filter(x => esAgendaCalificada(x.calificacion, x.lead_score_grade)).length
+    const totalShowTraz = a.filter(x => x.show === true).length
+    const califShowTraz = a.filter(x => x.show === true && esAgendaCalificada(x.calificacion, x.lead_score_grade)).length
+    const cierresCalifTraz = a.filter(x => (x.cerro === true || x.estado === "Adentro en Call" || x.estado === "Adentro en FUP" || x.estado === "Cerrado") && esAgendaCalificada(x.calificacion, x.lead_score_grade)).length
+
+    const llamadas_calificadas = {
+      total_programadas: totalProgTraz,
+      calificadas_programadas: califProgTraz,
+      pct_calificadas_programadas: pct(califProgTraz, totalProgTraz),
+      presentadas_total: totalShowTraz,
+      calificadas_presentadas: califShowTraz,
+      pct_show_calificadas: pct(califShowTraz, califProgTraz),
+      cierres_calificados: cierresCalifTraz,
+      tc_calificadas_pct: pct(cierresCalifTraz, califShowTraz),
+    }
+
+    // 2. De qué país están viniendo las ventas o los leads
+    const cashPorIdentityPais = new Map<string, number>()
+    for (const pago of p) {
+      const k = identityKey(pago)
+      cashPorIdentityPais.set(k, (cashPorIdentityPais.get(k) || 0) + Number(pago.monto || 0))
+    }
+
+    const paisMap = new Map<string, { pais: string; codigo: string; bandera: string; leads: number; presentadas: number; ventas: number; cash_collected: number }>()
+
+    for (const agenda of a) {
+      const infoPais = detectarPais(agenda.telefono, agenda.fuente)
+      const key = infoPais.pais
+      if (!paisMap.has(key)) {
+        paisMap.set(key, { ...infoPais, leads: 0, presentadas: 0, ventas: 0, cash_collected: 0 })
+      }
+      const entry = paisMap.get(key)!
+      entry.leads++
+      if (agenda.show === true) entry.presentadas++
+      const cerroLead = agenda.cerro === true || agenda.estado === "Adentro en Call" || agenda.estado === "Adentro en FUP" || agenda.estado === "Cerrado"
+      if (cerroLead) entry.ventas++
+
+      const idKey = identityKey(agenda)
+      if (cashPorIdentityPais.has(idKey)) {
+        entry.cash_collected += cashPorIdentityPais.get(idKey)!
+        cashPorIdentityPais.delete(idKey)
+      }
+    }
+
+    for (const pago of p) {
+      const idKey = identityKey(pago)
+      if (cashPorIdentityPais.has(idKey)) {
+        const infoPais = detectarPais(pago.telefono, pago.fuente)
+        const key = infoPais.pais
+        if (!paisMap.has(key)) {
+          paisMap.set(key, { ...infoPais, leads: 0, presentadas: 0, ventas: 0, cash_collected: 0 })
+        }
+        const entry = paisMap.get(key)!
+        entry.ventas++
+        entry.cash_collected += cashPorIdentityPais.get(idKey)!
+        cashPorIdentityPais.delete(idKey)
+      }
+    }
+
+    const paises = Array.from(paisMap.values())
+      .map(item => ({
+        ...item,
+        pct_leads: pct(item.leads, totalProgTraz) || 0,
+        tc_pct: item.presentadas > 0 ? pct(item.ventas, item.presentadas) : (item.leads > 0 ? pct(item.ventas, item.leads) : null),
+      }))
+      .sort((x, y) => y.leads - x.leads || y.ventas - x.ventas || y.cash_collected - x.cash_collected)
+
+    // 3, 4, 5. Arquetipos (cuál llega más, show rate, cuál se cierra más)
+    const arqStats: Record<MacroArquetipo, {
+      macro: MacroArquetipo
+      programadas: number
+      presentadas: number
+      cierres: number
+      cash_collected: number
+      subarquetipos: Map<string, number>
+    }> = {
+      "DUEÑO DE NEGOCIO": { macro: "DUEÑO DE NEGOCIO", programadas: 0, presentadas: 0, cierres: 0, cash_collected: 0, subarquetipos: new Map() },
+      "EMPLEADO": { macro: "EMPLEADO", programadas: 0, presentadas: 0, cierres: 0, cash_collected: 0, subarquetipos: new Map() },
+      "ESTUDIANTE": { macro: "ESTUDIANTE", programadas: 0, presentadas: 0, cierres: 0, cash_collected: 0, subarquetipos: new Map() },
+      "SIN CLASIFICAR": { macro: "SIN CLASIFICAR", programadas: 0, presentadas: 0, cierres: 0, cash_collected: 0, subarquetipos: new Map() },
+    }
+
+    const cashPorIdentityArq = new Map<string, number>()
+    for (const pago of p) {
+      const k = identityKey(pago)
+      cashPorIdentityArq.set(k, (cashPorIdentityArq.get(k) || 0) + Number(pago.monto || 0))
+    }
+
+    for (const agenda of a) {
+      const arq = leerArquetipoCrm(agenda.ocupacion)
+      const st = arqStats[arq.macro]
+      st.programadas++
+      if (agenda.show === true) st.presentadas++
+      const cerroLead = agenda.cerro === true || agenda.estado === "Adentro en Call" || agenda.estado === "Adentro en FUP" || agenda.estado === "Cerrado"
+      if (cerroLead) st.cierres++
+      if (arq.subarquetipo) {
+        st.subarquetipos.set(arq.subarquetipo, (st.subarquetipos.get(arq.subarquetipo) || 0) + 1)
+      }
+      const idKey = identityKey(agenda)
+      if (cashPorIdentityArq.has(idKey)) {
+        st.cash_collected += cashPorIdentityArq.get(idKey)!
+      }
+    }
+
+    const ranking_llegada = Object.values(arqStats)
+      .map(st => ({
+        macro: st.macro,
+        leads: st.programadas,
+        pct_total: pct(st.programadas, totalProgTraz) || 0,
+        subarquetipos_top: Array.from(st.subarquetipos.entries())
+          .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+          .sort((x, y) => y.cantidad - x.cantidad)
+          .slice(0, 5),
+      }))
+      .sort((x, y) => y.leads - x.leads)
+
+    const show_rate_arquetipos = Object.values(arqStats)
+      .map(st => ({
+        macro: st.macro,
+        programadas: st.programadas,
+        presentadas: st.presentadas,
+        show_rate_pct: pct(st.presentadas, st.programadas),
+      }))
+      .sort((x, y) => (y.show_rate_pct ?? -1) - (x.show_rate_pct ?? -1))
+
+    const cierres_arquetipos = Object.values(arqStats)
+      .map(st => ({
+        macro: st.macro,
+        presentadas: st.presentadas,
+        cierres: st.cierres,
+        tc_pct: pct(st.cierres, st.presentadas),
+        cash_collected: st.cash_collected,
+      }))
+      .sort((x, y) => (y.tc_pct ?? -1) - (x.tc_pct ?? -1) || y.cierres - x.cierres)
+
+    // 6. De qué anuncio están llegando los leads y qué tipo de leads
+    const adsMap = new Map<string, {
+      anuncio: string
+      leads: number
+      calificados: number
+      calificacion_desglose: { S: number; A: number; B: number; C: number; D: number; sin_scoring: number }
+      arquetipos_desglose: Record<string, number>
+      presentadas: number
+      cierres: number
+      cash_collected: number
+    }>()
+
+    const cashPorIdentityAds = new Map<string, number>()
+    for (const pago of p) {
+      const k = identityKey(pago)
+      cashPorIdentityAds.set(k, (cashPorIdentityAds.get(k) || 0) + Number(pago.monto || 0))
+    }
+
+    for (const agenda of a) {
+      const nombreAnuncio = (agenda.recurso || agenda.angulo_entrada || agenda.manychat || agenda.fuente || "Sin anuncio identificado").trim()
+      if (!adsMap.has(nombreAnuncio)) {
+        adsMap.set(nombreAnuncio, {
+          anuncio: nombreAnuncio,
+          leads: 0,
+          calificados: 0,
+          calificacion_desglose: { S: 0, A: 0, B: 0, C: 0, D: 0, sin_scoring: 0 },
+          arquetipos_desglose: {},
+          presentadas: 0,
+          cierres: 0,
+          cash_collected: 0,
+        })
+      }
+      const entry = adsMap.get(nombreAnuncio)!
+      entry.leads++
+      const esCalif = esAgendaCalificada(agenda.calificacion, agenda.lead_score_grade)
+      if (esCalif) entry.calificados++
+
+      const califGrade = String(agenda.lead_score_grade || agenda.calificacion || "").replace(/LEAD\s*/i, "").trim().slice(0, 1).toUpperCase()
+      if (["S", "A", "B", "C", "D"].includes(califGrade)) {
+        (entry.calificacion_desglose as any)[califGrade]++
+      } else {
+        entry.calificacion_desglose.sin_scoring++
+      }
+
+      const arq = leerArquetipoCrm(agenda.ocupacion)
+      entry.arquetipos_desglose[arq.macro] = (entry.arquetipos_desglose[arq.macro] || 0) + 1
+
+      if (agenda.show === true) entry.presentadas++
+      const cerroLead = agenda.cerro === true || agenda.estado === "Adentro en Call" || agenda.estado === "Adentro en FUP" || agenda.estado === "Cerrado"
+      if (cerroLead) entry.cierres++
+
+      const idKey = identityKey(agenda)
+      if (cashPorIdentityAds.has(idKey)) {
+        entry.cash_collected += cashPorIdentityAds.get(idKey)!
+      }
+    }
+
+    const anuncios = Array.from(adsMap.values())
+      .map(ad => {
+        let arqMax = "SIN CLASIFICAR"
+        let maxCount = -1
+        for (const [m, count] of Object.entries(ad.arquetipos_desglose)) {
+          if (count > maxCount) {
+            maxCount = count
+            arqMax = m
+          }
+        }
+        return {
+          ...ad,
+          pct_calificados: pct(ad.calificados, ad.leads),
+          arquetipo_principal: arqMax,
+          tc_pct: pct(ad.cierres, ad.presentadas),
+        }
+      })
+      .sort((x, y) => y.leads - x.leads)
+
+    const trazabilidad = {
+      llamadas_calificadas,
+      paises,
+      arquetipos: {
+        ranking_llegada,
+        show_rate: show_rate_arquetipos,
+        cierres: cierres_arquetipos,
+      },
+      anuncios,
+    }
+
     return NextResponse.json({
       mes, weekIdx, weekCount, volumen, embudo, embudos,
+      trazabilidad,
       funnel: {
         total_agendas, calls_evaluables: callsOccurred.length, calificadas, presentadas, calif_presentadas,
         cierres, cierres_fe, cierres_be, cierres_llamada, cierres_seguimiento,
