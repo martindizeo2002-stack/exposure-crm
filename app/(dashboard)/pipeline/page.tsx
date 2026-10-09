@@ -106,7 +106,10 @@ const NO_CERRADO_MOTIVOS = [
 type NoCierreTipo = (typeof NO_CERRADO_MOTIVOS)[number]["key"]
 const NOCERRADO_LEGACY_MAP: Record<string, NoCierreTipo> = {
   "No Califica": "Descalificado", "Era desempleado": "Descalificado",
+  "Necesitaba de un mayor para la decision": "Descalificado",
+  "No tenia dinero ni apoyo": "Descalificado",
   "Desconfianza": "Desconfianza", "Lo tenia que pensar": "Desconfianza",
+  "No tenia urgencia": "Desconfianza",
   "Miedo": "Miedo", "Le parecia caro": "Miedo",
   "Metodo de pago": "Problema logístico", "No llego al PIF": "Problema logístico", "No llegaba a la Cuota 1": "Problema logístico",
 }

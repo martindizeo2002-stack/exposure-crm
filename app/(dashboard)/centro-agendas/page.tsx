@@ -107,7 +107,7 @@ function isNoPrecallerAgenda(a: Partial<Agenda> | null | undefined) {
 }
 const CALIFICABA = ["Si","No"]
 const ESTADO_AG = ["Adentro en Call","Adentro en FUP","Fee"]
-const MOTIVO = ["Le parecia caro","No llego al PIF","No llegaba a la Cuota 1","Lo tenia que pensar","Desconfianza","Miedo","Metodo de pago","No Califica","Era desempleado"]
+const MOTIVO = ["Le parecia caro","No llego al PIF","No llegaba a la Cuota 1","Lo tenia que pensar","Desconfianza","Miedo","Metodo de pago","No Califica","Era desempleado","Necesitaba de un mayor para la decision","No tenia dinero ni apoyo","No tenia urgencia"]
 // Operaciones: catálogo único de lib/programas.ts (antes había una lista de Consulting heredada de la plantilla).
 const MEDIO_PAGO = ["Pesos","Stripe","USDT","Efectivo USD","Efectivo ARS","Transferencia Bancaria USD","Western Unión","PayPal"]
 const PROBLEMA = [

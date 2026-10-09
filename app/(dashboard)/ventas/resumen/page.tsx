@@ -50,7 +50,10 @@ const MOTIVOS_NO_CIERRE_CRM = [
   "Miedo",
   "Metodo de pago",
   "No Califica",
-  "Era desempleado"
+  "Era desempleado",
+  "Necesitaba de un mayor para la decision",
+  "No tenia dinero ni apoyo",
+  "No tenia urgencia"
 ]
 
 function hoyIso() {
