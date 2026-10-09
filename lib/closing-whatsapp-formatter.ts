@@ -145,11 +145,24 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
     const presentadasCalls = calls.filter((c) => c.resultado !== "NO SHOW" && c.resultado !== "CANCELADA")
     const noShows = calls.filter((c) => c.resultado === "NO SHOW" || c.resultado === "CANCELADA")
 
-    if (presentadasCalls.length > 0) {
+    // En el reporte diario: sólo leads calificados presentados del día.
+    // Si no hay ninguno calificado, se colocan hasta 3 aleatorios del día (que se presentaron).
+    const calificadasPresentadas = presentadasCalls.filter((c) => c.es_calificado)
+    let llamadasParaDetalle: CallDetalle[] = []
+
+    if (calificadasPresentadas.length > 0) {
+      llamadasParaDetalle = calificadasPresentadas
+    } else if (presentadasCalls.length <= 3) {
+      llamadasParaDetalle = presentadasCalls
+    } else {
+      llamadasParaDetalle = [...presentadasCalls].sort(() => 0.5 - Math.random()).slice(0, 3)
+    }
+
+    if (llamadasParaDetalle.length > 0) {
       lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━")
       lines.push("📋 DETALLE DE LLAMADAS TOMADAS")
       lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━")
-      presentadasCalls.forEach((c, idx) => {
+      llamadasParaDetalle.forEach((c, idx) => {
         lines.push(`\nCALL ${idx + 1} — ${c.nombre.toUpperCase()} ${c.hora ? "(" + c.hora + ")" : ""}`)
         lines.push(`Closer: ${c.closer}`)
         
