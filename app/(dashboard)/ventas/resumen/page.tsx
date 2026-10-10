@@ -1133,6 +1133,10 @@ export default function ResumenVentasPage() {
                       <span className="block text-[11px] text-muted-foreground">${arq?.dueno_negocio.cash_d1 || 0} USD</span>
                     </div>
                   </div>
+                  <div className="mt-2 pt-2 border-t border-emerald-500/10 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>${arq?.dueno_negocio.calificadas || 0} calif (${arq?.dueno_negocio.presentadas_calificadas || 0} pres)</span>
+                    <span>${arq?.dueno_negocio.cierres_calificados || 0} calif / ${arq?.dueno_negocio.cierres_no_calificados || 0} no calif</span>
+                  </div>
                 </div>
                 <Button
                   type="button"
@@ -1171,6 +1175,10 @@ export default function ResumenVentasPage() {
                       <span className="text-sm font-bold text-blue-400">{arq?.empleado.cierres || 0} cierres</span>
                       <span className="block text-[11px] text-muted-foreground">${arq?.empleado.cash_d1 || 0} USD</span>
                     </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-blue-500/10 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>${arq?.empleado.calificadas || 0} calif (${arq?.empleado.presentadas_calificadas || 0} pres)</span>
+                    <span>${arq?.empleado.cierres_calificados || 0} calif / ${arq?.empleado.cierres_no_calificados || 0} no calif</span>
                   </div>
                 </div>
                 <Button
@@ -1211,6 +1219,10 @@ export default function ResumenVentasPage() {
                       <span className="block text-[11px] text-muted-foreground">${arq?.estudiante.cash_d1 || 0} USD</span>
                     </div>
                   </div>
+                  <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>${arq?.estudiante.calificadas || 0} calif (${arq?.estudiante.presentadas_calificadas || 0} pres)</span>
+                    <span>${arq?.estudiante.cierres_calificados || 0} calif / ${arq?.estudiante.cierres_no_calificados || 0} no calif</span>
+                  </div>
                 </div>
                 <Button
                   type="button"
@@ -1249,6 +1261,10 @@ export default function ResumenVentasPage() {
                       <span className="text-sm font-bold text-amber-400 group-hover:text-zinc-200">{arq?.sin_clasificar.cierres || 0} cierres</span>
                       <span className="block text-[11px] text-muted-foreground">${arq?.sin_clasificar.cash_d1 || 0} USD</span>
                     </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-amber-500/10 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>${arq?.sin_clasificar.calificadas || 0} calif (${arq?.sin_clasificar.presentadas_calificadas || 0} pres)</span>
+                    <span>${arq?.sin_clasificar.cierres_calificados || 0} calif / ${arq?.sin_clasificar.cierres_no_calificados || 0} no calif</span>
                   </div>
                 </div>
                 <Button
@@ -2580,7 +2596,7 @@ export default function ResumenVentasPage() {
               dueno_negocio: {
                 titulo: "Arquetipo: Dueño de Negocio",
                 categoria: "Segmentación",
-                valor: `${arq?.dueno_negocio.total || 0} calls | ${arq?.dueno_negocio.cierres || 0} cierres`,
+                valor: `${arq?.dueno_negocio.total || 0} calls | ${arq?.dueno_negocio.calificadas || 0} calif | ${arq?.dueno_negocio.presentadas_calificadas || 0} pres calif | ${arq?.dueno_negocio.cierres || 0} cierres (${arq?.dueno_negocio.cierres_calificados || 0} calif, ${arq?.dueno_negocio.cierres_no_calificados || 0} no calif)`,
                 color: "emerald",
                 definicion: "Dueños de agencias, ecommerce o negocios de servicios que buscan escalar integrando soluciones de IA.",
                 formula: "Ocupación catalogada bajo el macro DUEÑO DE NEGOCIO",
@@ -2590,7 +2606,7 @@ export default function ResumenVentasPage() {
               empleado: {
                 titulo: "Arquetipo: Empleado (9 a 5)",
                 categoria: "Segmentación",
-                valor: `${arq?.empleado.total || 0} calls | ${arq?.empleado.cierres || 0} cierres`,
+                valor: `${arq?.empleado.total || 0} calls | ${arq?.empleado.calificadas || 0} calif | ${arq?.empleado.presentadas_calificadas || 0} pres calif | ${arq?.empleado.cierres || 0} cierres (${arq?.empleado.cierres_calificados || 0} calif, ${arq?.empleado.cierres_no_calificados} no calif)`,
                 color: "blue",
                 definicion: "Personas en relación de dependencia que buscan una vía de salida o ingresos extra superiores a su sueldo vendiendo IA.",
                 formula: "Ocupación catalogada bajo el macro EMPLEADO",
@@ -2600,7 +2616,7 @@ export default function ResumenVentasPage() {
               estudiante: {
                 titulo: "Arquetipo: Estudiante",
                 categoria: "Segmentación",
-                valor: `${arq?.estudiante.total || 0} calls | ${arq?.estudiante.cierres || 0} cierres`,
+                valor: `${arq?.estudiante.total || 0} calls | ${arq?.estudiante.calificadas || 0} calif | ${arq?.estudiante.presentadas_calificadas || 0} pres calif | ${arq?.estudiante.cierres || 0} cierres (${arq?.estudiante.cierres_calificados || 0} calif, ${arq?.estudiante.cierres_no_calificados || 0} no calif)`,
                 color: "amber",
                 definicion: "Jóvenes universitarios o autodidactas con hambre de emprender y adquirir habilidades técnicas de alto valor.",
                 formula: "Ocupación catalogada bajo el macro ESTUDIANTE",
@@ -2610,7 +2626,7 @@ export default function ResumenVentasPage() {
               sin_clasificar: {
                 titulo: "Arquetipo: Sin Clasificar",
                 categoria: "Segmentación",
-                valor: `${arq?.sin_clasificar.total || 0} calls | ${arq?.sin_clasificar.cierres || 0} cierres`,
+                valor: `${arq?.sin_clasificar.total || 0} calls | ${arq?.sin_clasificar.calificadas || 0} calif | ${arq?.sin_clasificar.presentadas_calificadas || 0} pres calif | ${arq?.sin_clasificar.cierres || 0} cierres (${arq?.sin_clasificar.cierres_calificados || 0} calif, ${arq?.sin_clasificar.cierres_no_calificados || 0} no calif)`,
                 color: "zinc",
                 definicion: "Leads cuya ocupación o arquetipo aún no fue completado en el formulario o durante la llamada.",
                 formula: "Leads con ocupación pendiente o no mapeada",

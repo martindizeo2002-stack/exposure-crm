@@ -85,10 +85,10 @@ export type MetricasClosing = {
 }
 
 export type ArquetiposMetricas = {
-  dueno_negocio: { total: number; calificadas: number; cierres: number; cash_d1: number }
-  empleado: { total: number; calificadas: number; cierres: number; cash_d1: number }
-  estudiante: { total: number; calificadas: number; cierres: number; cash_d1: number }
-  sin_clasificar: { total: number; calificadas: number; cierres: number; cash_d1: number }
+  dueno_negocio: { total: number; calificadas: number; presentadas_calificadas: number; cierres_calificados: number; cierres_no_calificados: number; cierres: number; cash_d1: number }
+  empleado: { total: number; calificadas: number; presentadas_calificadas: number; cierres_calificados: number; cierres_no_calificados: number; cierres: number; cash_d1: number }
+  estudiante: { total: number; calificadas: number; presentadas_calificadas: number; cierres_calificados: number; cierres_no_calificados: number; cierres: number; cash_d1: number }
+  sin_clasificar: { total: number; calificadas: number; presentadas_calificadas: number; cierres_calificados: number; cierres_no_calificados: number; cierres: number; cash_d1: number }
 }
 
 export type ResumenPayload = {
@@ -248,11 +248,11 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
     lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━")
     lines.push("🧠 PATRONES DEL DÍA")
     lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    lines.push(`• Dueños de negocio: ${arq.dueno_negocio.total} calls | ${arq.dueno_negocio.calificadas} calif | ${arq.dueno_negocio.cierres} cierres`)
-    lines.push(`• Empleados 9-5: ${arq.empleado.total} calls | ${arq.empleado.calificadas} calif | ${arq.empleado.cierres} cierres`)
-    lines.push(`• Estudiantes: ${arq.estudiante.total} calls | ${arq.estudiante.calificadas} calif | ${arq.estudiante.cierres} cierres`)
+    lines.push(`• Dueños de negocio: ${arq.dueno_negocio.total} calls | ${arq.dueno_negocio.calificadas || 0} calif (${arq.dueno_negocio.presentadas_calificadas || 0} pres) | ${arq.dueno_negocio.cierres || 0} cierres (${arq.dueno_negocio.cierres_calificados || 0} calif, ${arq.dueno_negocio.cierres_no_calificados || 0} no calif)`)
+    lines.push(`• Empleados 9-5: ${arq.empleado.total} calls | ${arq.empleado.calificadas || 0} calif (${arq.empleado.presentadas_calificadas || 0} pres) | ${arq.empleado.cierres || 0} cierres (${arq.empleado.cierres_calificados || 0} calif, ${arq.empleado.cierres_no_calificados} no calif)`)
+    lines.push(`• Estudiantes: ${arq.estudiante.total} calls | ${arq.estudiante.calificadas || 0} calif (${arq.estudiante.presentadas_calificadas || 0} pres) | ${arq.estudiante.cierres || 0} cierres (${arq.estudiante.cierres_calificados || 0} calif, ${arq.estudiante.cierres_no_calificados} no calif)`)
     if (arq.sin_clasificar.total > 0) {
-      lines.push(`• Sin clasificar: ${arq.sin_clasificar.total} calls | ${arq.sin_clasificar.calificadas} calif | ${arq.sin_clasificar.cierres} cierres`)
+      lines.push(`• Sin clasificar: ${arq.sin_clasificar.total} calls | ${arq.sin_clasificar.calificadas || 0} calif (${arq.sin_clasificar.presentadas_calificadas || 0} pres) | ${arq.sin_clasificar.cierres || 0} cierres (${arq.sin_clasificar.cierres_calificados || 0} calif, ${arq.sin_clasificar.cierres_no_calificados} no calif)`)
     }
 
     if (data.patrones?.motivos_no_cierre && Object.keys(data.patrones.motivos_no_cierre).length > 0) {
@@ -292,12 +292,12 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
     lines.push(`🎯 TC s/Presentadas: ${m.tc_presentadas_pct.toFixed(1).replace(".", ",")} %`)
     lines.push(`🔥 TC s/Calificadas: ${m.tc_calificadas_pct.toFixed(1).replace(".", ",")} %`)
     lines.push("")
-    lines.push("👤 Conversión por Arquetipo (Datos CRM):")
-    lines.push(`• Dueño de negocio: ${arq.dueno_negocio.total} calls | ${arq.dueno_negocio.calificadas} calif | ${arq.dueno_negocio.cierres} cierres | $${arq.dueno_negocio.cash_d1} USD D1`)
-    lines.push(`• Empleado 9-5: ${arq.empleado.total} calls | ${arq.empleado.calificadas} calif | ${arq.empleado.cierres} cierres | $${arq.empleado.cash_d1} USD D1`)
-    lines.push(`• Estudiante: ${arq.estudiante.total} calls | ${arq.estudiante.calificadas} calif | ${arq.estudiante.cierres} cierres | $${arq.estudiante.cash_d1} USD D1`)
+        lines.push("👤 Conversión por Arquetipo (Datos CRM):")
+    lines.push(`• Dueño de negocio: ${arq.dueno_negocio.total} calls | ${arq.dueno_negocio.calificadas || 0} calificadas | ${arq.dueno_negocio.presentadas_calificadas || 0} presentadas calif | ${arq.dueno_negocio.cierres || 0} cierres (${arq.dueno_negocio.cierres_calificados || 0} calificados, ${arq.dueno_negocio.cierres_no_calificados || 0} no calificados) | ${"$"}${arq.dueno_negocio.cash_d1 || 0} USD D1`)
+    lines.push(`• Empleado 9-5: ${arq.empleado.total} calls | ${arq.empleado.calificadas || 0} calificadas | ${arq.empleado.presentadas_calificadas || 0} presentadas calif | ${arq.empleado.cierres || 0} cierres (${arq.empleado.cierres_calificados || 0} calificados, ${arq.empleado.cierres_no_calificados} no calificados) | ${"$"}${arq.empleado.cash_d1 || 0} USD D1`)
+    lines.push(`• Estudiante: ${arq.estudiante.total} calls | ${arq.estudiante.calificadas || 0} calificadas | ${arq.estudiante.presentadas_calificadas || 0} presentadas calif | ${arq.estudiante.cierres || 0} cierres (${arq.estudiante.cierres_calificados || 0} calificados, ${arq.estudiante.cierres_no_calificados} no calificados) | ${"$"}${arq.estudiante.cash_d1 || 0} USD D1`)
     if (arq.sin_clasificar.total > 0) {
-      lines.push(`• Sin clasificar: ${arq.sin_clasificar.total} calls | ${arq.sin_clasificar.calificadas} calif | ${arq.sin_clasificar.cierres} cierres | $${arq.sin_clasificar.cash_d1} USD D1`)
+      lines.push(`• Sin clasificar: ${arq.sin_clasificar.total} calls | ${arq.sin_clasificar.calificadas || 0} calificadas | ${arq.sin_clasificar.presentadas_calificadas || 0} presentadas calif | ${arq.sin_clasificar.cierres || 0} cierres (${arq.sin_clasificar.cierres_calificados || 0} calificados, ${arq.sin_clasificar.cierres_no_calificados} no calificados) | ${"$"}${arq.sin_clasificar.cash_d1 || 0} USD D1`)
     }
     lines.push("")
 
@@ -344,12 +344,12 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
     lines.push(`• No shows: ${m.no_shows} (Calificados NS: ${m.no_shows_calificados})`)
     lines.push(`• Cierres totales: ${m.cierres} (TC s/Shows: ${m.tc_presentadas_pct.toFixed(1).replace(".", ",")} %, TC s/Calif: ${m.tc_calificadas_pct.toFixed(1).replace(".", ",")} %)`)
     lines.push("")
-    lines.push("👥 Radiografía por Arquetipo (CRM):")
-    lines.push(`• Dueño de negocio: ${arq.dueno_negocio.total} calls | ${arq.dueno_negocio.cierres} cierres | $${arq.dueno_negocio.cash_d1} USD D1`)
-    lines.push(`• Empleado 9-5: ${arq.empleado.total} calls | ${arq.empleado.cierres} cierres | $${arq.empleado.cash_d1} USD D1`)
-    lines.push(`• Estudiante: ${arq.estudiante.total} calls | ${arq.estudiante.cierres} cierres | $${arq.estudiante.cash_d1} USD D1`)
+        lines.push("👥 Radiografía por Arquetipo (CRM):")
+    lines.push(`• Dueño de negocio: ${arq.dueno_negocio.total} calls | ${arq.dueno_negocio.calificadas || 0} calificadas | ${arq.dueno_negocio.presentadas_calificadas || 0} presentadas calif | ${arq.dueno_negocio.cierres || 0} cierres (${arq.dueno_negocio.cierres_calificados || 0} calificados, ${arq.dueno_negocio.cierres_no_calificados || 0} no calificados) | ${"$"}${arq.dueno_negocio.cash_d1 || 0} USD D1`)
+    lines.push(`• Empleado 9-5: ${arq.empleado.total} calls | ${arq.empleado.calificadas || 0} calificadas | ${arq.empleado.presentadas_calificadas || 0} presentadas calif | ${arq.empleado.cierres || 0} cierres (${arq.empleado.cierres_calificados || 0} calificados, ${arq.empleado.cierres_no_calificados || 0} no calificados) | ${"$"}${arq.empleado.cash_d1 || 0} USD D1`)
+    lines.push(`• Estudiante: ${arq.estudiante.total} calls | ${arq.estudiante.calificadas || 0} calificadas | ${arq.estudiante.presentadas_calificadas || 0} presentadas calif | ${arq.estudiante.cierres || 0} cierres (${arq.estudiante.cierres_calificados || 0} calificados, ${arq.estudiante.cierres_no_calificados || 0} no calificados) | ${"$"}${arq.estudiante.cash_d1 || 0} USD D1`)
     if (arq.sin_clasificar.total > 0) {
-      lines.push(`• Sin clasificar: ${arq.sin_clasificar.total} calls | ${arq.sin_clasificar.cierres} cierres | $${arq.sin_clasificar.cash_d1} USD D1`)
+      lines.push(`• Sin clasificar: ${arq.sin_clasificar.total} calls | ${arq.sin_clasificar.calificadas || 0} calificadas | ${arq.sin_clasificar.presentadas_calificadas || 0} presentadas calif | ${arq.sin_clasificar.cierres || 0} cierres (${arq.sin_clasificar.cierres_calificados || 0} calificados, ${arq.sin_clasificar.cierres_no_calificados || 0} no calificados) | ${"$"}${arq.sin_clasificar.cash_d1 || 0} USD D1`)
     }
   }
 

@@ -429,10 +429,10 @@ export async function GET(request: NextRequest) {
     let ticketTotal = 0
 
     const arquetipos: ArquetiposMetricas = {
-      dueno_negocio: { total: 0, calificadas: 0, cierres: 0, cash_d1: 0 },
-      empleado: { total: 0, calificadas: 0, cierres: 0, cash_d1: 0 },
-      estudiante: { total: 0, calificadas: 0, cierres: 0, cash_d1: 0 },
-      sin_clasificar: { total: 0, calificadas: 0, cierres: 0, cash_d1: 0 },
+      dueno_negocio: { total: 0, calificadas: 0, presentadas_calificadas: 0, cierres_calificados: 0, cierres_no_calificados: 0, cierres: 0, cash_d1: 0 },
+      empleado: { total: 0, calificadas: 0, presentadas_calificadas: 0, cierres_calificados: 0, cierres_no_calificados: 0, cierres: 0, cash_d1: 0 },
+      estudiante: { total: 0, calificadas: 0, presentadas_calificadas: 0, cierres_calificados: 0, cierres_no_calificados: 0, cierres: 0, cash_d1: 0 },
+      sin_clasificar: { total: 0, calificadas: 0, presentadas_calificadas: 0, cierres_calificados: 0, cierres_no_calificados: 0, cierres: 0, cash_d1: 0 },
     }
 
     const motivosNoCierre: Record<string, number> = {}
@@ -536,10 +536,20 @@ export async function GET(request: NextRequest) {
           ? "estudiante"
           : "sin_clasificar"
 
-      arquetipos[arqKey].total++
-      if (esCalif) arquetipos[arqKey].calificadas++
+            arquetipos[arqKey].total++
+      if (esCalif) {
+        arquetipos[arqKey].calificadas++
+        if (esShow) {
+          arquetipos[arqKey].presentadas_calificadas++
+        }
+      }
       if (resComercial === "CIERRE") {
         arquetipos[arqKey].cierres++
+        if (esCalif) {
+          arquetipos[arqKey].cierres_calificados++
+        } else {
+          arquetipos[arqKey].cierres_no_calificados++
+        }
         arquetipos[arqKey].cash_d1 += cashLead
       }
 
