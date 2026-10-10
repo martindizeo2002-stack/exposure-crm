@@ -34,6 +34,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
   ["/reglas", ["CEO"]],
   ["/contenido/formatos", [...OPERATIONS, "Editor"]],   // el editor entra al catalogo de referencias; la pestana de rendimiento no se le muestra
   ["/contenido/angulos", OPERATIONS],      // medidor de ángulos de comunicación (etiquetas de ManyChat)
+  ["/contenido/tipos-agenda", OPERATIONS], // tipo de lead que trae cada pieza (resúmenes del setter)
   ["/setting-resumen", SALES_OPERATIONS],  // generador de resúmenes del setter
   ["/whatsapp", OPERATIONS],               // grupos de WhatsApp del equipo
   ["/testimonios", [...OPERATIONS, "CSM", "Editor"]],
@@ -78,6 +79,7 @@ const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/imagen", [...OPERATIONS, "Editor"]],   // subir miniaturas y portadas desde la compu
   ["/api/banco-formatos", [...OPERATIONS, "Editor"]],  // catálogo de formatos (escritura solo CEO, se valida en la ruta)
   ["/api/angulos-manychat", OPERATIONS],
+  ["/api/tipos-agenda", OPERATIONS],
   ["/api/ciudad", OPERATIONS],
   ["/api/setting-resumen", SALES_OPERATIONS],
   ["/api/ventas/resumen", SALES_OPERATIONS],

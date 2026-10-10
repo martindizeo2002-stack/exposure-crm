@@ -85,6 +85,7 @@ export const modules: NavItem[] = [
   { label: "Contenido", href: "/contenido-angulos", icon: Radar, match: ["/contenido-angulos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Formatos", href: "/contenido/formatos", icon: Clapperboard, match: ["/contenido/formatos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Ángulos", href: "/contenido/angulos", icon: Radar, match: ["/contenido/angulos"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT"] },
+  { label: "Tipos de agenda", href: "/contenido/tipos-agenda", icon: Users, match: ["/contenido/tipos-agenda"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT"] },
   { label: "YouTube", href: "/youtube", icon: Youtube, match: ["/youtube"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Radar", href: "/radar", icon: Telescope, match: ["/radar"], ramp: ramps.contenido, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "Editor"] },
   { label: "Testimonios", href: "/testimonios", icon: MessageSquareQuote, match: ["/testimonios"], ramp: ramps.testimonios, group: "Marketing", roles: ["CEO", "Sales Manager", "Manager MKT", "CSM", "Editor"] },
