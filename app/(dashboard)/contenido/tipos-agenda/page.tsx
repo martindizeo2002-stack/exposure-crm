@@ -245,7 +245,7 @@ function PorAngulo({ filas, piezas, desde }: { filas: FilaTipoAgenda[]; piezas: 
       const r = vacio()
       e.agendas.forEach((f) => sumar(r, f))
       return { angulo, cat: e.cat, piezas: e.piezas.length, dias: e.dias.size, r, porDia: e.dias.size ? r.agendas / e.dias.size : 0 }
-    }).sort((a, b) => b.porDia - a.porDia)
+    }).filter((a) => a.r.agendas > 0).sort((a, b) => b.porDia - a.porDia)
     return { lista, promedio: filas.length / diasPeriodo }
   }, [filas, piezas, desde])
   return <Card className="border-white/10 bg-white/[.035]">
