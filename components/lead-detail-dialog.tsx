@@ -433,6 +433,20 @@ export function LeadDetailDialog({
                         />
                       </div>
                     )}
+                    {editForm.show === false && editForm.estado === "No Show" && (
+                      <div className="sm:col-span-2 rounded-2xl border border-red-500/20 bg-red-500/5 p-3">
+                        <label className="mb-1 block text-xs font-bold text-red-700 dark:text-red-300">
+                          Motivo del no show
+                        </label>
+                        <textarea
+                          className="min-h-[72px] w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold"
+                          value={editForm.motivo_no_show || ""}
+                          onChange={e => ef("motivo_no_show", e.target.value)}
+                          placeholder="Ej.: no contestó el WhatsApp de confirmación, avisó que estaba trabajando, se le cortó internet…"
+                        />
+                        <p className="mt-1 text-[11px] text-muted-foreground">Sale al lado del lead en el reporte diario de llamadas.</p>
+                      </div>
+                    )}
                     {editForm.show === true && <>
                       <select className={inputClass} value={editForm.cerro ? "si" : "no"} onChange={e => ef("cerro", e.target.value === "si")}><option value="no">No cerró</option><option value="si">Cerró</option></select>
                       <input className={inputClass} value={editForm.link_fathom || ""} onChange={e => ef("link_fathom", e.target.value)} placeholder="Link Fathom" />
@@ -680,10 +694,11 @@ export function LeadDetailDialog({
                   </div>
                 )}
               </DetailSection>
-              {(agenda.motivo_no_cierre || agenda.motivo_inclusion || agenda.resumen_chat) && (
+              {(agenda.motivo_no_cierre || agenda.motivo_no_show || agenda.motivo_inclusion || agenda.resumen_chat) && (
                 <DetailSection icon={MessageSquareText} title="Resultado y notas">
                   <div className="grid gap-3 sm:grid-cols-2">
                     {agenda.motivo_no_cierre && <DetailField label="Motivo de no cierre" value={agenda.motivo_no_cierre} />}
+                    {agenda.motivo_no_show && <DetailField label="Motivo del no show" value={agenda.motivo_no_show} />}
                     <DetailField label="Motivo de inclusión" value={agenda.motivo_inclusion} />
                     {agenda.resumen_chat && (
                       <div className="rounded-2xl border border-violet-200/60 bg-violet-500/[.045] p-4 sm:col-span-2 dark:border-violet-400/15">

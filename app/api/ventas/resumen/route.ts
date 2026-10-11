@@ -328,6 +328,22 @@ export async function GET(request: NextRequest) {
     }
     const agendaIds = agendaList.map((a) => a.id).filter(Boolean)
 
+    // Motivo del no show cargado a mano en la ficha (vive en crm_events, ver /api/agendas).
+    // Si la persona tenía agendas duplicadas en el período, el motivo pasa a la agenda consolidada.
+    const motivoNoShowPorAgenda = new Map<string, string>()
+    const rawIds = rawAgendas.map((a: any) => String(a.id)).filter(Boolean)
+    for (let i = 0; i < rawIds.length; i += 300) {
+      const { data: motivos } = await sb.from("crm_events").select("source_record_id,metadata")
+        .eq("event_type", "agenda_no_show_motivo").in("source_record_id", rawIds.slice(i, i + 300))
+      for (const m of motivos || []) {
+        const motivo = String((m as any).metadata?.motivo || "").trim()
+        if (!motivo) continue
+        const rid = String((m as any).source_record_id)
+        const destino = String(clusterIdMap.get(rid) ?? clusterIdMap.get(Number(rid)) ?? rid)
+        if (!motivoNoShowPorAgenda.has(destino) || destino === rid) motivoNoShowPorAgenda.set(destino, motivo)
+      }
+    }
+
     // Consultamos pagos reales en el rango
     const { data: pagos } = await sb
       .from("pagos")
@@ -760,6 +776,7 @@ export async function GET(request: NextRequest) {
         forma_pago: formaPagoLead,
         objecion_principal: a.motivo_no_cierre || (resComercial === "NO CIERRE" ? "Sin motivo cargado" : ""),
         motivo_real: a.motivo_no_cierre || (resComercial === "CIERRE" ? "Propuesta y claridad en el modelo" : ""),
+        motivo_no_show: resComercial === "NO SHOW" ? (motivoNoShowPorAgenda.get(String(a.id)) || null) : null,
         siguiente_paso: resComercial === "CIERRE" ? "Onboarding" : (a.estado || "Seguimiento"),
         fathom: fDiag,
         fathom_lead: fLeadDetalle,

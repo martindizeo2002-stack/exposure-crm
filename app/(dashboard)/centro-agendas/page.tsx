@@ -56,6 +56,7 @@ const AGENDAS_CSV_COLUMNS = [
   { label: "Cerró", get: (a: any) => a.cerro ? "Sí" : "No" },
   { label: "Estado", get: (a: any) => a.estado },
   { label: "Motivo No Cierre", get: (a: any) => a.motivo_no_cierre },
+  { label: "Motivo No Show", get: (a: any) => a.motivo_no_show },
   { label: "Calificaba Realmente", get: (a: any) => a.calificaba_realmente },
   { label: "Score real post-call", get: (a: any) => a.calificacion_real },
   { label: "Motivo score real", get: (a: any) => a.motivo_calificacion_real },
@@ -1295,7 +1296,10 @@ export default function CentroAgendasPage() {
                 if (v === "pendiente") { setF("show", null); setF("cerro", false); if (form.estado === "No Show" || form.estado === "Cancelado") setF("estado", null) }
                 if (v === "cancelado") { setF("show", null); setF("cerro", false); setF("estado", "Cancelado"); setF("motivo_no_cierre", null) }
               }} /></div>
-              {form.show === false && <div className="sm:col-span-2 flex items-center rounded-xl border border-red-500/20 bg-red-500/[.07] px-3 py-2 text-xs font-bold text-red-500">No-show: al guardar sale de pendientes y no requiere ningún otro dato.</div>}
+              {form.show === false && <>
+                <div className="sm:col-span-2 flex items-center rounded-xl border border-red-500/20 bg-red-500/[.07] px-3 py-2 text-xs font-bold text-red-500">No-show: al guardar sale de pendientes. Si sabés por qué no se presentó, escribilo abajo: sale al lado del lead en el reporte diario.</div>
+                <div className="sm:col-span-2"><TxtArea label="Motivo del no show" value={form.motivo_no_show} onChange={v => setF("motivo_no_show", v)} /></div>
+              </>}
               {form.show && <>
                 <YesNo label="Cerró" value={!!form.cerro} onChange={v => setF("cerro", v)} />
                 {form.cerro

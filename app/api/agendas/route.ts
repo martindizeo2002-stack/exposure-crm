@@ -52,8 +52,7 @@ export async function GET(request: Request) {
     if (id) {
       const { data, error } = await sb.from("agendas").select("*,crm_people(primary_email)").eq("id", id).single()
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      const { data: followup } = await sb.from("crm_events").select("occurred_at,metadata,created_at").eq("dedupe_key", `agenda_followup:${id}`).maybeSingle()
-      return NextResponse.json(withFollowup(exposeAgendaEmail(data), followup))
+      return NextResponse.json(withEvents(exposeAgendaEmail(data), await agendaEvents(sb, [String(id)])))
     }
 
     const light = searchParams.get("light")
@@ -104,14 +103,11 @@ export async function GET(request: Request) {
             sb.from("agendas").select("id").in("id", ids).not("info_call_triage", "is", null),
           ])
         : [{ data: [], error: null }, { data: [], error: null }]
-      const { data: followups } = ids.length
-        ? await sb.from("crm_events").select("source_record_id,occurred_at,metadata,created_at").eq("event_type", "agenda_followup").in("source_record_id", ids.map(String))
-        : { data: [] }
-      const followupByAgenda = new Map((followups || []).map((row: any) => [String(row.source_record_id), row]))
+      const events = await agendaEvents(sb, ids.map(String))
       const withResumen = new Set((resR.data || []).map((r: any) => r.id))
       const withPrecall = new Set((precallR.data || []).map((r: any) => r.id))
       const data = (listR.data || []).map((r: any) => ({
-        ...withFollowup(exposeAgendaEmail(r), followupByAgenda.get(String(r.id))),
+        ...withEvents(exposeAgendaEmail(r), events),
         _has_resumen: withResumen.has(r.id),
         _has_precall: withPrecall.has(r.id),
       }))
@@ -124,9 +120,8 @@ export async function GET(request: Request) {
     const { data, error, count } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     const fullIds = (data || []).map((row: any) => String(row.id))
-    const { data: fullFollowups } = fullIds.length ? await sb.from("crm_events").select("source_record_id,occurred_at,metadata,created_at").eq("event_type", "agenda_followup").in("source_record_id", fullIds) : { data: [] }
-    const fullFollowupByAgenda = new Map((fullFollowups || []).map((row: any) => [String(row.source_record_id), row]))
-    const exposed = (data || []).map((row: any) => withFollowup(exposeAgendaEmail(row), fullFollowupByAgenda.get(String(row.id))))
+    const fullEvents = await agendaEvents(sb, fullIds)
+    const exposed = (data || []).map((row: any) => withEvents(exposeAgendaEmail(row), fullEvents))
     return NextResponse.json(pagination ? paginatedPayload(exposed, count || 0, pagination) : exposed)
   } catch (err) {
     return NextResponse.json({ error: "Error de servidor" }, { status: 500 })
@@ -221,13 +216,17 @@ export async function PATCH(request: Request) {
     } else if (updates.show === true && updates.estado === "No Show") {
       updates.estado = null
     }
+    // El motivo del no show vive en crm_events (como el seguimiento), no en una columna de agendas.
+    // Si al final se presentó, el motivo ya no aplica y se borra.
+    const hasNoShowUpdate = "motivo_no_show" in rawUpdates || updates.show === true
+    const motivoNoShow = updates.show === true ? "" : String(rawUpdates.motivo_no_show ?? "").trim()
     if (!String(updates.recurso || "").trim() && updates.resumen_chat) {
       const contentOrigin = extractBookingContentOrigin(updates.resumen_chat)
       if (contentOrigin) updates.recurso = contentOrigin
     }
     const email = rawEmail == null || rawEmail === "" ? null : normalizeLeadEmail(rawEmail)
     if (rawEmail && !email) return NextResponse.json({ error: "Email inválido" }, { status: 400 })
-    if (Object.keys(updates).length === 0 && !email && !hasFollowupUpdate) return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 })
+    if (Object.keys(updates).length === 0 && !email && !hasFollowupUpdate && !hasNoShowUpdate) return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 })
 
     // Guardamos el resultado anterior para emitir CAPI solo al cruzar por primera
     // vez a la condición valiosa: show real + calificación S/A/B.
@@ -288,6 +287,26 @@ export async function PATCH(request: Request) {
           }, { onConflict: "dedupe_key" })
         }
       }
+      if (hasNoShowUpdate) {
+        if (!motivoNoShow) {
+          await sb.from("crm_events").delete().eq("dedupe_key", `${NO_SHOW_EVENT}:${id}`)
+        } else if (updated.person_id) {
+          const { error: motivoError } = await sb.from("crm_events").upsert({
+            person_id: updated.person_id,
+            event_type: NO_SHOW_EVENT,
+            occurred_at: updated.fecha_closer || updated.fecha_agenda || new Date().toISOString(),
+            source: "CRM",
+            source_record_type: "agendas",
+            source_record_id: String(id),
+            title: "Motivo del no show",
+            metadata: { motivo: motivoNoShow.slice(0, 2000) },
+            dedupe_key: `${NO_SHOW_EVENT}:${id}`,
+          }, { onConflict: "dedupe_key" })
+          if (motivoError) return NextResponse.json({ error: `Se guardó la agenda pero no el motivo del no show: ${motivoError.message}` }, { status: 500 })
+        } else {
+          return NextResponse.json({ error: "Se guardó la agenda pero no el motivo del no show: la agenda no tiene una persona vinculada" }, { status: 500 })
+        }
+      }
     }
 
     // CAPI Meta: premiar únicamente show real + S/A/B. No-show, pendiente y C/D
@@ -312,6 +331,28 @@ export async function PATCH(request: Request) {
   } catch (err) {
     return NextResponse.json({ error: "Error de servidor" }, { status: 500 })
   }
+}
+
+const NO_SHOW_EVENT = "agenda_no_show_motivo"
+
+// Seguimiento y motivo del no show de un lote de agendas, en una sola consulta a crm_events.
+async function agendaEvents(sb: any, ids: string[]) {
+  const followups = new Map<string, any>()
+  const motivos = new Map<string, string>()
+  if (!ids.length) return { followups, motivos }
+  const { data } = await sb.from("crm_events").select("event_type,source_record_id,occurred_at,metadata,created_at")
+    .in("event_type", ["agenda_followup", NO_SHOW_EVENT]).in("source_record_id", ids)
+  for (const row of data || []) {
+    const key = String(row.source_record_id)
+    if (row.event_type === NO_SHOW_EVENT) motivos.set(key, String(row.metadata?.motivo || ""))
+    else followups.set(key, row)
+  }
+  return { followups, motivos }
+}
+
+function withEvents(row: any, events: { followups: Map<string, any>; motivos: Map<string, string> }) {
+  const key = String(row.id)
+  return { ...withFollowup(row, events.followups.get(key)), motivo_no_show: events.motivos.get(key) || null }
 }
 
 function withFollowup(row: any, event: any) {

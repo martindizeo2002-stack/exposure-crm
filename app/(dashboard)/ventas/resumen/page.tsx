@@ -217,6 +217,7 @@ export default function ResumenVentasPage() {
     calificaba_realmente: string
     objecion: string
     motivo_no_cierre: string
+    motivo_no_show: string
     siguiente_paso: string
     closer: string
     setter: string
@@ -239,6 +240,7 @@ export default function ResumenVentasPage() {
     calificaba_realmente: "Sin definir",
     objecion: "",
     motivo_no_cierre: "",
+    motivo_no_show: "",
     siguiente_paso: "Seguimiento",
     closer: "Cristian",
     setter: "",
@@ -329,6 +331,7 @@ export default function ResumenVentasPage() {
       calificaba_realmente: c.calificaba_realmente || "Sin definir",
       objecion: objBase,
       motivo_no_cierre: c.motivo_real && c.motivo_real !== "Propuesta y claridad en el modelo" ? c.motivo_real : "",
+      motivo_no_show: c.motivo_no_show || "",
       siguiente_paso: c.siguiente_paso || "Seguimiento",
       closer: c.closer || "Cristian",
       setter: "",
@@ -361,7 +364,8 @@ export default function ResumenVentasPage() {
             email: data.email || (data as any)?.crm_people?.primary_email || prev.email,
             instagram: data.instagram || prev.instagram,
             fecha_closer: data.fecha_closer ? data.fecha_closer.slice(0, 16) : prev.fecha_closer,
-            estado: data.estado || prev.estado,
+            estado: data.estado === "No Show" ? "No se presentó" : (data.estado || prev.estado),
+            motivo_no_show: data.motivo_no_show || prev.motivo_no_show,
             link_fathom: data.link_fathom || prev.link_fathom,
             problema_actual: data.problema_actual || prev.problema_actual,
             tiempo_problema: data.tiempo_problema || prev.tiempo_problema,
@@ -447,6 +451,7 @@ export default function ResumenVentasPage() {
         updates.show = false
         updates.cerro = false
         updates.estado = "No Show"
+        updates.motivo_no_show = formEdit.motivo_no_show.trim() || null
       } else if (formEdit.estado === "Se presentó") {
         updates.show = true
       }
@@ -1553,6 +1558,9 @@ export default function ResumenVentasPage() {
                               >
                                 {c.resultado}
                               </Badge>
+                              {c.resultado === "NO SHOW" && c.motivo_no_show && (
+                                <span className="text-xs text-rose-300/90">Motivo: {c.motivo_no_show}</span>
+                              )}
 
                               {/* Botón visible de edición en la cabecera cerca de nombre / estado */}
                               <Button
@@ -2214,6 +2222,19 @@ export default function ResumenVentasPage() {
                     />
                   </div>
                 </div>
+
+                {formEdit.estado === "No se presentó" && (
+                  <div>
+                    <Label className="text-rose-300 font-bold text-xs">Motivo del no show</Label>
+                    <textarea
+                      className="mt-1 min-h-[64px] w-full rounded-md border border-rose-500/30 bg-zinc-900 px-3 py-2 text-xs text-white"
+                      placeholder="Ej.: no contestó el WhatsApp de confirmación, avisó que estaba trabajando, se le cortó internet…"
+                      value={formEdit.motivo_no_show}
+                      onChange={e => setFormEdit(prev => ({ ...prev, motivo_no_show: e.target.value }))}
+                    />
+                    <p className="mt-1 text-[11px] text-zinc-500">Sale al lado del lead en el reporte diario de llamadas.</p>
+                  </div>
+                )}
 
                 <div>
                   <Label className="text-zinc-300 text-xs">Link grabación Fathom</Label>

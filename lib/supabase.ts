@@ -38,6 +38,7 @@ export type Agenda = {
   cerro: boolean
   estado: string | null
   motivo_no_cierre: string | null
+  motivo_no_show: string | null
   seguimiento_estado: "Pendiente" | "Contactado" | "Reagendado" | "Cerrado" | "Descartado" | null
   seguimiento_fecha: string | null
   seguimiento_nota: string | null
