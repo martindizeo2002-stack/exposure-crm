@@ -23,11 +23,11 @@ const COLOR_AREA: Record<string, string> = { Marketing: "#8b5cf6", Ventas: "#22c
 const COLOR_GASTO = "#f43f5e"
 const COLOR_INGRESO = "#10b981"
 
-type Error503 = { error: string; codigo?: string }
+
 const fetcher = async (url: string) => {
   const r = await fetch(url)
   const j = await r.json().catch(() => null)
-  if (!r.ok) throw Object.assign(new Error(j?.error || "Error"), { info: j as Error503 })
+  if (!r.ok) throw new Error(j?.error || "Error")
   return j as RegistroFinanzas[]
 }
 
@@ -429,34 +429,13 @@ function Celda({ valor, onGuardar, tipo = "text", lista, className }: { valor: s
   )
 }
 
-// ─────────────────────────── Página ───────────────────────────
+// ─────────────────────────── Bloque completo (va en Finanzas → Centro Financiero) ───────────────────────────
 
-const SQL_MIGRACION = `create table if not exists public.finanzas_registros (
-  id uuid primary key default gen_random_uuid(),
-  libro text not null check (libro in ('nahuel', 'alex', 'exposure')),
-  tipo text not null default 'gasto' check (tipo in ('gasto', 'ingreso')),
-  fecha date not null default current_date,
-  concepto text not null check (char_length(concepto) between 1 and 300),
-  monto_usd numeric(14,2) not null default 0 check (monto_usd >= 0),
-  area text check (area is null or area in ('Marketing', 'Ventas', 'Producto', 'Operaciones')),
-  categoria text,
-  medio_pago text,
-  notas text,
-  creado_por text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-create index if not exists finanzas_registros_libro_fecha_idx on public.finanzas_registros(libro, fecha desc);
-alter table public.finanzas_registros enable row level security;
-revoke all on public.finanzas_registros from anon, authenticated;
-notify pgrst, 'reload schema';`
-
-export default function LibrosFinanzasPage() {
+export function LibrosFinanzas() {
   const { data, error, isLoading, mutate } = useSWR<RegistroFinanzas[]>(API, fetcher)
   const [tab, setTab] = useState<LibroFinanzas>("exposure")
   const filas = useMemo(() => data || [], [data])
   const porLibro = (l: LibroFinanzas) => filas.filter(f => f.libro === l)
-  const faltaTabla = (error as { info?: Error503 } | undefined)?.info?.codigo === "tabla_faltante"
 
   const crear = async (n: Nuevo) => {
     const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(n) })
@@ -483,40 +462,29 @@ export default function LibrosFinanzasPage() {
     toast.success("Registro borrado")
   }
 
+
   return (
-    <div className="space-y-6 p-6 lg:p-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Gastos y payroll</h1>
+        <h2 className="text-xl font-black tracking-tight">Gastos y payroll</h2>
         <p className="text-sm text-muted-foreground">Gastos personales de Nahuel y de Alex, y el payroll de EXPOSURE (sueldos, software y demás costos). Todo en USD; los ingresos se cargan a mano.</p>
       </div>
 
-      {faltaTabla && (
-        <Alert>
-          <AlertTitle>Falta crear la tabla en la base</AlertTitle>
-          <AlertDescription className="space-y-2">
-            <p>Una sola vez: abrí Supabase → SQL Editor, pegá esto y tocá Run. Después recargá esta página.</p>
-            <pre className="max-h-56 overflow-auto rounded-md bg-muted p-3 text-[11px] leading-relaxed">{SQL_MIGRACION}</pre>
-            <button onClick={() => { void navigator.clipboard.writeText(SQL_MIGRACION); toast.success("SQL copiado") }} className="h-8 rounded-md border border-border px-3 text-xs font-semibold">Copiar SQL</button>
-          </AlertDescription>
-        </Alert>
-      )}
-      {error && !faltaTabla && <Alert variant="destructive"><AlertTitle>No se pudieron cargar los datos</AlertTitle><AlertDescription>{(error as Error).message}</AlertDescription></Alert>}
-      {isLoading && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando…</div>}
+      {error && <Alert variant="destructive"><AlertTitle>No se pudieron cargar los registros</AlertTitle><AlertDescription>{(error as Error).message}</AlertDescription></Alert>}
+      {isLoading && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando registros…</div>}
 
-      {data && <>
-        <section className="space-y-3">
-          <Tabs value={tab} onValueChange={v => setTab(v as LibroFinanzas)}>
-            <TabsList>
-              {LIBROS_FINANZAS.map(l => <TabsTrigger key={l.id} value={l.id}>Dashboard · {l.corto}</TabsTrigger>)}
-            </TabsList>
-          </Tabs>
-          <Dashboard key={tab} libro={tab} filas={porLibro(tab)} />
-        </section>
+      <section className="space-y-3">
+        <Tabs value={tab} onValueChange={v => setTab(v as LibroFinanzas)}>
+          <TabsList className="h-auto flex-wrap">
+            {LIBROS_FINANZAS.map(l => <TabsTrigger key={l.id} value={l.id}>Dashboard · {l.corto}</TabsTrigger>)}
+          </TabsList>
+        </Tabs>
+        <Dashboard key={tab} libro={tab} filas={porLibro(tab)} />
+      </section>
 
-        {LIBROS_FINANZAS.map(l => (
-          <TablaLibro key={l.id} libro={l.id} titulo={l.titulo} filas={porLibro(l.id)} onCrear={crear} onEditar={editar} onBorrar={borrar} />
-        ))}
-      </>}
+      {LIBROS_FINANZAS.map(l => (
+        <TablaLibro key={l.id} libro={l.id} titulo={l.titulo} filas={porLibro(l.id)} onCrear={crear} onEditar={editar} onBorrar={borrar} />
+      ))}
     </div>
   )
 }

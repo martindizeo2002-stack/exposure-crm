@@ -5,7 +5,7 @@ import useSWR from "swr"
 import {
   AlertTriangle, Banknote, CheckCircle2, CircleDashed,
   FileCheck2, History, LockKeyhole, Scale, ShieldCheck, Split,
-  WalletCards,
+
 } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+import { LibrosFinanzas } from "@/components/finanzas-libros"
 
 type Closing = {
   id: string
@@ -146,7 +147,6 @@ export default function FinanzasPage() {
   }
 
   if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando Centro Financiero…</div>
-  if (error) return <div className="p-6"><Alert variant="destructive"><AlertTriangle /><AlertTitle>No se pudo cargar</AlertTitle><AlertDescription>{error.message}</AlertDescription></Alert></div>
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6 p-4 sm:p-6">
@@ -162,18 +162,22 @@ export default function FinanzasPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {data?.policy.previewReadOnly && <Badge variant="outline" className="gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-700"><LockKeyhole className="h-3.5 w-3.5" /> Preview · solo lectura</Badge>}
-          <select
+          {closings.length > 0 && <select
             aria-label="Período"
             className="h-10 rounded-xl border bg-background px-3 text-sm font-semibold"
             value={selected?.id ?? ""}
             onChange={event => selectPeriod(event.target.value)}
           >
             {closings.map(item => <option key={item.id} value={item.id}>{monthLabel(item.period_start)}</option>)}
-          </select>
+          </select>}
         </div>
       </div>
 
-      {!closings.length ? <EmptyFinance /> : <>
+      {error && <Alert variant="destructive"><AlertTriangle /><AlertTitle>No se pudieron cargar los cierres</AlertTitle><AlertDescription>{error.message}</AlertDescription></Alert>}
+
+      <LibrosFinanzas />
+
+      {closings.length > 0 && <>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Metric icon={ShieldCheck} label="Cierres reales" value={`${verifiedCount} de ${closings.length}`} helper={`${detailedCount} con desglose completo · ${unverifiedCount} sin cierre final`} tone="emerald" />
           {selected && <>
@@ -324,8 +328,4 @@ function FormulaLine({ label, value, positive = false }: { label: string; value:
 
 function StatusBlock({ label, value, ok }: { label: string; value: string; ok: boolean }) {
   return <div className="rounded-xl border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className={cn("mt-1 text-sm font-bold", ok ? "text-emerald-600" : "text-amber-600")}>{value}</p></div>
-}
-
-function EmptyFinance() {
-  return <Card><CardContent className="flex min-h-72 flex-col items-center justify-center text-center"><WalletCards className="h-10 w-10 text-muted-foreground" /><h2 className="mt-4 text-lg font-bold">Modelo listo, sin cierres cargados</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">La migración está preparada. Los datos históricos se cargan por un canal privado y nunca se incluyen en el repositorio.</p></CardContent></Card>
 }
