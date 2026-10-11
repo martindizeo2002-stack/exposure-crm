@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
-import type { FilaTipoAgenda } from "@/lib/tipos-agenda"
+import { diaAR, type FilaTipoAgenda, type PiezaPropia } from "@/lib/tipos-agenda"
 
 export const dynamic = "force-dynamic"
 
@@ -52,6 +52,7 @@ export async function GET(request: Request) {
       if (persona) contada.add(persona)
       return {
         ...r,
+        dia_reserva: diaAR(a?.fecha_agenda ? `${String(a.fecha_agenda).slice(0, 19)}Z` : r.publicado_at),
         nombre: a?.nombre ?? null,
         instagram: a?.instagram ?? null,
         fecha_llamada: a?.fecha_closer || a?.fecha_agenda || null,
@@ -62,7 +63,29 @@ export async function GET(request: Request) {
       } as FilaTipoAgenda
     })
 
-    return NextResponse.json({ desde, dias, filas })
+    // Piezas propias publicadas en el período (y dos días antes), con el ángulo que les asignó el Radar
+    const [{ data: crudas, error: ep }, { data: banco }] = await Promise.all([
+      db.from("radar_piezas").select("id,url,tipo_media,fecha,caption,views,analisis")
+        .eq("cuenta_fuente", "alexmcarrera").gte("fecha", new Date(new Date(desde).getTime() - 2 * 86400000).toISOString())
+        .order("fecha", { ascending: true }).limit(2000),
+      db.from("crm_angulos").select("titulo,dolor"),
+    ])
+    if (ep) throw ep
+    const clave = (s: unknown) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim()
+    const categoria = new Map((banco || []).map((b) => [clave(b.titulo), String(b.dolor || "")]))
+    const piezas: PiezaPropia[] = (crudas || []).map((p) => {
+      const a = (p.analisis || {}) as Record<string, unknown>
+      const angulo = String(a.angulo_bm_nombre || "").trim() || null
+      return {
+        id: p.id, url: p.url, tipo: p.tipo_media, fecha: p.fecha, dia: diaAR(p.fecha),
+        titulo: String(p.caption || "").split("\n")[0].slice(0, 120), views: p.views,
+        angulo, categoria: angulo ? categoria.get(clave(angulo)) || null : null,
+        angulo_texto: a.angulo_comunicacion ? String(a.angulo_comunicacion) : null,
+        keyword: a.keyword ? String(a.keyword) : null, analizada: Boolean(p.analisis),
+      }
+    })
+
+    return NextResponse.json({ desde, dias, filas, piezas })
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }

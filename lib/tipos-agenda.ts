@@ -33,8 +33,36 @@ export function grupoDe(arquetipo?: string | null): GrupoId {
   return ARQUETIPOS[String(arquetipo || "")]?.grupo || "otros"
 }
 
+/** Día calendario en hora argentina (UTC−3) de un instante ISO. */
+export function diaAR(iso: string) {
+  return new Date(new Date(iso).getTime() - 3 * 3600000).toISOString().slice(0, 10)
+}
+
+export function sumarDias(dia: string, n: number) {
+  const d = new Date(`${dia}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Pieza propia (reel o carrusel) con el ángulo que le asignó el Radar al analizarla. */
+export type PiezaPropia = {
+  id: string
+  url: string | null
+  tipo: string | null
+  fecha: string
+  dia: string
+  titulo: string
+  views: number | null
+  angulo: string | null
+  categoria: string | null      // PROBLEMA · SOLUCIÓN · PRODUCTO · MENTALIDAD · VOLUMEN/TOFU (columna dolor del banco)
+  angulo_texto: string | null
+  keyword: string | null
+  analizada: boolean
+}
+
 export type FilaTipoAgenda = {
   id: string
+  dia_reserva: string           // día en que el lead reservó (hora argentina)
   agenda_id: string | null
   publicado_at: string
   setter: string | null

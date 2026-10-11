@@ -5,9 +5,9 @@ import useSWR from "swr"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
-import { ARQUETIPOS, GRUPOS, grupoDe, piezaDe, fechaDePieza, type FilaTipoAgenda, type GrupoId } from "@/lib/tipos-agenda"
+import { ARQUETIPOS, GRUPOS, grupoDe, piezaDe, fechaDePieza, diaAR, sumarDias, type FilaTipoAgenda, type GrupoId, type PiezaPropia } from "@/lib/tipos-agenda"
 
-type Datos = { desde: string; dias: number; filas: FilaTipoAgenda[] }
+type Datos = { desde: string; dias: number; filas: FilaTipoAgenda[]; piezas: PiezaPropia[] }
 type Resumen = { agendas: number; foco: number; calificadas: number; presentadas: number; cierres: number; cash: number; grupos: Record<GrupoId, number> }
 
 const fetcher = (url: string) => fetch(url).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error || "No se pudo cargar"); return b })
@@ -202,6 +202,134 @@ function Leads({ filas, pieza }: { filas: FilaTipoAgenda[]; pieza: string | null
   </Card>
 }
 
+const CAT_COLOR: Record<string, string> = {
+  "PROBLEMA": "bg-red-500/15 text-red-300", "SOLUCIÓN": "bg-emerald-500/15 text-emerald-300", "PRODUCTO": "bg-sky-500/15 text-sky-300",
+  "MENTALIDAD": "bg-amber-500/15 text-amber-200", "VOLUMEN/TOFU": "bg-violet-500/15 text-violet-300",
+}
+function Cat({ c }: { c: string | null }) {
+  if (!c) return <span className="text-white/30">—</span>
+  return <span className={cn("inline-block whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase", CAT_COLOR[c] || "bg-white/10 text-white/70")}>{c}</span>
+}
+const nombreAngulo = (p: PiezaPropia) => p.angulo || (p.analizada ? "Sin ángulo del banco" : "Sin analizar todavía")
+
+function agendasPorDia(filas: FilaTipoAgenda[]) {
+  const m = new Map<string, FilaTipoAgenda[]>()
+  for (const f of filas) {
+    if (!m.has(f.dia_reserva)) m.set(f.dia_reserva, [])
+    m.get(f.dia_reserva)!.push(f)
+  }
+  return m
+}
+
+/** Cada agenda se cruza con lo publicado el mismo día y el día anterior a la reserva. */
+function PorAngulo({ filas, piezas, desde }: { filas: FilaTipoAgenda[]; piezas: PiezaPropia[]; desde: string }) {
+  const { lista, promedio } = useMemo(() => {
+    const porDia = agendasPorDia(filas)
+    const inicio = diaAR(desde)
+    const hoy = diaAR(new Date().toISOString())
+    const diasPeriodo = Math.max(1, Math.round((new Date(`${hoy}T12:00:00Z`).getTime() - new Date(`${inicio}T12:00:00Z`).getTime()) / 864e5) + 1)
+    const m = new Map<string, { cat: string | null; piezas: PiezaPropia[]; dias: Set<string>; agendas: Map<string, FilaTipoAgenda> }>()
+    for (const p of piezas) {
+      if (p.dia < sumarDias(inicio, -1)) continue
+      const k = nombreAngulo(p)
+      if (!m.has(k)) m.set(k, { cat: p.categoria, piezas: [], dias: new Set(), agendas: new Map() })
+      const e = m.get(k)!
+      e.piezas.push(p)
+      for (const d of [p.dia, sumarDias(p.dia, 1)]) {
+        if (d < inicio || d > hoy) continue
+        e.dias.add(d)
+        for (const f of porDia.get(d) || []) e.agendas.set(f.id, f)
+      }
+    }
+    const lista = [...m.entries()].map(([angulo, e]) => {
+      const r = vacio()
+      e.agendas.forEach((f) => sumar(r, f))
+      return { angulo, cat: e.cat, piezas: e.piezas.length, dias: e.dias.size, r, porDia: e.dias.size ? r.agendas / e.dias.size : 0 }
+    }).sort((a, b) => b.porDia - a.porDia)
+    return { lista, promedio: filas.length / diasPeriodo }
+  }, [filas, piezas, desde])
+  return <Card className="border-white/10 bg-white/[.035]">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-base">Ángulo publicado → agendas de ese día y el siguiente</CardTitle>
+      <p className="text-xs text-muted-foreground">Cada agenda se cruza con tus reels y carruseles publicados el mismo día de la reserva y el día anterior. El ángulo de cada pieza lo asigna el Radar al leer el texto, lo hablado y los slides (piezas de la API de Instagram). Promedio general del período: {promedio.toLocaleString("es-AR", { maximumFractionDigits: 1 })} agendas con resumen por día. Si el mismo día salieron dos ángulos, esas agendas suman en los dos.</p>
+    </CardHeader>
+    <CardContent className="pt-2"><div className="overflow-x-auto"><Table>
+      <TableHeader><TableRow className="hover:bg-transparent">
+        <TableHead>Ángulo</TableHead><TableHead>Etapa</TableHead><TableHead className="text-right">Piezas</TableHead>
+        <TableHead className="text-right">Días cubiertos</TableHead><TableHead className="text-right">Agendas</TableHead>
+        <TableHead className="text-right">Agendas por día</TableHead><TableHead className="text-right">vs. promedio</TableHead>
+        <TableHead className="min-w-[160px]">Tipo de lead</TableHead><TableHead className="text-right">Foco</TableHead>
+        <TableHead className="text-right">Calificadas</TableHead><TableHead className="text-right">Presentadas</TableHead><TableHead className="text-right">Cierres</TableHead>
+      </TableRow></TableHeader>
+      <TableBody>{lista.map((a) => <TableRow key={a.angulo}>
+        <TableCell className="max-w-[260px] whitespace-normal font-bold">{a.angulo}</TableCell>
+        <TableCell><Cat c={a.cat} /></TableCell>
+        <TableCell className="text-right">{a.piezas}</TableCell>
+        <TableCell className="text-right text-muted-foreground">{a.dias}</TableCell>
+        <TableCell className="text-right font-semibold">{a.r.agendas}</TableCell>
+        <TableCell className="text-right font-bold">{a.porDia.toLocaleString("es-AR", { maximumFractionDigits: 1 })}</TableCell>
+        <TableCell className={cn("text-right text-xs", a.porDia >= promedio ? "text-emerald-300" : "text-white/50")}>{promedio ? `${a.porDia >= promedio ? "+" : ""}${Math.round((a.porDia / promedio - 1) * 100)}%` : "—"}</TableCell>
+        <TableCell><Mezcla r={a.r} /></TableCell>
+        <TableCell className="text-right">{pct(a.r.foco, a.r.agendas)}</TableCell>
+        <TableCell className="text-right">{a.r.calificadas}</TableCell>
+        <TableCell className="text-right">{a.r.presentadas}</TableCell>
+        <TableCell className="text-right font-semibold">{a.r.cierres}</TableCell>
+      </TableRow>)}</TableBody>
+    </Table></div></CardContent>
+  </Card>
+}
+
+function PorDia({ filas, piezas, desde }: { filas: FilaTipoAgenda[]; piezas: PiezaPropia[]; desde: string }) {
+  const [todos, setTodos] = useState(false)
+  const dias = useMemo(() => {
+    const porDia = agendasPorDia(filas)
+    const piezasDia = new Map<string, PiezaPropia[]>()
+    for (const p of piezas) {
+      if (!piezasDia.has(p.dia)) piezasDia.set(p.dia, [])
+      piezasDia.get(p.dia)!.push(p)
+    }
+    const inicio = diaAR(desde)
+    const salida: Array<{ dia: string; hoy: PiezaPropia[]; ayer: PiezaPropia[]; agendas: FilaTipoAgenda[]; r: Resumen }> = []
+    for (let d = diaAR(new Date().toISOString()); d >= inicio; d = sumarDias(d, -1)) {
+      const agendas = porDia.get(d) || []
+      const r = vacio()
+      agendas.forEach((f) => sumar(r, f))
+      salida.push({ dia: d, hoy: piezasDia.get(d) || [], ayer: piezasDia.get(sumarDias(d, -1)) || [], agendas, r })
+    }
+    return salida
+  }, [filas, piezas, desde])
+  const visibles = todos ? dias : dias.slice(0, 21)
+  const chip = (p: PiezaPropia, tenue = false) => <a key={`${p.id}-${tenue ? "a" : "h"}`} href={p.url || undefined} target="_blank" rel="noreferrer" title={`${p.titulo}${p.angulo_texto ? ` — ${p.angulo_texto}` : ""}`}
+    className={cn("inline-flex max-w-[280px] items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] hover:bg-white/5", tenue ? "border-white/5 text-white/45" : "border-white/15 text-white/85")}>
+    <span className="shrink-0 text-[10px] uppercase text-white/40">{tenue ? "ayer · " : ""}{p.tipo === "carrusel" ? "Carru" : p.tipo === "reel" ? "Reel" : p.tipo}</span>
+    <span className="truncate">{nombreAngulo(p)}</span>{p.categoria && !tenue && <Cat c={p.categoria} />}
+  </a>
+  return <Card className="border-white/10 bg-white/[.035]">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-base">Día por día: lo que publicaste y quién agendó</CardTitle>
+      <p className="text-xs text-muted-foreground">Por cada día de reserva: las piezas de ese día, las del día anterior (más tenues) y las agendas con su tipo de lead. Tocá una pieza para abrirla en Instagram; pasá el mouse para leer el ángulo completo.</p>
+    </CardHeader>
+    <CardContent className="space-y-1 pt-2">
+      {visibles.map((d) => <div key={d.dia} className="grid gap-2 border-b border-white/5 py-2 md:grid-cols-[70px_1fr_260px]">
+        <div className="text-sm font-bold">{ddmm(d.dia)}</div>
+        <div className="flex flex-wrap gap-1">
+          {d.hoy.map((p) => chip(p))}
+          {d.ayer.map((p) => chip(p, true))}
+          {!d.hoy.length && !d.ayer.length && <span className="text-xs text-white/30">Sin reels ni carruseles ese día ni el anterior</span>}
+        </div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs"><span className="font-bold">{d.r.agendas} agendas</span>{d.r.calificadas > 0 && <span className="text-emerald-300">{d.r.calificadas} calificadas</span>}</div>
+          <Mezcla r={d.r} />
+          {d.agendas.length > 0 && <div className="truncate text-[11px] text-muted-foreground" title={d.agendas.map((f) => `${f.nombre || f.nombre_perfil} (${ARQUETIPOS[f.arquetipo || "otro"]?.nombre})`).join("\n")}>
+            {d.agendas.slice(0, 4).map((f) => (f.nombre || f.nombre_perfil || "").split(" ")[0]).join(", ")}{d.agendas.length > 4 ? "…" : ""}
+          </div>}
+        </div>
+      </div>)}
+      {dias.length > 21 && <button type="button" onClick={() => setTodos(!todos)} className="mt-2 rounded-full border border-white/15 px-3 py-1 text-xs font-bold text-white/70 hover:bg-white/5">{todos ? "Ver menos" : `Ver los ${dias.length} días`}</button>}
+    </CardContent>
+  </Card>
+}
+
 export default function TiposAgendaPage() {
   const [dias, setDias] = useState(90)
   const [pieza, setPieza] = useState<string | null>(null)
@@ -226,6 +354,8 @@ export default function TiposAgendaPage() {
       </div>
       <div className="space-y-1"><Mezcla r={total} alto={14} /><Leyenda /></div>
       <Semanas filas={filas} />
+      <PorAngulo filas={filas} piezas={data.piezas || []} desde={data.desde} />
+      <PorDia filas={filas} piezas={data.piezas || []} desde={data.desde} />
       <TablaPiezas filas={filas} elegida={pieza} elegir={setPieza} />
       <TablaArquetipos filas={filas} />
       <Leads filas={filas} pieza={pieza} />
