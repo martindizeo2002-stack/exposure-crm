@@ -195,6 +195,7 @@ function Leads({ filas, pieza }: { filas: FilaTipoAgenda[]; pieza: string | null
           <TableCell className="text-xs">{f.cerro || f.cash > 0 ? <span className="font-bold text-emerald-300">Cerró{f.cash ? ` · ${money(f.cash)}` : ""}</span> : f.show ? "Presentada" : f.show === false ? "No se presentó" : "Sin resultado"}</TableCell>
         </TableRow>
         {abierta === f.id && <TableRow className="hover:bg-transparent"><TableCell colSpan={7} className="whitespace-pre-wrap bg-black/30 text-xs text-white/80">
+          {f.anuncio_confianza && <><b>Anuncio probable:</b> {f.anuncio_nombre || "ninguno (no resuena con los creativos que corrían)"}{f.anuncio_nombre ? ` · confianza ${f.anuncio_confianza}` : ""}{f.anuncio_evidencia ? ` · ${f.anuncio_evidencia}` : ""}{"\n"}</>}
           <b>Pieza:</b> {piezaDe(f)} · <b>Setter:</b> {f.setter}{f.minutos_aviso_resumen != null ? ` · resumen a los ${f.minutos_aviso_resumen} min del aviso` : ""}{f.seguimientos_n != null ? ` · ${f.seguimientos_n} seguimientos para agendar` : ""}{"\n\n"}{f.sintesis || "Sin síntesis en el resumen."}
         </TableCell></TableRow>}
       </Fragment>)}</TableBody>
@@ -337,9 +338,13 @@ type AnuncioFM = {
   etiqueta: string | null; atribucion: "propia" | "compartida" | "sin etiqueta"
   agendas?: number; contactos_con_etiqueta?: number; en_europa?: number; calificadas?: number; presentadas?: number; cierres?: number
   estimado_por_fecha?: Estimado
+  resonancia?: Estimado & { alta: number }
 }
 type PersonaEuropa = { nombre: string; instagram: string | null; reserva: string; pais: string | null; arquetipo: string | null; profesion: string | null; evidencia: string | null; anuncio_europa: boolean; show: boolean | null; cerro: boolean }
-type FmAds = { generado: string; anuncios: AnuncioFM[]; fm_sin_fecha_de_seguimiento: number; agendas_en_europa: PersonaEuropa[] }
+type FmAds = {
+  generado: string; anuncios: AnuncioFM[]; fm_sin_fecha_de_seguimiento: number; agendas_en_europa: PersonaEuropa[]
+  resonancia_cobertura?: { follow_me_ads: number; evaluadas: number; ninguno: number; baja: number }
+}
 
 function resumenDeTipos(tipos: Record<string, number>): Resumen {
   const r = vacio()
@@ -357,19 +362,20 @@ function FollowMeAds({ datos }: { datos: FmAds }) {
   return <Card className="border-white/10 bg-white/[.035]">
     <CardHeader className="pb-2">
       <CardTitle className="text-base">Follow Me Ads: qué anuncio trajo qué tipo de lead</CardTitle>
-      <p className="text-xs text-muted-foreground">Cada anuncio con su frecuencia y el costo por seguidor de la cuenta en sus fechas (mezclado: Meta no informa seguidores por anuncio). «Comentaron y agendaron» son agendas de personas con la etiqueta de ManyChat del anuncio. «Agendas estimadas» reparte las agendas cuyo gatillo fue Follow Me Ads entre los anuncios que gastaban el día en que esa persona empezó a seguirte y que apuntaban a su país, según el gasto de cada uno: anuncios que corren juntos se reparten el crédito. Actualizado {datos.generado.replace("T", " ")}; {datos.fm_sin_fecha_de_seguimiento} agendas de Follow Me Ads no tienen fecha de seguimiento y no se reparten.</p>
+      <p className="text-xs text-muted-foreground">«Follow Me Ads» en el resumen solo dice que el lead entró como seguidor nuevo: puede ser pauta u orgánico y nunca se sabe con certeza. Se estima por <b>resonancia</b>: Claude compara lo que contó el lead (situación, dolor, objetivo, cómo habla) con los creativos que corrían las tres semanas previas a su agenda y elige uno o ninguno, con la frase que los conecta (cuentan los de confianza alta o media; el detalle está en cada lead, abajo). «Comentaron y agendaron» son agendas de quienes tienen la etiqueta de ManyChat del anuncio. Frecuencia y costo por seguidor de la cuenta en las fechas del anuncio van primero (el costo es mezclado: Meta no informa seguidores por anuncio). «Por fecha» es la referencia anterior: reparte por el gasto del día en que la persona empezó a seguirte.{datos.resonancia_cobertura ? ` Resonancia evaluada en ${datos.resonancia_cobertura.evaluadas} de ${datos.resonancia_cobertura.follow_me_ads} agendas de Follow Me Ads (${datos.resonancia_cobertura.ninguno} sin ningún creativo que resuene).` : ""} Actualizado {datos.generado.replace("T", " ")}.</p>
     </CardHeader>
     <CardContent className="pt-2"><div className="overflow-x-auto"><Table>
       <TableHeader><TableRow className="hover:bg-transparent">
         <TableHead>Anuncio</TableHead><TableHead>Apunta a</TableHead><TableHead>Corrió</TableHead>
         <TableHead className="text-right">Frecuencia</TableHead><TableHead className="text-right">Costo por seguidor</TableHead><TableHead className="text-right">Gasto</TableHead>
-        <TableHead className="text-right">Comentaron y agendaron</TableHead><TableHead className="text-right">Agendas estimadas</TableHead>
+        <TableHead className="text-right">Comentaron y agendaron</TableHead><TableHead className="text-right">Resuenan con el creativo</TableHead>
         <TableHead className="text-right">Costo por agenda</TableHead><TableHead className="min-w-[150px]">Tipo de lead</TableHead>
         <TableHead className="text-right">Foco</TableHead><TableHead className="text-right">Calificadas</TableHead>
         <TableHead className="text-right">Presentadas</TableHead><TableHead className="text-right">Cierres</TableHead><TableHead className="text-right">En Europa</TableHead>
+        <TableHead className="text-right">Por fecha (ref.)</TableHead>
       </TableRow></TableHeader>
       <TableBody>{lista.map((a) => {
-        const e = a.estimado_por_fecha
+        const e = a.resonancia
         const r = e ? resumenDeTipos(e.tipos) : vacio()
         return <TableRow key={a.id}>
           <TableCell className="max-w-[260px] whitespace-normal" title={a.texto || ""}>
@@ -382,7 +388,7 @@ function FollowMeAds({ datos }: { datos: FmAds }) {
           <TableCell className="text-right font-bold">{a.costo_por_seguidor_cuenta != null ? `USD ${a.costo_por_seguidor_cuenta.toLocaleString("es-AR")}` : "—"}</TableCell>
           <TableCell className="text-right">{money(a.gasto)}</TableCell>
           <TableCell className="text-right">{a.agendas != null ? `${a.agendas} de ${a.contactos_con_etiqueta}` : "—"}</TableCell>
-          <TableCell className="text-right font-semibold">{uno(e?.agendas)}</TableCell>
+          <TableCell className="text-right font-semibold">{e ? `${e.agendas}${e.alta ? ` (${e.alta} alta)` : ""}` : "—"}</TableCell>
           <TableCell className="text-right">{e?.costo_por_agenda != null ? money(e.costo_por_agenda) : "—"}</TableCell>
           <TableCell><Mezcla r={r} /></TableCell>
           <TableCell className="text-right">{e && e.agendas ? pct(e.foco, e.agendas) : "—"}</TableCell>
@@ -390,6 +396,7 @@ function FollowMeAds({ datos }: { datos: FmAds }) {
           <TableCell className="text-right">{uno(e?.presentadas)}</TableCell>
           <TableCell className="text-right">{uno(e?.cierres)}</TableCell>
           <TableCell className="text-right">{uno(e?.en_europa)}</TableCell>
+          <TableCell className="text-right text-xs text-muted-foreground">{uno(a.estimado_por_fecha?.agendas)}</TableCell>
         </TableRow>
       })}</TableBody>
     </Table></div></CardContent>
@@ -397,14 +404,14 @@ function FollowMeAds({ datos }: { datos: FmAds }) {
 }
 
 function AgendasEuropa({ datos }: { datos: FmAds }) {
-  const anuncio = datos.anuncios.find((a) => a.paises.includes("europe"))
+  const anuncio = datos.anuncios.find((a) => a.paises.includes("europe") || /europa/i.test(a.anuncio))
   const lista = [...datos.agendas_en_europa].sort((a, b) => b.reserva.localeCompare(a.reserva))
   const desde = anuncio?.desde
   const despues = desde ? lista.filter((p) => p.reserva >= desde) : []
   return <Card className="border-white/10 bg-white/[.035]">
     <CardHeader className="pb-2">
       <CardTitle className="text-base">Agendas con el lead en Europa</CardTitle>
-      <p className="text-xs text-muted-foreground">Por la característica del teléfono (agenda o formulario de iClosed). {lista.length} desde mediados de julio{desde ? `; ${despues.length} desde que arrancó «${anuncio?.anuncio}» (${ddmm(desde)}), de las cuales ${despues.filter((p) => p.anuncio_europa).length} comentaron el anuncio` : ""}. Todos los Follow Me Ads incluyen España: un lead español pudo venir de cualquiera; el de Europa es el único que llega al resto del continente.</p>
+      <p className="text-xs text-muted-foreground">Por la característica del teléfono (agenda o formulario de iClosed). {lista.length} desde mediados de julio{desde ? `; ${despues.length} desde que arrancó «${anuncio?.anuncio}» (${ddmm(desde)}), de las cuales ${despues.filter((p) => p.anuncio_europa).length} comentaron el anuncio` : ""}. Todos los Follow Me Ads incluyen España: un lead español pudo venir de cualquiera. El de Europa apuntó a todo el continente hasta el 10/10 y desde entonces a España, Italia y Alemania.</p>
     </CardHeader>
     <CardContent className="pt-2"><div className="overflow-x-auto"><Table>
       <TableHeader><TableRow className="hover:bg-transparent">

@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
     const { data: resumenes, error } = await db
       .from("crm_setting_resumenes")
-      .select("id,agenda_id,person_id,publicado_at,setter,nombre_perfil,arquetipo,arquetipo_secundario,macro,profesion,arquetipo_evidencia,foco,calificada,ingreso_declarado,gatillo_etiqueta,gatillo_formato,minutos_aviso_resumen,seguimientos_n,sintesis")
+      .select("id,agenda_id,person_id,publicado_at,setter,nombre_perfil,arquetipo,arquetipo_secundario,macro,profesion,arquetipo_evidencia,foco,calificada,ingreso_declarado,gatillo_etiqueta,gatillo_formato,minutos_aviso_resumen,seguimientos_n,sintesis,anuncio_id,anuncio_nombre,anuncio_confianza,anuncio_evidencia")
       .gte("publicado_at", desde)
       .order("publicado_at", { ascending: false })
       .limit(5000)

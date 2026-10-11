@@ -80,6 +80,10 @@ export type FilaTipoAgenda = {
   minutos_aviso_resumen: number | null
   seguimientos_n: number | null
   sintesis: string | null
+  anuncio_id: string | null           // creativo de Follow Me Ads con el que resuena (scripts/ads/resonancia.py)
+  anuncio_nombre: string | null
+  anuncio_confianza: string | null    // alta · media · baja · ninguno
+  anuncio_evidencia: string | null
   // de la agenda
   nombre: string | null
   instagram: string | null
