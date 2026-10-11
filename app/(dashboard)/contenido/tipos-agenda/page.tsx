@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils"
 import { ARQUETIPOS, GRUPOS, grupoDe, piezaDe, fechaDePieza, diaAR, sumarDias, type FilaTipoAgenda, type GrupoId, type PiezaPropia } from "@/lib/tipos-agenda"
 
-type Datos = { desde: string; dias: number; filas: FilaTipoAgenda[]; piezas: PiezaPropia[] }
+type Datos = { desde: string; dias: number; filas: FilaTipoAgenda[]; piezas: PiezaPropia[]; fmAds: FmAds | null }
 type Resumen = { agendas: number; foco: number; calificadas: number; presentadas: number; cierres: number; cash: number; grupos: Record<GrupoId, number> }
 
 const fetcher = (url: string) => fetch(url).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error || "No se pudo cargar"); return b })
@@ -330,6 +330,98 @@ function PorDia({ filas, piezas, desde }: { filas: FilaTipoAgenda[]; piezas: Pie
   </Card>
 }
 
+type Estimado = { agendas: number; en_europa: number; foco: number; calificadas: number; presentadas: number; cierres: number; cash: number; costo_por_agenda: number | null; tipos: Record<string, number> }
+type AnuncioFM = {
+  id: string; anuncio: string; texto: string | null; paises: string[]; edad: Array<number | null>; desde: string; hasta: string; gasto: number
+  frecuencia: number | null; alcance: number | null; costo_por_seguidor_cuenta: number | null
+  etiqueta: string | null; atribucion: "propia" | "compartida" | "sin etiqueta"
+  agendas?: number; contactos_con_etiqueta?: number; en_europa?: number; calificadas?: number; presentadas?: number; cierres?: number
+  estimado_por_fecha?: Estimado
+}
+type PersonaEuropa = { nombre: string; instagram: string | null; reserva: string; pais: string | null; arquetipo: string | null; profesion: string | null; evidencia: string | null; anuncio_europa: boolean; show: boolean | null; cerro: boolean }
+type FmAds = { generado: string; anuncios: AnuncioFM[]; fm_sin_fecha_de_seguimiento: number; agendas_en_europa: PersonaEuropa[] }
+
+function resumenDeTipos(tipos: Record<string, number>): Resumen {
+  const r = vacio()
+  for (const [k, v] of Object.entries(tipos)) {
+    r.grupos[grupoDe(k === "sin resumen" ? null : k)] += v
+    r.agendas += v
+  }
+  return r
+}
+const uno = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleString("es-AR", { maximumFractionDigits: 1 }))
+const ETIQUETA_TXT: Record<string, string> = { propia: "etiqueta propia", compartida: "etiqueta del reel", "sin etiqueta": "sin etiqueta" }
+
+function FollowMeAds({ datos }: { datos: FmAds }) {
+  const lista = [...datos.anuncios].sort((a, b) => b.hasta.localeCompare(a.hasta) || b.gasto - a.gasto)
+  return <Card className="border-white/10 bg-white/[.035]">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-base">Follow Me Ads: qué anuncio trajo qué tipo de lead</CardTitle>
+      <p className="text-xs text-muted-foreground">Cada anuncio con su frecuencia y el costo por seguidor de la cuenta en sus fechas (mezclado: Meta no informa seguidores por anuncio). «Comentaron y agendaron» son agendas de personas con la etiqueta de ManyChat del anuncio. «Agendas estimadas» reparte las agendas cuyo gatillo fue Follow Me Ads entre los anuncios que gastaban el día en que esa persona empezó a seguirte y que apuntaban a su país, según el gasto de cada uno: anuncios que corren juntos se reparten el crédito. Actualizado {datos.generado.replace("T", " ")}; {datos.fm_sin_fecha_de_seguimiento} agendas de Follow Me Ads no tienen fecha de seguimiento y no se reparten.</p>
+    </CardHeader>
+    <CardContent className="pt-2"><div className="overflow-x-auto"><Table>
+      <TableHeader><TableRow className="hover:bg-transparent">
+        <TableHead>Anuncio</TableHead><TableHead>Apunta a</TableHead><TableHead>Corrió</TableHead>
+        <TableHead className="text-right">Frecuencia</TableHead><TableHead className="text-right">Costo por seguidor</TableHead><TableHead className="text-right">Gasto</TableHead>
+        <TableHead className="text-right">Comentaron y agendaron</TableHead><TableHead className="text-right">Agendas estimadas</TableHead>
+        <TableHead className="text-right">Costo por agenda</TableHead><TableHead className="min-w-[150px]">Tipo de lead</TableHead>
+        <TableHead className="text-right">Foco</TableHead><TableHead className="text-right">Calificadas</TableHead>
+        <TableHead className="text-right">Presentadas</TableHead><TableHead className="text-right">Cierres</TableHead><TableHead className="text-right">En Europa</TableHead>
+      </TableRow></TableHeader>
+      <TableBody>{lista.map((a) => {
+        const e = a.estimado_por_fecha
+        const r = e ? resumenDeTipos(e.tipos) : vacio()
+        return <TableRow key={a.id}>
+          <TableCell className="max-w-[260px] whitespace-normal" title={a.texto || ""}>
+            <div className="font-bold">{a.anuncio}</div>
+            <div className="text-[10px] uppercase text-white/40">{ETIQUETA_TXT[a.atribucion]}</div>
+          </TableCell>
+          <TableCell className="text-xs text-muted-foreground">{a.paises.join(", ").replace("europe", "Europa")}{a.edad?.[0] ? ` · ${a.edad[0]}-${a.edad[1]}` : ""}</TableCell>
+          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{ddmm(a.desde)} → {ddmm(a.hasta)}</TableCell>
+          <TableCell className="text-right font-bold">{uno(a.frecuencia)}</TableCell>
+          <TableCell className="text-right font-bold">{a.costo_por_seguidor_cuenta != null ? `USD ${a.costo_por_seguidor_cuenta.toLocaleString("es-AR")}` : "—"}</TableCell>
+          <TableCell className="text-right">{money(a.gasto)}</TableCell>
+          <TableCell className="text-right">{a.agendas != null ? `${a.agendas} de ${a.contactos_con_etiqueta}` : "—"}</TableCell>
+          <TableCell className="text-right font-semibold">{uno(e?.agendas)}</TableCell>
+          <TableCell className="text-right">{e?.costo_por_agenda != null ? money(e.costo_por_agenda) : "—"}</TableCell>
+          <TableCell><Mezcla r={r} /></TableCell>
+          <TableCell className="text-right">{e && e.agendas ? pct(e.foco, e.agendas) : "—"}</TableCell>
+          <TableCell className="text-right">{uno(e?.calificadas)}</TableCell>
+          <TableCell className="text-right">{uno(e?.presentadas)}</TableCell>
+          <TableCell className="text-right">{uno(e?.cierres)}</TableCell>
+          <TableCell className="text-right">{uno(e?.en_europa)}</TableCell>
+        </TableRow>
+      })}</TableBody>
+    </Table></div></CardContent>
+  </Card>
+}
+
+function AgendasEuropa({ datos }: { datos: FmAds }) {
+  const anuncio = datos.anuncios.find((a) => a.paises.includes("europe"))
+  const lista = [...datos.agendas_en_europa].sort((a, b) => b.reserva.localeCompare(a.reserva))
+  const desde = anuncio?.desde
+  const despues = desde ? lista.filter((p) => p.reserva >= desde) : []
+  return <Card className="border-white/10 bg-white/[.035]">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-base">Agendas con el lead en Europa</CardTitle>
+      <p className="text-xs text-muted-foreground">Por la característica del teléfono (agenda o formulario de iClosed). {lista.length} desde mediados de julio{desde ? `; ${despues.length} desde que arrancó «${anuncio?.anuncio}» (${ddmm(desde)}), de las cuales ${despues.filter((p) => p.anuncio_europa).length} comentaron el anuncio` : ""}. Todos los Follow Me Ads incluyen España: un lead español pudo venir de cualquiera; el de Europa es el único que llega al resto del continente.</p>
+    </CardHeader>
+    <CardContent className="pt-2"><div className="overflow-x-auto"><Table>
+      <TableHeader><TableRow className="hover:bg-transparent">
+        <TableHead>Reserva</TableHead><TableHead>Lead</TableHead><TableHead>País</TableHead><TableHead>Tipo</TableHead><TableHead>Evidencia</TableHead><TableHead>Resultado</TableHead>
+      </TableRow></TableHeader>
+      <TableBody>{lista.slice(0, 25).map((p) => <TableRow key={`${p.nombre}-${p.reserva}`} className="align-top">
+        <TableCell className="text-muted-foreground">{ddmm(p.reserva)}</TableCell>
+        <TableCell className="font-bold">{p.nombre}{p.anuncio_europa && <div className="text-[10px] font-bold uppercase text-emerald-300">comentó EUROPA</div>}</TableCell>
+        <TableCell className="text-xs">{p.pais || "—"}</TableCell>
+        <TableCell className="whitespace-nowrap text-xs"><span className="mr-1.5 inline-block h-2 w-2 rounded-sm" style={{ background: COLOR[grupoDe(p.arquetipo)] }} />{p.arquetipo ? ARQUETIPOS[p.arquetipo]?.nombre : "sin resumen"}{p.profesion ? <div className="text-[11px] text-muted-foreground">{p.profesion}</div> : null}</TableCell>
+        <TableCell className="max-w-[360px] whitespace-normal text-xs text-muted-foreground">{p.evidencia ? `«${p.evidencia}»` : "—"}</TableCell>
+        <TableCell className="text-xs">{p.cerro ? <span className="font-bold text-emerald-300">Cerró</span> : p.show ? "Presentada" : p.show === false ? "No se presentó" : "Sin resultado"}</TableCell>
+      </TableRow>)}</TableBody>
+    </Table></div></CardContent>
+  </Card>
+}
+
 export default function TiposAgendaPage() {
   const [dias, setDias] = useState(90)
   const [pieza, setPieza] = useState<string | null>(null)
@@ -356,6 +448,8 @@ export default function TiposAgendaPage() {
       <Semanas filas={filas} />
       <PorAngulo filas={filas} piezas={data.piezas || []} desde={data.desde} />
       <PorDia filas={filas} piezas={data.piezas || []} desde={data.desde} />
+      {data.fmAds && <FollowMeAds datos={data.fmAds} />}
+      {data.fmAds && <AgendasEuropa datos={data.fmAds} />}
       <TablaPiezas filas={filas} elegida={pieza} elegir={setPieza} />
       <TablaArquetipos filas={filas} />
       <Leads filas={filas} pieza={pieza} />

@@ -85,7 +85,11 @@ export async function GET(request: Request) {
       }
     })
 
-    return NextResponse.json({ desde, dias, filas, piezas })
+    // Follow Me Ads → agendas (lo carga Central Negocio/scripts/ads/anuncios-agendas.py --aplicar)
+    const { data: fm } = await db.from("crm_integration_assets").select("metadata")
+      .eq("source", "fm-ads").eq("asset_type", "atribucion").eq("source_id", "ultimo").maybeSingle()
+
+    return NextResponse.json({ desde, dias, filas, piezas, fmAds: fm?.metadata ?? null })
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
