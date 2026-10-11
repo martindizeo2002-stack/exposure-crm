@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { colorAngulo } from "@/lib/colores-angulo"
 import { useAngulos } from "@/lib/use-angulos"
+import { useFormatos } from "@/lib/use-formatos"
 import { SIN_ASIGNAR, claveNombre, responsableDe as nombreResponsable, unificarResponsables } from "@/lib/responsables"
 import { Plus } from "lucide-react"
 import { toast } from "sonner"
@@ -25,6 +26,7 @@ export type PiezaSemana = {
   status: string
   platform: string | null
   assigned_to: string | null
+  metadata?: Record<string, unknown> | null
 }
 
 const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
@@ -284,6 +286,18 @@ const COLUMNAS: Array<{ id: string; label: string; estados: string[]; acento: st
 // "Ian Algue" son la misma persona y tienen que dar un solo chip en el filtro.
 const responsableDe = (p: PiezaSemana) => nombreResponsable(p.assigned_to)
 
+// El tipo de contenido de cada pieza (pedido de Alex, 11/10): si ya se publicó, manda lo que dice Instagram;
+// si no, el tipo de su formato en el banco (Contenido → Formatos). Las historias se marcan en metadata.
+const COLOR_TIPO: Record<string, string> = {
+  Reel: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  Carrusel: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  Historia: "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300",
+}
+const instagramDe = (p: PiezaSemana) => {
+  const ig = p.metadata?.instagram
+  return ig && typeof ig === "object" ? ig as { tipo?: string; url?: string } : null
+}
+
 export function PipelineContenido({ rows, onOpen, editor, responsables = [], onMover }: {
   rows: PiezaSemana[]
   onOpen: (row: PiezaSemana) => void
@@ -293,8 +307,17 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [], onM
   onMover?: (row: PiezaSemana, estado: string) => Promise<void> | void
 }) {
   const { categoriaDe } = useAngulos()
+  const { formatos } = useFormatos()
+  const tipoDe = useCallback((p: PiezaSemana) => {
+    if (p.metadata?.content_type === "stories") return "Historia"
+    const formato = String(p.format || "").trim().toLocaleUpperCase("es")
+    return instagramDe(p)?.tipo
+      || formatos.find((f) => f.nombre.toLocaleUpperCase("es") === formato)?.tipo
+      || (/CARRUSEL/.test(formato) ? "Carrusel" : "Reel")
+  }, [formatos])
   // Un editor entra viendo lo suyo; el resto del equipo entra viendo todo.
   const [filtro, setFiltro] = useState<string | null>(editor || null)
+  const [filtroTipo, setFiltroTipo] = useState<string | null>(null)
 
   // Mientras se guarda el cambio, la pieza ya se dibuja en la columna nueva. Si el guardado falla,
   // se borra el provisorio y vuelve sola a donde estaba.
@@ -406,9 +429,20 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [], onM
     return sin ? [...lista, [SIN_ASIGNAR, sin] as [string, number]] : lista
   }, [rows, responsables])
 
-  const visibles = useMemo(
+  const delResponsable = useMemo(
     () => (filtro ? rows.filter((r) => claveNombre(responsableDe(r)) === claveNombre(filtro)) : rows),
     [rows, filtro],
+  )
+  // Los chips de tipo cuentan sobre lo que deja el filtro de responsable, así los dos filtros se combinan.
+  const tipos = useMemo(() => {
+    const cuenta = new Map<string, number>()
+    for (const row of delResponsable) cuenta.set(tipoDe(row), (cuenta.get(tipoDe(row)) || 0) + 1)
+    const orden = ["Reel", "Carrusel", "Historia"]
+    return [...cuenta.entries()].sort((a, b) => (orden.indexOf(a[0]) + 1 || 9) - (orden.indexOf(b[0]) + 1 || 9) || a[0].localeCompare(b[0], "es"))
+  }, [delResponsable, tipoDe])
+  const visibles = useMemo(
+    () => (filtroTipo ? delResponsable.filter((r) => tipoDe(r) === filtroTipo) : delResponsable),
+    [delResponsable, filtroTipo, tipoDe],
   )
 
   // Si quien mira es un editor, sus piezas van primero: es lo que tiene que hacer hoy.
@@ -448,7 +482,32 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [], onM
         {onMover && <span className="ml-auto hidden text-[11px] text-muted-foreground lg:block">Arrastrá una pieza a otra columna para cambiarle el estado, o usá las flechas de la tarjeta</span>}
       </div>
 
-      {filtro && !visibles.length && (
+      {tipos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[11px] font-black uppercase tracking-wider text-muted-foreground">Tipo</span>
+          <button
+            type="button"
+            onClick={() => setFiltroTipo(null)}
+            className={cn("rounded-full border px-3 py-1 text-xs font-bold transition",
+              filtroTipo === null ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-muted")}
+          >
+            Todos <span className="opacity-70">{delResponsable.length}</span>
+          </button>
+          {tipos.map(([tipo, n]) => (
+            <button
+              key={tipo}
+              type="button"
+              onClick={() => setFiltroTipo(filtroTipo === tipo ? null : tipo)}
+              className={cn("rounded-full border px-3 py-1 text-xs font-bold transition",
+                filtroTipo === tipo ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-muted")}
+            >
+              {tipo} <span className="opacity-70">{n}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filtro && !delResponsable.length && (
         <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
           {filtro === SIN_ASIGNAR ? "No hay piezas sin asignar." : `${filtro} no tiene piezas asignadas todavía.`}
         </p>
@@ -488,6 +547,18 @@ export function PipelineContenido({ rows, onOpen, editor, responsables = [], onM
                         guardando && !arrastre && "animate-pulse")}
                     >
                       <Pieza row={row} categoria={categoriaDe(row.angle)} onOpen={() => onOpen(row)} compacta dosLineas />
+                      <div className="flex flex-wrap items-center gap-1 px-2 pt-1">
+                        <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold", COLOR_TIPO[tipoDe(row)] || "bg-muted text-muted-foreground")}>{tipoDe(row)}</span>
+                        {row.format && row.format.toLocaleUpperCase("es") !== tipoDe(row).toLocaleUpperCase("es") && (
+                          <span className="min-w-0 truncate rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{row.format}</span>
+                        )}
+                        {instagramDe(row)?.url && (
+                          <a href={instagramDe(row)!.url} target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()}
+                            className="rounded px-1 text-[10px] font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+                            Ver post ↗
+                          </a>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1 px-2 pb-1 pt-0.5">
                         {responsableDe(row) !== SIN_ASIGNAR && (
                           <p className={cn("min-w-0 flex-1 truncate text-[10px] font-semibold", mia ? "text-primary" : "text-muted-foreground")}>
