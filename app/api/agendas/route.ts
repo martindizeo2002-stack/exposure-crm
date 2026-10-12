@@ -312,7 +312,17 @@ export async function PATCH(request: Request) {
         }
       }
       if (hasNoShowUpdate) {
-        if (!motivoNoShow) {
+        // Si la agenda viene de una reprogramación, el motivo es el del no show del día original:
+        // marcar "Se presentó" en la segunda reunión no lo borra (queda para la trazabilidad).
+        let conservarMotivo = false
+        if (!motivoNoShow && updates.show === true) {
+          const { count } = await sb.from("crm_events").select("id", { count: "exact", head: true })
+            .eq("event_type", REPROGRAMADA_EVENT).eq("source_record_id", String(id))
+          conservarMotivo = (count || 0) > 0
+        }
+        if (conservarMotivo) {
+          // no se toca el motivo guardado
+        } else if (!motivoNoShow) {
           await sb.from("crm_events").delete().eq("dedupe_key", `${NO_SHOW_EVENT}:${id}`)
         } else if (updated.person_id) {
           const { error: motivoError } = await sb.from("crm_events").upsert({
