@@ -459,20 +459,22 @@ export async function GET(request: NextRequest) {
       sin_resumen_presentadas: 0, cierres_sin_resumen: 0,
     }
 
-    // Consultamos pagos reales en el rango (los anulados o borrados no cuentan)
-    const { data: pagos } = await sb
+    // Pagos del período. Ojo: la tabla pagos no tiene agenda_id; hasta el 12/10/2026 esta consulta lo pedía,
+    // fallaba sin avisar y el resumen no cruzaba ningún pago (cierres y cash salían solo de la agenda).
+    const { data: pagosTodos, error: errPagos } = await sb
       .from("pagos")
-      .select("id, agenda_id, person_id, cliente, telefono, fecha, monto, tipo, operacion, medio_de_pago, comprobante")
-      .eq("record_status", "active")
+      .select("id, person_id, cliente, telefono, fecha, monto, tipo, operacion, closer, medio_de_pago, comprobante, record_status")
       .gte("fecha", fechaDesde)
       .lte("fecha", fechaHasta)
+      .order("fecha", { ascending: true })
+    if (errPagos) throw new Error(`No se pudieron leer los pagos: ${errPagos.message}`)
+    // los anulados o borrados no cuentan
+    const pagos = (pagosTodos || []).filter((p: any) => (p.record_status || "active") === "active")
 
-    // Cada pago va a UNA sola agenda del período: por agenda_id; si no tiene, con la misma regla que
-    // Métricas y Embudos (persona → teléfono → nombre completo, la agenda más cercana a la fecha del pago).
-    // Un pago enlazado a una agenda de otro mes no se cuenta acá.
-    const agendasEnlace = await cargarAgendasEnlace(sb)
-    const { agendaDe } = armarEnlazador(agendasEnlace)
-    const enlacePorId = new Map(agendasEnlace.map((x) => [String(x.id), x]))
+    // Cada pago va a UNA sola agenda del período, con la misma regla que Métricas y Embudos
+    // (persona → teléfono → nombre y apellido, la agenda más cercana a la fecha del pago).
+    // Si esa agenda es de otro mes, se busca la llamada de la misma persona en este período.
+    const { agendaDe } = armarEnlazador(await cargarAgendasEnlace(sb))
     const idGanador = (id: unknown) => String(clusterIdMap.get(id as any) ?? id)
     const idsDelPeriodo = new Set(agendaList.map((a: any) => String(a.id)))
     const ganadorPorPersona = new Map<string, string>(), ganadorPorTel = new Map<string, string>()
@@ -482,70 +484,30 @@ export async function GET(request: NextRequest) {
     }
     const pagosPorAgenda = new Map<string, any[]>()
     const viaPorAgenda = new Map<string, string>()
-    const destinoPorPago = new Map<string, { destino: string; via: string }>()
-    for (const p of (pagos || []) as any[]) {
+    const destinoPorPago = new Map<string, { destino: string | null; via: string | null }>()
+    for (const p of pagos as any[]) {
       let destino: string | null = null
-      let via = "agenda"
-      if (p.agenda_id && idsDelPeriodo.has(idGanador(p.agenda_id))) {
-        destino = idGanador(p.agenda_id)
+      let via: string | null = null
+      if (p.person_id && ganadorPorPersona.has(String(p.person_id))) {
+        destino = ganadorPorPersona.get(String(p.person_id))!; via = "persona"
       } else {
-        // agenda_id de una llamada de otro mes: se busca la llamada de esa persona en este período
-        const ref = p.agenda_id ? enlacePorId.get(String(p.agenda_id)) || null : null
-        const enl = ref ? { a: ref, via: "agenda" } : agendaDe(p)
+        const enl = agendaDe(p)
         if (enl) {
           via = enl.via
           destino = idsDelPeriodo.has(idGanador(enl.a.id)) ? idGanador(enl.a.id)
             : (enl.a.person_id && ganadorPorPersona.get(String(enl.a.person_id))) || ganadorPorTel.get(tel9(enl.a.telefono)) || null
         }
       }
-      if (!destino || !idsDelPeriodo.has(destino)) continue
+      if (destino && !idsDelPeriodo.has(destino)) destino = null
       destinoPorPago.set(String(p.id), { destino, via })
+      if (!destino) continue
       if (!pagosPorAgenda.has(destino)) pagosPorAgenda.set(destino, [])
       pagosPorAgenda.get(destino)!.push(p)
       const previa = viaPorAgenda.get(destino)
-      if (!previa || previa === "nombre") viaPorAgenda.set(destino, via)
+      if (!previa || previa === "nombre") viaPorAgenda.set(destino, via || "nombre")
     }
-
-    // auditar_cruce=1: lista de pagos del período que cambiaron de agenda con la regla nueva del 12/10/2026
-    // (antes: agenda_id, persona o primer nombre contenido en el cliente, sin filtrar anulados).
-    if (searchParams.get("auditar_cruce") === "1") {
-      const { data: pagosTodos, error: errPT } = await sb
-        .from("pagos")
-        .select("id, agenda_id, person_id, cliente, telefono, fecha, monto, tipo, operacion, closer, record_status")
-        .gte("fecha", fechaDesde)
-        .lte("fecha", fechaHasta)
-        .order("fecha", { ascending: true })
-      if (errPT) throw new Error(errPT.message)
-      const ficha = (id: string) => {
-        const a: any = agendaList.find((x: any) => String(x.id) === id)
-        return a ? { id, nombre: a.nombre || "Sin nombre", fecha: String(a.fecha_closer || "").slice(0, 10), closer: a.closer || "" } : { id, nombre: "Agenda fuera de la lista", fecha: "", closer: "" }
-      }
-      const cambios: any[] = []
-      for (const p of (pagosTodos || []) as any[]) {
-        const antes = (agendaList as any[]).filter((a) =>
-          (p.agenda_id && (p.agenda_id === a.id || clusterIdMap.get(p.agenda_id) === a.id)) ||
-          (p.person_id && a.person_id && p.person_id === a.person_id) ||
-          (p.cliente && a.nombre && String(p.cliente).toLowerCase().includes(String(a.nombre).toLowerCase().split(" ")[0]))
-        ).map((a) => String(a.id))
-        const activo = (p.record_status || "active") === "active"
-        const ahora = activo ? destinoPorPago.get(String(p.id)) || null : null
-        const igual = antes.length === (ahora ? 1 : 0) && (!ahora || antes[0] === ahora.destino)
-        if (igual) continue
-        let motivo = ""
-        if (!activo) motivo = `El pago está ${p.record_status === "deleted" ? "borrado" : "anulado"}: antes contaba y ahora no.`
-        else if (antes.length > 1) motivo = `Antes se contaba en ${antes.length} agendas a la vez${ahora ? "; ahora queda en una sola" : "; ahora no coincide con ninguna"}.`
-        else if (antes.length === 1 && !ahora) motivo = "Antes coincidía solo por el primer nombre; ahora no se encuentra una agenda de esa persona en el período."
-        else if (antes.length === 1 && ahora) motivo = `Cambió de agenda: ahora se encuentra por ${ahora.via}.`
-        else if (!antes.length && ahora) motivo = `Antes no se encontraba; ahora sí, por ${ahora.via}.`
-        cambios.push({
-          pago: { id: p.id, cliente: p.cliente, fecha: p.fecha, monto: Number(p.monto) || 0, tipo: p.tipo, operacion: p.operacion, closer: p.closer, estado: p.record_status || "active" },
-          antes: antes.map(ficha),
-          ahora: ahora ? { ...ficha(ahora.destino), via: ahora.via } : null,
-          motivo,
-        })
-      }
-      return NextResponse.json({ ok: true, fecha_desde: fechaDesde, fecha_hasta: fechaHasta, total_pagos: (pagosTodos || []).length, cambios })
-    }
+    // auditar_cruce=1: qué mostraba el resumen antes (solo la agenda) y qué muestra ahora (agenda + pagos)
+    const antesPorAgenda = new Map<string, { resultado: string; cash: number }>()
 
     // Consultamos grabaciones Fathom enlazadas
     let callRecords: Record<string, any> = {}
@@ -692,6 +654,14 @@ export async function GET(request: NextRequest) {
       let cashLead = Number(a.cc_dia_1) || 0
       let ticketLead = 0
       let formaPagoLead = a.medio_de_pago || ""
+
+      // Lo que mostraba el resumen antes del 12/10/2026, cuando no cruzaba pagos: solo lo cargado en la agenda
+      antesPorAgenda.set(String(a.id), esCancel ? { resultado: "CANCELADA", cash: 0 }
+        : esNoShow ? { resultado: "NO SHOW", cash: 0 }
+        : a.cerro === true || estadoStr.includes("cierre") ? { resultado: "CIERRE", cash: Number(a.cc_dia_1) || 0 }
+        : estadoStr.includes("fee") ? { resultado: "FEE", cash: Number(a.cc_dia_1) || 0 }
+        : estadoStr.includes("seguimiento") || estadoStr.includes("fup") ? { resultado: "SEGUIMIENTO", cash: 0 }
+        : { resultado: "NO CIERRE", cash: 0 })
 
       if (esCancel) {
         resComercial = "CANCELADA"
@@ -1041,6 +1011,32 @@ export async function GET(request: NextRequest) {
       show_rate_calificados_pct: showRateCalifPct,
       tc_presentadas_pct: tcPresentadasPct,
       tc_calificadas_pct: tcCalifPct,
+    }
+
+    if (searchParams.get("auditar_cruce") === "1") {
+      const ficha = (id: string) => {
+        const c = callsDetalle.find((x) => String(x.agenda_id) === id)
+        return c ? { id, nombre: c.nombre, fecha: c.fecha || "", closer: c.closer } : { id, nombre: "Agenda fuera del período", fecha: "", closer: "" }
+      }
+      const resumenPago = (p: any) => ({ id: p.id, cliente: p.cliente, fecha: p.fecha, monto: Number(p.monto) || 0, tipo: p.tipo, operacion: p.operacion, closer: p.closer, estado: p.record_status || "active" })
+      // Agendas cuyo resultado o cash cambia al cruzar los pagos
+      const agendasCambian = callsDetalle.flatMap((c) => {
+        const antes = antesPorAgenda.get(String(c.agenda_id)) || { resultado: c.resultado, cash: 0 }
+        const ahora = { resultado: c.resultado, cash: c.resultado === "CIERRE" || c.resultado === "FEE" ? c.cash_d1 : 0 }
+        if (antes.resultado === ahora.resultado && Math.round(antes.cash) === Math.round(ahora.cash)) return []
+        return [{ agenda: ficha(String(c.agenda_id)), antes, ahora, via: c.pago_enlazado_por || null, pagos: (pagosPorAgenda.get(String(c.agenda_id)) || []).map(resumenPago) }]
+      })
+      // Pagos para revisar: los que entraron solo por nombre, los que no tienen agenda en el período y los anulados
+      const pagosRevisar = (pagosTodos || []).flatMap((p: any) => {
+        const activo = (p.record_status || "active") === "active"
+        const d = destinoPorPago.get(String(p.id))
+        const estado = !activo ? "anulado" : !d?.destino ? "sin_agenda" : d.via === "nombre" ? "nombre" : null
+        if (!estado) return []
+        // cuotas y back end de clientes viejos: es normal que no tengan llamada en el período
+        if (estado === "sin_agenda" && /cuota|interna|upsell|renov/i.test(String(p.tipo || ""))) return []
+        return [{ pago: resumenPago(p), estado, agenda: d?.destino ? ficha(d.destino) : null, via: d?.via || null }]
+      })
+      return NextResponse.json({ ok: true, fecha_desde: fechaDesde, fecha_hasta: fechaHasta, total_pagos: (pagosTodos || []).length, agendas: agendasCambian, pagos: pagosRevisar })
     }
 
     const payload: ResumenPayload = {
