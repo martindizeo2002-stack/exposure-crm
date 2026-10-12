@@ -222,11 +222,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Consultamos agendas reales del CRM por fecha_closer (excluyendo registros archivados manualmente)
+    const AG_COLS =
+      "id, nombre, email, telefono, instagram, fecha_closer, fecha_agenda, closer, setter, show, cerro, estado, calificacion, lead_score, lead_score_grade, lead_score_detalle, calificaba_realmente, ocupacion, angulo_entrada, recurso, manychat, fuente, medio_de_pago, motivo_no_cierre, plan_de_pago, cc_dia_1, person_id, problema_actual, motivo_urgencia, ingresos, inversion, link_fathom, ia_analisis, resumen_chat"
     let query = sb
       .from("agendas")
-      .select(
-        "id, nombre, email, telefono, instagram, fecha_closer, fecha_agenda, closer, setter, show, cerro, estado, calificacion, lead_score, lead_score_grade, lead_score_detalle, calificaba_realmente, ocupacion, angulo_entrada, recurso, manychat, fuente, medio_de_pago, motivo_no_cierre, plan_de_pago, cc_dia_1, person_id, problema_actual, motivo_urgencia, ingresos, inversion, link_fathom, ia_analisis, resumen_chat"
-      )
+      .select(AG_COLS)
       .gte("fecha_closer", `${fechaDesde}T00:00:00`)
       .lte("fecha_closer", `${fechaHasta}T23:59:59`)
       .or("estado.is.null,estado.neq.Archivada manualmente")
@@ -273,6 +273,76 @@ export async function GET(request: NextRequest) {
       if (item.intentos_previos) score += 5
       if (item.link_fathom) score += 10
       return score
+    }
+
+    // ── Reprogramaciones (eventos agenda_reprogramada que guarda PATCH /api/agendas) ──
+    // La agenda vive en su día nuevo. En el día original se muestra UNA fila de NO SHOW
+    // ("Reprogramó para el …") solo si la persona no aparece ya en el rango: si el rango
+    // incluye el día nuevo, o tiene otra agenda en el rango, queda una sola fila (la real).
+    const diaHora = (s?: string | null) => (s ? `${s.slice(8, 10)}/${s.slice(5, 7)}${s.length >= 16 ? ` ${s.slice(11, 16)}` : ""}` : "")
+    const identidades = (a: any) => [
+      a.person_id && `p:${a.person_id}`,
+      normPhone(a.telefono).length >= 7 && `t:${normPhone(a.telefono).slice(-10)}`,
+      normIg(a.instagram).length >= 3 && `i:${normIg(a.instagram)}`,
+    ].filter(Boolean) as string[]
+    const idsEnRango = new Set(rawAgendas.map((a: any) => String(a.id)))
+    // Agendas del rango que llegaron acá por una reprogramación: en su día nuevo están pendientes, no son no show.
+    const reprogramadaDesde = new Map<string, string>()
+    if (idsEnRango.size) {
+      const ids = [...idsEnRango]
+      for (let i = 0; i < ids.length; i += 300) {
+        const { data: evs } = await sb.from("crm_events").select("source_record_id,metadata")
+          .eq("event_type", "agenda_reprogramada").in("source_record_id", ids.slice(i, i + 300))
+        for (const ev of evs || []) {
+          const id = String((ev as any).source_record_id)
+          const actual = rawAgendas.find((a: any) => String(a.id) === id)
+          const m = (ev as any).metadata || {}
+          if (actual && String(m.fecha_nueva || "").slice(0, 10) === String(actual.fecha_closer || "").slice(0, 10)) {
+            reprogramadaDesde.set(id, String(m.fecha_original || ""))
+          }
+        }
+      }
+    }
+    const { data: evsOrigen } = await sb.from("crm_events").select("source_record_id,metadata")
+      .eq("event_type", "agenda_reprogramada")
+      .gte("occurred_at", `${fechaDesde}T00:00:00-03:00`).lte("occurred_at", `${fechaHasta}T23:59:59-03:00`)
+    // Una sola fila por agenda: si se reprogramó dos veces dentro del rango, queda el último día original.
+    const origenPorAgenda = new Map<string, { fecha_original: string; fecha_nueva: string }>()
+    for (const ev of evsOrigen || []) {
+      const id = String((ev as any).source_record_id)
+      const m = (ev as any).metadata || {}
+      const dia = String(m.fecha_original || "").slice(0, 10)
+      if (!dia || dia < fechaDesde || dia > fechaHasta || idsEnRango.has(id)) continue
+      const previo = origenPorAgenda.get(id)
+      if (!previo || String(m.fecha_original) > previo.fecha_original) origenPorAgenda.set(id, { fecha_original: String(m.fecha_original), fecha_nueva: String(m.fecha_nueva || "") })
+    }
+    if (origenPorAgenda.size) {
+      const vistas = new Set(rawAgendas.flatMap(identidades))
+      const { data: originales } = await sb.from("agendas").select(AG_COLS).in("id", [...origenPorAgenda.keys()])
+      const filtroCloser = closer && closer !== "todos" ? closer.toLowerCase() : ""
+      for (const row of (originales || []) as any[]) {
+        const ev = origenPorAgenda.get(String(row.id))
+        if (!ev || String(row.estado || "").startsWith("Archivada")) continue
+        if (filtroCloser && !String(row.closer || "").toLowerCase().includes(filtroCloser)) continue
+        const claves = identidades(row)
+        if (claves.some(k => vistas.has(k))) continue
+        claves.forEach(k => vistas.add(k))
+        rawAgendas.push({
+          ...row,
+          fecha_closer: ev.fecha_original,
+          show: false,
+          cerro: false,
+          estado: "No Show",
+          motivo_no_cierre: null,
+          link_fathom: null,
+          ia_analisis: null,
+          medio_de_pago: null,
+          plan_de_pago: null,
+          cc_dia_1: null,
+          _reprogramada_a: ev.fecha_nueva,
+        } as any)
+      }
+      rawAgendas.sort((a: any, b: any) => String(a.fecha_closer || "").localeCompare(String(b.fecha_closer || "")))
     }
 
     const agendaList: typeof rawAgendas = []
@@ -467,7 +537,10 @@ export async function GET(request: NextRequest) {
       // Estados operativos
       const estadoStr = (a.estado || "").toLowerCase()
       const esCancel = estadoStr.includes("cancelad")
-      const esNoShow = Boolean(!esCancel && (a.show === false || estadoStr.includes("no show")))
+      // En su día nuevo, una agenda reprogramada está pendiente: no cuenta como no show.
+      const llegoReprogramada = reprogramadaDesde.has(String(a.id)) && estadoStr.includes("reprogram")
+      const reprogramadaA: string | null = (a as any)._reprogramada_a || null
+      const esNoShow = Boolean(!esCancel && !llegoReprogramada && (a.show === false || estadoStr.includes("no show")))
       const esShow = Boolean(!esCancel && !esNoShow && (a.show === true || estadoStr.includes("adentro") || estadoStr.includes("fee") || estadoStr.includes("cierre") || a.cerro === true))
 
       const hora = a.fecha_closer ? a.fecha_closer.slice(11, 16) : undefined
@@ -580,7 +653,8 @@ export async function GET(request: NextRequest) {
       }
 
       // Diagnóstico Fathom: cruza crm_call_records por ID, person_id, link_fathom o coincidencia de nombre
-      let fathomData = callRecords[a.id] || (a.person_id ? callRecords[a.person_id] : null)
+      // La fila del día original de una reprogramación no tiene llamada: no se le cruza Fathom.
+      let fathomData = reprogramadaA ? null : callRecords[a.id] || (a.person_id ? callRecords[a.person_id] : null)
       if (!fathomData && a.link_fathom) {
         fathomData = callRecords[a.link_fathom]
         if (!fathomData && cRecsWindowList.length > 0) {
@@ -591,7 +665,7 @@ export async function GET(request: NextRequest) {
           })
         }
       }
-      if (!fathomData && cRecsWindowList.length > 0 && a.nombre) {
+      if (!reprogramadaA && !fathomData && cRecsWindowList.length > 0 && a.nombre) {
         const aNorm = normName(a.nombre)
         if (aNorm.length >= 4) {
           fathomData = cRecsWindowList.find((r: any) => {
@@ -776,8 +850,12 @@ export async function GET(request: NextRequest) {
         forma_pago: formaPagoLead,
         objecion_principal: a.motivo_no_cierre || (resComercial === "NO CIERRE" ? "Sin motivo cargado" : ""),
         motivo_real: a.motivo_no_cierre || (resComercial === "CIERRE" ? "Propuesta y claridad en el modelo" : ""),
-        motivo_no_show: resComercial === "NO SHOW" ? (motivoNoShowPorAgenda.get(String(a.id)) || null) : null,
-        siguiente_paso: resComercial === "CIERRE" ? "Onboarding" : (a.estado || "Seguimiento"),
+        motivo_no_show: reprogramadaA
+          ? [`Reprogramó para el ${diaHora(reprogramadaA)}`, motivoNoShowPorAgenda.get(String(a.id))].filter(Boolean).join(" · ")
+          : resComercial === "NO SHOW" ? (motivoNoShowPorAgenda.get(String(a.id)) || null) : null,
+        siguiente_paso: reprogramadaA ? `Reprogramada al ${diaHora(reprogramadaA)}`
+          : llegoReprogramada ? `Reprogramada (venía del ${diaHora(reprogramadaDesde.get(String(a.id)))})`
+          : resComercial === "CIERRE" ? "Onboarding" : (a.estado || "Seguimiento"),
         fathom: fDiag,
         fathom_lead: fLeadDetalle,
         link_fathom: fUrl,
