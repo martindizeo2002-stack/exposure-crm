@@ -177,7 +177,9 @@ export async function POST(request: Request) {
       const validas = banco?.length
         ? banco.map((a) => `${a.numero} · ${a.titulo}`)
         : (SALES_ANGLES as readonly string[])
-      if (!validas.includes(String(angle || ""))) {
+      // Sin ángulo también se guarda (pedido de Alex, 12/10: que nunca se pierda un guion por un campo vacío);
+      // lo que se rechaza es un ángulo escrito que no está en el banco.
+      if (angle && !validas.includes(String(angle))) {
         return NextResponse.json({ error: "Elegí un ángulo del banco antes de guardar" }, { status: 400 })
       }
     }
@@ -291,7 +293,8 @@ export async function PATCH(request: Request) {
     if (!isStories && "angle" in body && !/VOLUMEN/i.test(resultingFormat) && !hasNoAngle) {
       const { data: banco } = await sb.from("crm_angulos").select("numero,titulo")
       const validas = banco?.length ? banco.map((a) => `${a.numero} · ${a.titulo}`) : (SALES_ANGLES as readonly string[])
-      if (!validas.includes(String(updates.angle || ""))) {
+      // Igual que al crear: sin ángulo se guarda; un ángulo que no está en el banco, no.
+      if (updates.angle && !validas.includes(String(updates.angle))) {
         return NextResponse.json({ error: "Elegí un ángulo del banco antes de guardar" }, { status: 400 })
       }
     }

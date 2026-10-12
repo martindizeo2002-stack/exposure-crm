@@ -55,6 +55,7 @@ type ContentRow = {
   week_label: string | null
   day_of_week: string | null
   metadata: Record<string, unknown> | null
+  updated_at?: string | null
 }
 
 type ApiResponse = { schemaReady: boolean; rows: ContentRow[]; total: number }
@@ -108,6 +109,10 @@ function canonicalFormatLabel(value: string) {
   }
   return map[normalized] || value.trim().toUpperCase()
 }
+
+// Borrador local de la ficha de una pieza: lo que se escribe queda en el navegador mientras no se guarda, para
+// que cerrar la ficha (o un guardado que falla) no borre el guion (pasó el 12/10 con 40 minutos de guiones).
+const borradorKey = (id: string | null) => `contenido-borrador:${id || "nueva"}`
 
 function automaticTitle(angle: string, rawTitle: string, plannedAt: string) {
   const code = (angle.match(/^[A-Z]*\d+/i)?.[0] || "PIEZA").toUpperCase()
@@ -391,14 +396,17 @@ export function ContentWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(id ? { id, ...payload } : payload),
       })
-      const json = await res.json()
+      const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || "No se pudo guardar")
+      // Guardado en la base: el borrador local ya no hace falta.
+      try { window.localStorage.removeItem(borradorKey(id)) } catch { /* sin almacenamiento local */ }
       toast.success(id ? "Pieza actualizada." : "Pieza creada.")
       setEditing(null)
       setCreating(false)
       mutateAll()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al guardar")
+      // La ficha queda abierta y lo escrito sigue en el borrador local: no se pierde nada.
+      toast.error(`${err instanceof Error ? err.message : "Error al guardar"}. Lo escrito sigue en la ficha y como borrador.`)
     }
   }
 
@@ -741,6 +749,48 @@ function ContentEditDialog({
     funnel_stage: initialStage,
   })
   const set = (field: string) => (value: string) => setForm((f) => ({ ...f, [field]: value }))
+  // Con qué se abrió la ficha: sirve para saber si hay cambios sin guardar.
+  const [inicial] = useState(() => JSON.stringify(form))
+  const clave = borradorKey(row?.id || null)
+  const hayCambios = !readOnly && JSON.stringify(form) !== inicial
+  // Al abrir: si quedó un borrador más nuevo que el último guardado en la base, se recupera solo.
+  useEffect(() => {
+    if (readOnly) return
+    try {
+      const crudo = window.localStorage.getItem(clave)
+      if (!crudo) return
+      const borrador = JSON.parse(crudo) as { form?: typeof form; savedAt?: number }
+      const guardadoEnBase = Date.parse(String(row?.updated_at || "")) || 0
+      if (!borrador?.form || JSON.stringify(borrador.form) === inicial) return
+      if (row && (borrador.savedAt || 0) <= guardadoEnBase) return
+      setForm((actual) => ({ ...actual, ...borrador.form }))
+      toast("Recuperé lo que habías escrito sin guardar en esta pieza.", {
+        duration: 10000,
+        action: {
+          label: "Descartar",
+          onClick: () => {
+            try { window.localStorage.removeItem(clave) } catch { /* sin almacenamiento local */ }
+            setForm(JSON.parse(inicial))
+          },
+        },
+      })
+    } catch { /* sin almacenamiento local */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  // Mientras se escribe, cada cambio queda como borrador en este navegador hasta que se guarda.
+  useEffect(() => {
+    if (readOnly) return
+    // Este efecto corre después del que recupera el borrador: si la ficha vuelve a quedar como se abrió, el
+    // borrador se descarta; si hay cambios, se guarda con la hora para compararlo con el último guardado en la base.
+    try {
+      if (JSON.stringify(form) === inicial) window.localStorage.removeItem(clave)
+      else window.localStorage.setItem(clave, JSON.stringify({ form, savedAt: Date.now() }))
+    } catch { /* sin almacenamiento local */ }
+  }, [form, clave, readOnly])
+  const cerrar = () => {
+    if (hayCambios && !window.confirm("Tenés cambios sin guardar. Quedan como borrador en este navegador y vuelven cuando abras la pieza. ¿Cerrar igual?")) return
+    onClose()
+  }
   const availableFormats = useMemo(() => {
     const formats = [...new Set([
       ...nombresDeFormato,
@@ -777,13 +827,26 @@ function ContentEditDialog({
   const statusOptions = row && isReel(row) ? REEL_STATUS_OPTIONS : STATUS_OPTIONS
   const reel = !!row && isReel(row)
   const payload = (status = form.status) => ({
-    title: reel ? automaticTitle(form.angle, form.title, form.planned_at) : form.title,
+    title: reel
+      ? automaticTitle(form.angle, form.title, form.planned_at)
+      : (form.title.trim() || form.script_text.trim().split("\n")[0].slice(0, 80) || "Pieza sin título"),
     angle: noAngle ? "" : form.angle,
     format: canonicalFormatLabel(form.format), platform: form.platform, assigned_to: form.assigned_to,
     status, planned_at: form.planned_at, awareness_level: form.awareness_level,
     script_text: form.script_text, insight_notes: form.insight_notes, cta: form.cta, source_url: form.source_url,
     funnel_stage: isVolume ? "TOFU" : (isTestimony ? "" : form.funnel_stage),
   })
+  // Guardar nunca se traba (pedido de Alex, 12/10): si falta algo, guarda igual y avisa qué queda por completar.
+  const guardar = () => {
+    const faltan = [
+      !noAngle && !form.angle ? "ángulo" : "",
+      !form.planned_at ? "fecha" : "",
+      !isVolume && !isTestimony && !form.funnel_stage ? "capa del embudo" : "",
+      !isTestimony && !form.awareness_level ? "nivel de consciencia" : "",
+    ].filter(Boolean)
+    if (faltan.length) toast.warning(`Se guarda igual. Queda por completar: ${faltan.join(", ")}.`)
+    onSave(payload())
+  }
 
   async function generateScript() {
     if (generatorIdea.trim().length < 8) {
@@ -852,7 +915,7 @@ function ContentEditDialog({
   }, [isVolume, form.angle, form.planned_at, row?.id])
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && cerrar()}>
       <DialogContent className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-x-hidden overflow-y-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="shrink-0 px-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-[1.5cm]">
           <DialogTitle className="flex items-center gap-2">
@@ -1068,11 +1131,11 @@ function ContentEditDialog({
             <Button variant="ghost" className="text-red-400 hover:text-red-300" onClick={onDelete}><Trash2 className="mr-1.5 h-4 w-4" />Archivar</Button>
           ) : <span />}
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button variant="outline" onClick={cerrar}>Cancelar</Button>
             {!readOnly && (
               <>
                 {reel && form.status === "idea" && <Button className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400" onClick={() => onSave(payload("grabado"))}><CheckCircle2 className="mr-1.5 h-4 w-4" />Marcar como grabado</Button>}
-                <Button disabled={(!noAngle && !form.angle) || !form.planned_at || (!isVolume && !isTestimony && !form.funnel_stage) || (!isTestimony && !form.awareness_level)} onClick={() => onSave(payload())}>Guardar</Button>
+                <Button onClick={guardar}>Guardar</Button>
               </>
             )}
           </div>
