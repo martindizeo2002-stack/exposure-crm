@@ -2,7 +2,7 @@
 // `dias`, perfil e historias activas. Después el ciclo normal transcribe y analiza. Pedido de Alex del 12/10/2026
 // («analizá la estrategia de este creador en los últimos 30 días y sumalo a mi tracker de historias»).
 //
-//   npx tsx scripts/radar-cuenta.ts <handle> [dias=30] [tope=60]
+//   npx tsx scripts/radar-cuenta.ts <handle> [dias=30] [tope=60] [--nota="Quién es y por qué se suma"]
 //   npx tsx scripts/radar-cuenta.ts <handle> --solo-ciclo      corre el ciclo (transcribir + analizar) sin leer de nuevo
 import { readFileSync } from "node:fs"
 import { createClient } from "@supabase/supabase-js"
@@ -14,7 +14,8 @@ for (const linea of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 async function main() {
-  const [handleCrudo, diasTxt, topeTxt] = process.argv.slice(2)
+  const [handleCrudo, diasTxt, topeTxt] = process.argv.slice(2).filter((a) => !a.startsWith("--"))
+  const notaArg = process.argv.find((a) => a.startsWith("--nota="))?.slice("--nota=".length).trim()
   const handle = String(handleCrudo || "").replace(/^@/, "").replace(/.*instagram\.com\//, "").replace(/[/?].*$/, "").toLowerCase()
   if (!handle) throw new Error("uso: npx tsx scripts/radar-cuenta.ts <handle> [dias] [tope]")
   const soloCiclo = process.argv.includes("--solo-ciclo")
@@ -34,7 +35,7 @@ async function main() {
     // 1) semilla con historias activadas (si ya estaba pausada, se reactiva)
     const { data: ya } = await db.from("radar_semillas").select("handle,activa,historias").eq("handle", handle).maybeSingle()
     if (!ya) {
-      const { error } = await db.from("radar_semillas").insert({ handle, tags: ["referente"], historias: true, activa: true, creado_por: "Claude (pedido de Alex)", nota: `Sumada el ${new Date().toISOString().slice(0, 10)}: estrategia de los últimos ${dias} días, ángulos y avatar.` })
+      const { error } = await db.from("radar_semillas").insert({ handle, tags: ["referente"], historias: true, activa: true, creado_por: "Claude (pedido de Alex)", nota: notaArg || `Sumada el ${new Date().toISOString().slice(0, 10)} por pedido de Alex.` })
       if (error) throw new Error(error.message)
       console.log(`semilla: @${handle} sumada con historias`)
     } else {
