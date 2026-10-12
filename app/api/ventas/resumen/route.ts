@@ -15,6 +15,7 @@ import {
   type ArquetiposMetricas,
 } from "@/lib/closing-whatsapp-formatter"
 import { extractBookingContentOrigin } from "@/lib/chat-summary-attribution"
+import { armarEnlazador, cargarAgendasEnlace, tel9 } from "@/lib/embudo-atribucion"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -458,12 +459,93 @@ export async function GET(request: NextRequest) {
       sin_resumen_presentadas: 0, cierres_sin_resumen: 0,
     }
 
-    // Consultamos pagos reales en el rango
+    // Consultamos pagos reales en el rango (los anulados o borrados no cuentan)
     const { data: pagos } = await sb
       .from("pagos")
-      .select("id, agenda_id, person_id, cliente, fecha, monto, tipo, operacion, medio_de_pago, comprobante")
+      .select("id, agenda_id, person_id, cliente, telefono, fecha, monto, tipo, operacion, medio_de_pago, comprobante")
+      .eq("record_status", "active")
       .gte("fecha", fechaDesde)
       .lte("fecha", fechaHasta)
+
+    // Cada pago va a UNA sola agenda del período: por agenda_id; si no tiene, con la misma regla que
+    // Métricas y Embudos (persona → teléfono → nombre completo, la agenda más cercana a la fecha del pago).
+    // Un pago enlazado a una agenda de otro mes no se cuenta acá.
+    const agendasEnlace = await cargarAgendasEnlace(sb)
+    const { agendaDe } = armarEnlazador(agendasEnlace)
+    const enlacePorId = new Map(agendasEnlace.map((x) => [String(x.id), x]))
+    const idGanador = (id: unknown) => String(clusterIdMap.get(id as any) ?? id)
+    const idsDelPeriodo = new Set(agendaList.map((a: any) => String(a.id)))
+    const ganadorPorPersona = new Map<string, string>(), ganadorPorTel = new Map<string, string>()
+    for (const a of agendaList as any[]) {
+      if (a.person_id) ganadorPorPersona.set(String(a.person_id), String(a.id))
+      const t = tel9(a.telefono); if (t) ganadorPorTel.set(t, String(a.id))
+    }
+    const pagosPorAgenda = new Map<string, any[]>()
+    const viaPorAgenda = new Map<string, string>()
+    const destinoPorPago = new Map<string, { destino: string; via: string }>()
+    for (const p of (pagos || []) as any[]) {
+      let destino: string | null = null
+      let via = "agenda"
+      if (p.agenda_id && idsDelPeriodo.has(idGanador(p.agenda_id))) {
+        destino = idGanador(p.agenda_id)
+      } else {
+        // agenda_id de una llamada de otro mes: se busca la llamada de esa persona en este período
+        const ref = p.agenda_id ? enlacePorId.get(String(p.agenda_id)) || null : null
+        const enl = ref ? { a: ref, via: "agenda" } : agendaDe(p)
+        if (enl) {
+          via = enl.via
+          destino = idsDelPeriodo.has(idGanador(enl.a.id)) ? idGanador(enl.a.id)
+            : (enl.a.person_id && ganadorPorPersona.get(String(enl.a.person_id))) || ganadorPorTel.get(tel9(enl.a.telefono)) || null
+        }
+      }
+      if (!destino || !idsDelPeriodo.has(destino)) continue
+      destinoPorPago.set(String(p.id), { destino, via })
+      if (!pagosPorAgenda.has(destino)) pagosPorAgenda.set(destino, [])
+      pagosPorAgenda.get(destino)!.push(p)
+      const previa = viaPorAgenda.get(destino)
+      if (!previa || previa === "nombre") viaPorAgenda.set(destino, via)
+    }
+
+    // auditar_cruce=1: lista de pagos del período que cambiaron de agenda con la regla nueva del 12/10/2026
+    // (antes: agenda_id, persona o primer nombre contenido en el cliente, sin filtrar anulados).
+    if (searchParams.get("auditar_cruce") === "1") {
+      const { data: pagosTodos, error: errPT } = await sb
+        .from("pagos")
+        .select("id, agenda_id, person_id, cliente, telefono, fecha, monto, tipo, operacion, closer, record_status")
+        .gte("fecha", fechaDesde)
+        .lte("fecha", fechaHasta)
+        .order("fecha", { ascending: true })
+      if (errPT) throw new Error(errPT.message)
+      const ficha = (id: string) => {
+        const a: any = agendaList.find((x: any) => String(x.id) === id)
+        return a ? { id, nombre: a.nombre || "Sin nombre", fecha: String(a.fecha_closer || "").slice(0, 10), closer: a.closer || "" } : { id, nombre: "Agenda fuera de la lista", fecha: "", closer: "" }
+      }
+      const cambios: any[] = []
+      for (const p of (pagosTodos || []) as any[]) {
+        const antes = (agendaList as any[]).filter((a) =>
+          (p.agenda_id && (p.agenda_id === a.id || clusterIdMap.get(p.agenda_id) === a.id)) ||
+          (p.person_id && a.person_id && p.person_id === a.person_id) ||
+          (p.cliente && a.nombre && String(p.cliente).toLowerCase().includes(String(a.nombre).toLowerCase().split(" ")[0]))
+        ).map((a) => String(a.id))
+        const activo = (p.record_status || "active") === "active"
+        const ahora = activo ? destinoPorPago.get(String(p.id)) || null : null
+        const igual = antes.length === (ahora ? 1 : 0) && (!ahora || antes[0] === ahora.destino)
+        if (igual) continue
+        let motivo = ""
+        if (!activo) motivo = `El pago está ${p.record_status === "deleted" ? "borrado" : "anulado"}: antes contaba y ahora no.`
+        else if (antes.length > 1) motivo = `Antes se contaba en ${antes.length} agendas a la vez${ahora ? "; ahora queda en una sola" : "; ahora no coincide con ninguna"}.`
+        else if (antes.length === 1 && !ahora) motivo = "Antes coincidía solo por el primer nombre; ahora no se encuentra una agenda de esa persona en el período."
+        else if (antes.length === 1 && ahora) motivo = `Cambió de agenda: ahora se encuentra por ${ahora.via}.`
+        else if (!antes.length && ahora) motivo = `Antes no se encontraba; ahora sí, por ${ahora.via}.`
+        cambios.push({
+          pago: { id: p.id, cliente: p.cliente, fecha: p.fecha, monto: Number(p.monto) || 0, tipo: p.tipo, operacion: p.operacion, closer: p.closer, estado: p.record_status || "active" },
+          antes: antes.map(ficha),
+          ahora: ahora ? { ...ficha(ahora.destino), via: ahora.via } : null,
+          motivo,
+        })
+      }
+      return NextResponse.json({ ok: true, fecha_desde: fechaDesde, fecha_hasta: fechaHasta, total_pagos: (pagosTodos || []).length, cambios })
+    }
 
     // Consultamos grabaciones Fathom enlazadas
     let callRecords: Record<string, any> = {}
@@ -603,13 +685,8 @@ export async function GET(request: NextRequest) {
         if (esCalif) calificadasPresentadas++
       }
 
-      // Cruce con pagos para validar cierres y cash (soportando IDs consolidados)
-      const pagosLead = (pagos || []).filter(
-        (p: any) =>
-          (p.agenda_id && (p.agenda_id === a.id || clusterIdMap.get(p.agenda_id) === a.id)) ||
-          (p.person_id && a.person_id && p.person_id === a.person_id) ||
-          (p.cliente && a.nombre && p.cliente.toLowerCase().includes(a.nombre.toLowerCase().split(" ")[0]))
-      )
+      // Pagos de esta agenda (cada pago quedó asignado a una sola agenda más arriba)
+      const pagosLead = pagosPorAgenda.get(String(a.id)) || []
 
       let resComercial: CallDetalle["resultado"] = "NO CIERRE"
       let cashLead = Number(a.cc_dia_1) || 0
@@ -892,6 +969,9 @@ export async function GET(request: NextRequest) {
 
       return {
         agenda_id: a.id,
+        es_show: esShow,
+        tipos_pago: pagosLead.map((p: any) => String(p.tipo || "")).filter(Boolean),
+        pago_enlazado_por: pagosLead.length ? viaPorAgenda.get(String(a.id)) || null : null,
         nombre: a.nombre || "Sin nombre",
         fecha: a.fecha_closer ? a.fecha_closer.slice(0, 10) : undefined,
         hora,
@@ -985,6 +1065,11 @@ export async function GET(request: NextRequest) {
     }
 
     const textoWhatsApp = generarTextoWhatsApp(payload)
+
+    // ligero=1: la auditoría mensual no necesita transcripciones ni resúmenes largos.
+    if (searchParams.get("ligero") === "1") {
+      payload.calls = payload.calls.map(({ transcript, fathom_summary, trace_analysis, ia_analisis, resumen_chat, ...c }) => c)
+    }
 
     return NextResponse.json({
       ok: true,

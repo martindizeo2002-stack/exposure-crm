@@ -29,6 +29,9 @@ export type FathomDiagnostico = {
 
 export type CallDetalle = {
   agenda_id?: number | string
+  es_show?: boolean
+  tipos_pago?: string[] // conceptos de los pagos del período cruzados con la agenda
+  pago_enlazado_por?: string | null // "agenda" | "persona" | "teléfono" | "nombre": cómo se encontró el pago
   nombre: string
   fecha?: string
   hora?: string

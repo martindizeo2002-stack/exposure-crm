@@ -39,6 +39,7 @@ import { CLOSERS_ACTIVOS, SETTERS_TODOS } from "@/lib/equipo"
 import type { Agenda } from "@/lib/supabase"
 import type { ResumenPayload, CallDetalle } from "@/lib/closing-whatsapp-formatter"
 import { cn } from "@/lib/utils"
+import { RevisionCruces } from "@/components/ventas/revision-cruces"
 
 
 const MOTIVOS_NO_CIERRE_CRM = [
@@ -1651,6 +1652,14 @@ export default function ResumenVentasPage() {
                               {esCierre && (
                                 <span className="font-black text-emerald-400">${c.cash_d1} USD D1</span>
                               )}
+                              {c.pago_enlazado_por === "nombre" && (
+                                <span
+                                  className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300"
+                                  title="El pago no está vinculado a esta agenda ni a la persona: se encontró por nombre y apellido. Vinculalo desde la ficha del pago."
+                                >
+                                  Pago por nombre
+                                </span>
+                              )}
                               {expandida ? <ChevronUp className="h-4 w-4 text-zinc-400" /> : <ChevronDown className="h-4 w-4 text-zinc-400" />}
                             </div>
                           </div>
@@ -1775,7 +1784,8 @@ export default function ResumenVentasPage() {
                 <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400">
                   Preview para WhatsApp
                 </h3>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <RevisionCruces />
                   <Button
                     variant="outline"
                     size="sm"
