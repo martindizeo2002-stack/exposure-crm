@@ -19,6 +19,8 @@ import { extractBookingContentOrigin } from "@/lib/chat-summary-attribution"
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
+const pct = (parte: number, total: number) => (total > 0 ? (parte / total) * 100 : 0)
+
 function hoyIso() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
@@ -414,6 +416,48 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Calificada con el criterio vigente (08/10/2026): ingreso declarado USD 1.000-3.000 + arquetipo foco.
+    // Sale del resumen de setting clasificado (crm_setting_resumenes.calificada), no del Lead S/A/B/C.
+    // Si la persona tenía varias agendas o varios resúmenes, manda el resumen más nuevo.
+    type ResumenSetting = { calificada: boolean | null; arquetipo: string | null; ingreso: string | null; publicado: string }
+    const resumenPorAgenda = new Map<string, ResumenSetting>()
+    for (let i = 0; i < rawIds.length; i += 300) {
+      const { data: resumenes } = await sb.from("crm_setting_resumenes")
+        .select("agenda_id,calificada,arquetipo,ingreso_declarado,publicado_at")
+        .in("agenda_id", rawIds.slice(i, i + 300))
+      for (const r of (resumenes || []) as any[]) {
+        const rid = String(r.agenda_id)
+        const destino = String(clusterIdMap.get(rid) ?? clusterIdMap.get(Number(rid)) ?? rid)
+        const nuevo: ResumenSetting = { calificada: r.calificada ?? null, arquetipo: r.arquetipo ?? null, ingreso: r.ingreso_declarado ?? null, publicado: String(r.publicado_at || "") }
+        const previo = resumenPorAgenda.get(destino)
+        if (!previo || nuevo.publicado > previo.publicado) resumenPorAgenda.set(destino, nuevo)
+      }
+    }
+    // Respaldo por persona: el resumen puede haber quedado en una agenda duplicada que se archivó a mano
+    const agendaPorPersona = new Map<string, string>()
+    for (const a of agendaList as any[]) {
+      if (a.person_id && !resumenPorAgenda.has(String(a.id))) agendaPorPersona.set(String(a.person_id), String(a.id))
+    }
+    const personasSinResumen = [...agendaPorPersona.keys()]
+    for (let i = 0; i < personasSinResumen.length; i += 300) {
+      const { data: resumenes } = await sb.from("crm_setting_resumenes")
+        .select("person_id,calificada,arquetipo,ingreso_declarado,publicado_at")
+        .in("person_id", personasSinResumen.slice(i, i + 300))
+      for (const r of (resumenes || []) as any[]) {
+        const destino = agendaPorPersona.get(String(r.person_id))
+        if (!destino) continue
+        const nuevo: ResumenSetting = { calificada: r.calificada ?? null, arquetipo: r.arquetipo ?? null, ingreso: r.ingreso_declarado ?? null, publicado: String(r.publicado_at || "") }
+        const previo = resumenPorAgenda.get(destino)
+        if (!previo || nuevo.publicado > previo.publicado) resumenPorAgenda.set(destino, nuevo)
+      }
+    }
+    const tcv = {
+      presentadas: 0, cierres: 0,
+      calificadas_presentadas: 0, cierres_calificados: 0,
+      no_calificadas_presentadas: 0, cierres_no_calificados: 0,
+      sin_resumen_presentadas: 0, cierres_sin_resumen: 0,
+    }
+
     // Consultamos pagos reales en el rango
     const { data: pagos } = await sb
       .from("pagos")
@@ -642,6 +686,25 @@ export async function GET(request: NextRequest) {
         arquetipos[arqKey].cash_d1 += cashLead
       }
 
+      // Tasa de cierre con el criterio vigente: un cierre cuenta como presentada aunque falte el show
+      const resumenSetting = resumenPorAgenda.get(String(a.id))
+      const esCierre = resComercial === "CIERRE"
+      const presento = esShow || esCierre
+      if (presento) {
+        tcv.presentadas++
+        if (esCierre) tcv.cierres++
+        if (!resumenSetting || resumenSetting.calificada === null) {
+          tcv.sin_resumen_presentadas++
+          if (esCierre) tcv.cierres_sin_resumen++
+        } else if (resumenSetting.calificada) {
+          tcv.calificadas_presentadas++
+          if (esCierre) tcv.cierres_calificados++
+        } else {
+          tcv.no_calificadas_presentadas++
+          if (esCierre) tcv.cierres_no_calificados++
+        }
+      }
+
       // Registro de patrones
       if (a.motivo_no_cierre && resComercial === "NO CIERRE") {
         const objKey = a.motivo_no_cierre.trim()
@@ -865,6 +928,10 @@ export async function GET(request: NextRequest) {
         trace_analysis: fTrace || null,
         resumen_chat: a.resumen_chat || null,
         calificacion: califLetra,
+        presento,
+        calificada_vigente: resumenSetting ? resumenSetting.calificada : null,
+        arquetipo_setting: resumenSetting?.arquetipo || null,
+        ingreso_setting: resumenSetting?.ingreso || null,
       }
     })
 
@@ -904,6 +971,12 @@ export async function GET(request: NextRequest) {
       modo,
       metricas,
       arquetipos,
+      tasa_cierre_vigente: {
+        ...tcv,
+        tc_pct: pct(tcv.cierres, tcv.presentadas),
+        tc_calificadas_pct: pct(tcv.cierres_calificados, tcv.calificadas_presentadas),
+        tc_no_calificadas_pct: pct(tcv.cierres_no_calificados, tcv.no_calificadas_presentadas),
+      },
       calls: callsDetalle,
       patrones: {
         motivos_no_cierre: motivosNoCierre,

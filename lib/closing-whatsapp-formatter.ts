@@ -61,6 +61,27 @@ export type CallDetalle = {
   fathom_summary?: string | null
   transcript?: string | null
   trace_analysis?: any | null
+  // Criterio vigente de calificada (08/10/2026): sale del resumen de setting clasificado
+  presento?: boolean
+  calificada_vigente?: boolean | null // null = sin resumen de setting
+  arquetipo_setting?: string | null
+  ingreso_setting?: string | null
+}
+
+// Tasa de cierre con el criterio de calificada vigente (08/10/2026): declaró en iClosed que gana
+// USD 1.000-3.000 por mes + arquetipo foco (9 a 5, universitario, sabe IA o dueño de negocio).
+export type TasaCierreVigente = {
+  presentadas: number
+  cierres: number
+  tc_pct: number
+  calificadas_presentadas: number
+  cierres_calificados: number
+  tc_calificadas_pct: number
+  no_calificadas_presentadas: number
+  cierres_no_calificados: number
+  tc_no_calificadas_pct: number
+  sin_resumen_presentadas: number
+  cierres_sin_resumen: number
 }
 
 export type MetricasClosing = {
@@ -100,6 +121,7 @@ export type ResumenPayload = {
   modo: "detallado" | "corto"
   metricas: MetricasClosing
   arquetipos: ArquetiposMetricas
+  tasa_cierre_vigente?: TasaCierreVigente
   calls: CallDetalle[]
   patrones?: {
     motivos_no_cierre?: Record<string, number>

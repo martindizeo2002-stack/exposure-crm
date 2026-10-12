@@ -1106,6 +1106,57 @@ export default function ResumenVentasPage() {
             </div>
           )}
 
+          {/* Tasa de cierre con el criterio de calificada vigente (08/10/2026) */}
+          {datos?.tasa_cierre_vigente && (() => {
+            const t = datos.tasa_cierre_vigente
+            const p = (n: number) => `${n.toFixed(1).replace(".", ",")} %`
+            const bloques = [
+              { key: "tc_vigente_todas", titulo: "Sobre todas las presentadas", tasa: t.tc_pct, cierres: t.cierres, base: t.presentadas, clase: "text-white", borde: "border-white/10 hover:border-emerald-500/50" },
+              { key: "tc_vigente_calificadas", titulo: "Sobre calificadas", tasa: t.tc_calificadas_pct, cierres: t.cierres_calificados, base: t.calificadas_presentadas, clase: "text-blue-400", borde: "border-blue-500/20 hover:border-blue-500/50" },
+              { key: "tc_vigente_no_calificadas", titulo: "Sobre no calificadas", tasa: t.tc_no_calificadas_pct, cierres: t.cierres_no_calificados, base: t.no_calificadas_presentadas, clase: "text-zinc-300", borde: "border-white/10 hover:border-zinc-500/50" },
+            ]
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1 flex-wrap gap-2">
+                  <span className="text-xs text-zinc-300 font-semibold flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+                    Tasa de cierre · criterio de calificada vigente
+                  </span>
+                  <span className="text-[11px] text-zinc-400">
+                    Calificada = declaró que gana USD 1.000 a 3.000 por mes + arquetipo foco (resumen del setter)
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {bloques.map((b) => (
+                    <Card
+                      key={b.key}
+                      onClick={() => setMetricaAuditoriaKey(b.key)}
+                      role="button"
+                      tabIndex={0}
+                      className={cn("bg-zinc-900/50 p-4 cursor-pointer transition-all hover:bg-zinc-800/70 group", b.borde)}
+                      title="Pulsá para ver los leads que componen la tasa"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-zinc-300 group-hover:text-white transition-colors">{b.titulo}</span>
+                        <Info className="h-3.5 w-3.5 text-zinc-400 group-hover:text-emerald-400 transition-colors" />
+                      </div>
+                      <div className={cn("mt-2 text-2xl font-black tabular-nums", b.clase)}>{p(b.tasa)}</div>
+                      <span className="text-[11px] text-zinc-400 tabular-nums">
+                        {b.cierres} {b.cierres === 1 ? "cierre" : "cierres"} de {b.base} {b.base === 1 ? "presentada" : "presentadas"}
+                      </span>
+                    </Card>
+                  ))}
+                </div>
+                {t.sin_resumen_presentadas > 0 && (
+                  <p className="px-1 text-[11px] text-zinc-500">
+                    {t.sin_resumen_presentadas} {t.sin_resumen_presentadas === 1 ? "presentada no tiene" : "presentadas no tienen"} resumen del setter
+                    {t.cierres_sin_resumen > 0 ? ` (${t.cierres_sin_resumen} con cierre)` : ""}: cuentan en el total, pero no se pueden clasificar como calificadas o no.
+                  </p>
+                )}
+              </div>
+            )
+          })()}
+
           {/* Distribución por Arquetipos (Interactivos para auditar composición) */}
           <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
@@ -2545,6 +2596,7 @@ export default function ResumenVentasPage() {
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col bg-zinc-950 border-white/10 text-white">
           {(() => {
             if (!metricaAuditoriaKey || !metricas) return null
+            const tcv = datos?.tasa_cierre_vigente
 
             // Definición canónica de cada métrica
             const defs: Record<string, {
@@ -2616,6 +2668,36 @@ export default function ResumenVentasPage() {
                 formula: "Cierres × $1.500 USD (o suma de acuerdos contractuales)",
                 fuente: "Contratos de Venta del CRM.",
                 criterio: (c) => c.resultado === "CIERRE",
+              },
+              tc_vigente_todas: {
+                titulo: "Tasa de cierre sobre todas las presentadas",
+                categoria: "Conversión · criterio vigente",
+                valor: `${tcv?.cierres || 0}/${tcv?.presentadas || 0} (${(tcv?.tc_pct || 0).toFixed(1).replace(".", ",")} %)`,
+                color: "emerald",
+                definicion: "Cierres sobre todas las llamadas en las que el lead se presentó, califique o no. Un cierre cuenta como presentada aunque al lead le falte la marca de show.",
+                formula: "(Cierres ÷ Presentadas) × 100",
+                fuente: "CRM Agendas + CRM Pagos.",
+                criterio: (c) => Boolean(c.presento),
+              },
+              tc_vigente_calificadas: {
+                titulo: "Tasa de cierre sobre calificadas",
+                categoria: "Conversión · criterio vigente",
+                valor: `${tcv?.cierres_calificados || 0}/${tcv?.calificadas_presentadas || 0} (${(tcv?.tc_calificadas_pct || 0).toFixed(1).replace(".", ",")} %)`,
+                color: "blue",
+                definicion: "Criterio vigente desde el 08/10/2026: el lead declaró en iClosed que gana USD 1.000 a 3.000 por mes y encaja en un arquetipo foco (9 a 5, universitario, sabe IA pero no cómo venderla o dueño de negocio tradicional). No usa el Lead S/A/B/C.",
+                formula: "(Cierres calificados ÷ Calificadas presentadas) × 100",
+                fuente: "Resúmenes de setting del grupo de ventas, clasificados en Marketing → Tipos de agenda.",
+                criterio: (c) => Boolean(c.presento && c.calificada_vigente === true),
+              },
+              tc_vigente_no_calificadas: {
+                titulo: "Tasa de cierre sobre no calificadas",
+                categoria: "Conversión · criterio vigente",
+                valor: `${tcv?.cierres_no_calificados || 0}/${tcv?.no_calificadas_presentadas || 0} (${(tcv?.tc_no_calificadas_pct || 0).toFixed(1).replace(".", ",")} %)`,
+                color: "zinc",
+                definicion: "Presentadas cuyo resumen de setting dice que no califica con el criterio vigente. Las que no tienen resumen no entran acá ni en calificadas.",
+                formula: "(Cierres no calificados ÷ No calificadas presentadas) × 100",
+                fuente: "Resúmenes de setting del grupo de ventas, clasificados en Marketing → Tipos de agenda.",
+                criterio: (c) => Boolean(c.presento && c.calificada_vigente === false),
               },
               dueno_negocio: {
                 titulo: "Arquetipo: Dueño de Negocio",
@@ -2729,7 +2811,12 @@ export default function ResumenVentasPage() {
                                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-white/10 text-zinc-300">
                                   {c.lead_score || "SIN SCORE"}
                                 </Badge>
-                                {c.es_calificado && (
+                                {metricaAuditoriaKey.startsWith("tc_vigente") && (
+                                  <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4", c.calificada_vigente ? "border-blue-500/40 text-blue-300" : "border-white/10 text-zinc-400")}>
+                                    {c.calificada_vigente === null || c.calificada_vigente === undefined ? "Sin resumen" : `${c.calificada_vigente ? "Calificada" : "No calificada"}${c.ingreso_setting ? ` · ${c.ingreso_setting}` : ""}`}
+                                  </Badge>
+                                )}
+                                {!metricaAuditoriaKey.startsWith("tc_vigente") && c.es_calificado && (
                                   <Badge className="bg-blue-500/20 text-blue-300 text-[9px] px-1 py-0 h-3.5 border-0">
                                     Calificada
                                   </Badge>
