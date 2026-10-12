@@ -351,7 +351,7 @@ export default function ResumenVentasPage() {
     setFormEdit(initial)
 
     try {
-      const res = await fetch(`/api/agendas?id=${c.agenda_id}`)
+      const res = await fetch(`/api/agendas?id=${c.agenda_id}`, { cache: "no-store" })
       if (res.ok) {
         const data: Agenda = await res.json()
         if (data) {
@@ -371,6 +371,8 @@ export default function ResumenVentasPage() {
             tiempo_problema: data.tiempo_problema || prev.tiempo_problema,
             intentos_previos: data.intentos_previos || prev.intentos_previos,
             motivo_urgencia: data.motivo_urgencia || prev.motivo_urgencia,
+            objecion: data.motivo_no_cierre ?? prev.objecion,
+            motivo_no_cierre: data.motivo_no_cierre ?? prev.motivo_no_cierre,
             ingresos: data.ingresos || prev.ingresos,
             inversion: data.inversion || prev.inversion,
             lead_scoring: data.calificacion || prev.lead_scoring,
@@ -413,6 +415,7 @@ export default function ResumenVentasPage() {
       const orig = agendaOriginalRef.current
       const pickVal = (newVal: string | null | undefined, origVal: string | null | undefined) => {
         if (newVal !== undefined && newVal !== null && newVal.trim() !== "") return newVal.trim()
+        if (orig && newVal !== undefined && newVal !== null) return null
         return origVal || null
       }
 
@@ -435,7 +438,7 @@ export default function ResumenVentasPage() {
         lead_score_grade: formEdit.lead_scoring,
         ocupacion: ocupacionFinal || orig?.ocupacion || null,
         calificaba_realmente: formEdit.calificaba_realmente === "Sin definir" ? (orig?.calificaba_realmente || null) : formEdit.calificaba_realmente,
-        motivo_no_cierre: formEdit.motivo_no_cierre || (formEdit.objecion && formEdit.objecion !== "none" ? formEdit.objecion : null) || orig?.motivo_no_cierre || null,
+        motivo_no_cierre: formEdit.motivo_no_cierre.trim() || (formEdit.objecion && formEdit.objecion !== "none" ? formEdit.objecion : null) || null,
         estado: estadoFinal,
       }
 
@@ -471,7 +474,7 @@ export default function ResumenVentasPage() {
       setModalLeadAbierto(false)
       setLeadEditando(null)
       await mutate((key: string) => typeof key === "string" && key.startsWith("/api/agendas"))
-      await cargarResumen()
+      await cargarResumen(true)
     } catch (err: any) {
       toast.error(err.message || "Error al guardar cambios")
     } finally {
@@ -532,7 +535,7 @@ export default function ResumenVentasPage() {
       toast.success(`¡Lead ${lead.nombre || ""} movido al ${fechaDestino} (${horaOriginal})!`)
       setBusquedaLead("")
       setResultadosBusqueda([])
-      await cargarResumen()
+      await cargarResumen(true)
       void mutate((key: string) => typeof key === "string" && key.startsWith("/api/agendas"))
     } catch (err: any) {
       toast.error(err.message || "Error al mover el lead")
@@ -2062,7 +2065,7 @@ export default function ResumenVentasPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-zinc-300 text-xs">Objeción</Label>
-                    <Select value={formEdit.objecion || "none"} onValueChange={v => setFormEdit(prev => ({ ...prev, objecion: v === "none" ? "" : v }))}>
+                    <Select value={formEdit.objecion || "none"} onValueChange={v => setFormEdit(prev => ({ ...prev, objecion: v === "none" ? "" : v, motivo_no_cierre: v === "none" ? "" : v }))}>
                       <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white">
                         <SelectValue placeholder="Seleccionar objeción..." />
                       </SelectTrigger>

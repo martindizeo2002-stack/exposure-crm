@@ -140,6 +140,32 @@ export async function POST(request: Request) {
     const agendasByPerson = new Map<string, any[]>()
     for (const agenda of agendas || []) if (agenda.person_id) agendasByPerson.set(agenda.person_id, [...(agendasByPerson.get(agenda.person_id) || []), agenda])
 
+    // Reprogramaciones hechas a mano en el CRM (crm_events agenda_reprogramada, las guarda PATCH /api/agendas).
+    // iClosed sigue teniendo la reserva original, y esta sincronización devolvía la agenda a su día viejo
+    // (desaparecía del día al que se reprogramó). 1) Se reparan las que ya volvieron: si la agenda está en el
+    // día original de su última reprogramación, vuelve al día nuevo. 2) Más abajo, a una agenda reprogramada
+    // iClosed ya no la puede mover a un día anterior al que tiene en el CRM.
+    const ultimaReprogramacion = new Map<string, any>()
+    const desdeRepro = new Date(Date.now() - 90 * 864e5).toISOString()
+    const eventosRepro = await allRows((from, to) => admin.from("crm_events").select("source_record_id,metadata,created_at")
+      .eq("event_type", "agenda_reprogramada").gte("created_at", desdeRepro).order("created_at", { ascending: true }).range(from, to))
+    for (const ev of eventosRepro || []) ultimaReprogramacion.set(String(ev.source_record_id), ev)
+    let reprogramadasRestauradas = 0
+    for (const agenda of agendas || []) {
+      const m = ultimaReprogramacion.get(String(agenda.id))?.metadata || {}
+      const dia = String(agenda.fecha_closer || "").slice(0, 10)
+      const diaOriginal = String(m.fecha_original || "").slice(0, 10)
+      const diaNuevo = String(m.fecha_nueva || "").slice(0, 10)
+      if (!diaNuevo || !dia || dia !== diaOriginal || dia === diaNuevo) continue
+      if (!dryRun) {
+        const { error: errRepro } = await admin.from("agendas").update({ fecha_closer: m.fecha_nueva, fecha_agenda: m.fecha_nueva }).eq("id", agenda.id)
+        if (errRepro) throw errRepro
+      }
+      agenda.fecha_closer = m.fecha_nueva
+      agenda.fecha_agenda = m.fecha_nueva
+      reprogramadasRestauradas++
+    }
+
     let matched = 0, eventsInserted = 0, agendasInserted = 0, agendasUpdated = 0, identitiesAttached = 0, emailsAttached = 0, identityConflicts = 0, withoutNearbyAgenda = 0
     const events: any[] = []
     for (const call of calls) {
@@ -195,7 +221,10 @@ export async function POST(request: Request) {
           // Reagendamiento / actualizacion: actualizar fecha de llamada y datos en la agenda existente sin crear duplicado
           if (!dryRun) {
             const updates: Record<string, any> = {}
-            if (fechaCloser && existingAgenda.fecha_closer !== fechaCloser) {
+            // Reprogramada a mano en el CRM: la reserva vieja de iClosed no la devuelve a un día anterior.
+            const volveriaAtras = ultimaReprogramacion.has(String(existingAgenda.id))
+              && String(fechaCloser || "").slice(0, 10) < String(existingAgenda.fecha_closer || "").slice(0, 10)
+            if (fechaCloser && existingAgenda.fecha_closer !== fechaCloser && !volveriaAtras) {
               updates.fecha_closer = fechaCloser
               updates.fecha_agenda = fechaCloser
             }
@@ -288,7 +317,7 @@ export async function POST(request: Request) {
       eventsInserted += data?.length || 0
     }
     await finishIntegrationJob(admin, { jobId, provider: "iclosed", route: "/api/iclosed-sync", startedAt, success: true })
-    return NextResponse.json({ ok: true, dry_run: dryRun, start_page: startPage, pages: pageCount, fetched: calls.length, matched, unmatched: calls.length - matched, identity_conflicts: identityConflicts, without_nearby_agenda: withoutNearbyAgenda, events_inserted: eventsInserted, agendas_inserted: agendasInserted, agendas_updated: agendasUpdated, identities_attached: identitiesAttached, emails_attached: emailsAttached })
+    return NextResponse.json({ ok: true, dry_run: dryRun, start_page: startPage, pages: pageCount, fetched: calls.length, matched, unmatched: calls.length - matched, identity_conflicts: identityConflicts, without_nearby_agenda: withoutNearbyAgenda, events_inserted: eventsInserted, agendas_inserted: agendasInserted, agendas_updated: agendasUpdated, reprogramadas_restauradas: reprogramadasRestauradas, identities_attached: identitiesAttached, emails_attached: emailsAttached })
   } catch (error: any) {
     await finishIntegrationJob(admin, { jobId, provider: "iclosed", route: "/api/iclosed-sync", startedAt, success: false, error })
     return NextResponse.json({ error: String(error?.message || error) }, { status: 500 })
