@@ -94,6 +94,10 @@
     {
       "path": "/api/ventas-diario",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/hammer-audience-sync",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

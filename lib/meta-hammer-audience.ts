@@ -1,6 +1,9 @@
 import crypto from "node:crypto"
 
-const AUDIENCE_ID = process.env.META_HAMMER_AUDIENCE_ID || "120247430345380778"
+// El público «Hammer Them» (120247430345380778) venía de otra cuenta y no existe en la de Exposure: desde el
+// 13/10/2026 el público de agendas pendientes lo reconcilia lib/meta-audiencia-pendientes.ts cada 15 minutos.
+// Estos avisos sueltos (al agendar) quedan apagados salvo que se configure META_HAMMER_AUDIENCE_ID.
+const AUDIENCE_ID = process.env.META_HAMMER_AUDIENCE_ID || ""
 const API = `https://graph.facebook.com/v21.0/${AUDIENCE_ID}/users`
 
 const sha = (value: string) => crypto.createHash("sha256").update(value).digest("hex")
@@ -23,6 +26,7 @@ export async function updateHammerAudience(
   identifiers: { email?: unknown; telefono?: unknown },
 ) {
   const token = process.env.META_ADS_ACCESS_TOKEN
+  if (!AUDIENCE_ID) return { ok: false, skipped: "sync_cada_15_min" }
   if (!token) return { ok: false, skipped: "missing_token" }
   const em = email(identifiers.email), ph = phone(identifiers.telefono)
   if (!em && !ph) return { ok: false, skipped: "missing_identity" }
