@@ -4,6 +4,7 @@
 // Todos los programas duran 4 meses (Alex, 11/09/2026); Círculo Privado es anual y las variantes "8 meses" llevan su override.
 // Precio IA Partner vigente desde septiembre 2026 (Alex, 12/09/2026): $1500 PIF · 2 x $750 si se completa
 // antes de los 21 días · si no, 2 x $1000 ($2000). Las etiquetas de $1300 pasaron a históricas.
+// 3 x $667 ($2000) sumado al selector el 13/10/2026 (pedido de Alex).
 export type ProgramaId = "ia_partner" | "agency" | "agency_pro" | "content" | "circulo"
 
 export type OperacionCatalogo = { label: string; total: number; meses?: number }
@@ -26,6 +27,7 @@ export const PROGRAMAS: ProgramaDef[] = [
       { label: "IA PARTNER | $1500 PIF", total: 1500 },
       { label: "IA PARTNER | 2 x $750 (antes de 21 días)", total: 1500 },
       { label: "IA PARTNER | 2 x $1000", total: 2000 },
+      { label: "IA PARTNER | 3 x $667", total: 2000 },
     ],
   },
   {
