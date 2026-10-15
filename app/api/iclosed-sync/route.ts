@@ -136,7 +136,7 @@ export async function POST(request: Request) {
     ).values()]
     const identities = await allRows((from, to) => admin.from("crm_identities").select("person_id,kind,value").in("kind", ["phone", "email", "iclosed"]).range(from, to))
     const personByIdentity = new Map((identities || []).map((x: any) => [`${x.kind}:${x.value}`, x.person_id]))
-    const agendas = await allRows((from, to) => admin.from("agendas").select("id,person_id,nombre,telefono,fecha_closer,closer,fecha_agenda,created_at,instagram,edad,problema_actual,tiempo_problema,intentos_previos,motivo_urgencia,ocupacion,ingresos,inversion,calificacion").range(from, to))
+    const agendas = await allRows((from, to) => admin.from("agendas").select("id,person_id,nombre,telefono,fecha_closer,closer,fecha_agenda,created_at,instagram,edad,problema_actual,tiempo_problema,intentos_previos,motivo_urgencia,ocupacion,ingresos,inversion,calificacion,show,cerro,estado").range(from, to))
     const agendasByPerson = new Map<string, any[]>()
     for (const agenda of agendas || []) if (agenda.person_id) agendasByPerson.set(agenda.person_id, [...(agendasByPerson.get(agenda.person_id) || []), agenda])
 
@@ -199,7 +199,11 @@ export async function POST(request: Request) {
         const cleanCallIg = extracted.instagram ? String(extracted.instagram).replace(/[@\s]/g, "").toLowerCase().trim() : ""
 
         // Identificar si ya existe una agenda para esta persona (evitar duplicados por reagendamientos o cambio de fecha)
-        const existingAgenda = (agendas || []).find((row: any) => {
+        // Si la persona tiene varias agendas (2da llamada, reagenda), va la más cercana a la fecha de esta llamada.
+        // Antes se tomaba la primera que aparecía: dos reservas de iClosed movían la misma agenda de un día a otro
+        // en cada corrida (cada 10 min) y el resultado cargado quedaba en una fecha que no era la de esa llamada.
+        const callTime = new Date(fechaCloser || call.createdAt || "").getTime()
+        const existingAgenda = (agendas || []).filter((row: any) => {
           const samePhone = phone && normPhone(row.telefono) === phone
           const rowIg = row.instagram ? String(row.instagram).replace(/[@\s]/g, "").toLowerCase().trim() : ""
           const sameIg = cleanCallIg && rowIg && cleanCallIg === rowIg
@@ -215,7 +219,7 @@ export async function POST(request: Request) {
           const callDate = new Date(fechaCloser || call.createdAt || "")
           const diffDays = Math.abs(callDate.getTime() - rowDate.getTime()) / (1000 * 60 * 60 * 24)
           return diffDays <= 45
-        })
+        }).sort((x: any, z: any) => Math.abs(new Date(x.fecha_closer || x.fecha_agenda || x.created_at).getTime() - callTime) - Math.abs(new Date(z.fecha_closer || z.fecha_agenda || z.created_at).getTime() - callTime))[0]
 
         if (existingAgenda) {
           // Reagendamiento / actualizacion: actualizar fecha de llamada y datos en la agenda existente sin crear duplicado
@@ -224,7 +228,11 @@ export async function POST(request: Request) {
             // Reprogramada a mano en el CRM: la reserva vieja de iClosed no la devuelve a un día anterior.
             const volveriaAtras = ultimaReprogramacion.has(String(existingAgenda.id))
               && String(fechaCloser || "").slice(0, 10) < String(existingAgenda.fecha_closer || "").slice(0, 10)
-            if (fechaCloser && existingAgenda.fecha_closer !== fechaCloser && !volveriaAtras) {
+            // Con resultado cargado (show, cierre o estado final) la agenda ya es de su llamada: otra fecha en iClosed
+            // es otra llamada (2da call), no una reprogramación, y no se la mueve.
+            const conResultado = existingAgenda.show != null || existingAgenda.cerro === true
+              || ["No Show", "Fee", "Adentro en Call", "Adentro en FUP", "Cancelado", "Seguimiento", "Hacer Seguimiento", "Seguimiento por wpp"].includes(String(existingAgenda.estado || ""))
+            if (fechaCloser && existingAgenda.fecha_closer !== fechaCloser && !volveriaAtras && !conResultado) {
               updates.fecha_closer = fechaCloser
               updates.fecha_agenda = fechaCloser
             }

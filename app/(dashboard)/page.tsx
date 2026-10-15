@@ -164,7 +164,7 @@ function LegacyHomePage() {
           <div className="grid gap-3 p-4 sm:grid-cols-3 sm:p-5">
             <FocusCard href="/recordatorios" icon={Clock3} label="Cobros atrasados" value={String(work.overdue.length)} detail={money(work.amount)} urgent={work.overdue.length > 0} />
             <FocusCard href="/recordatorios" icon={CalendarCheck} label="Vencen hoy" value={String(work.today.length)} detail="contactar y registrar" />
-            <FocusCard href="/centro-agendas" icon={Kanban} label="CRM por completar" value={String(crm.incomplete)} detail={`${crm.calls} llamadas · ${crm.setting} setting${manager ? " del equipo" : ""}`} urgent={crm.incomplete > 0} />
+            <FocusCard href={session.rol === "CEO" || session.rol === "Sales Manager" ? "/agendas-incompletas" : "/centro-agendas"} icon={Kanban} label="CRM por completar" value={String(crm.incomplete)} detail={`${crm.calls} llamadas · ${crm.setting} setting${manager ? " del equipo" : ""}`} urgent={crm.incomplete > 0} />
           </div>
           <div className="border-t bg-muted/25 px-5 py-3 text-xs text-muted-foreground">Regla simple: si hiciste una acción, registrala en el momento. El CRM se ocupa del resto.</div>
         </div>

@@ -44,6 +44,7 @@ const pageRules: Array<[string, CRMRole[]]> = [
   ["/contenido", [...OPERATIONS, "Editor"]],
   ["/contenido-angulos", [...OPERATIONS, "Editor"]],
   ["/calidad-datos", [...OPERATIONS, "CSM"]],
+  ["/agendas-incompletas", ["CEO", "Sales Manager"]],   // Home · CRM por completar: causa y completado desde Fathom, pagos e iClosed
   ["/rendimiento", [...OPERATIONS, "Contaduria"]],
   ["/metricas", [...OPERATIONS, "Contaduria"]],
   ["/embudos", [...OPERATIONS, "Contaduria"]],     // métricas por embudo (webinar / orgánico / outbound)
@@ -83,6 +84,7 @@ const apiRules: Array<[string, CRMRole[]]> = [
   ["/api/ciudad", OPERATIONS],
   ["/api/setting-resumen", SALES_OPERATIONS],
   ["/api/ventas/resumen", SALES_OPERATIONS],
+  ["/api/agendas-incompletas", ["CEO", "Sales Manager"]],
   ["/api/whatsapp", OPERATIONS],
   ["/api/security/activity", CRM_ROLES as unknown as CRMRole[]],
   ["/api/push", CRM_ROLES as unknown as CRMRole[]],   // suscripción a avisos push de este dispositivo (quién recibe qué se decide en lib/push.ts)

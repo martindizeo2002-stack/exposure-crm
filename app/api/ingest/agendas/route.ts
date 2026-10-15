@@ -169,7 +169,7 @@ export async function POST(request: Request) {
       // Traer agendas recientes para matchear tanto por clave exacta como por identidad (evitar duplicados por reagendas)
       const { data: existingRecent, error: existingError } = await sb
         .from("agendas")
-        .select("id,nombre,telefono,instagram,fecha_agenda,fecha_closer,closer,created_at")
+        .select("id,nombre,telefono,instagram,fecha_agenda,fecha_closer,closer,created_at,show,cerro,estado")
         .or("estado.is.null,estado.neq.Archivada manualmente")
         .order("created_at", { ascending: false })
         .limit(3000)
@@ -201,7 +201,15 @@ export async function POST(request: Request) {
           return samePhone || sameIg || sameName
         })
 
-        if (match) {
+        // Una agenda con resultado cargado ya es de su llamada: si la reserva nueva es otro día, es una 2da llamada
+        // y va como agenda propia. Antes se le pisaba la fecha y el resultado quedaba colgado de una llamada que no era.
+        const conResultado = match && (match.show != null || match.cerro === true
+          || ["No Show", "Fee", "Adentro en Call", "Adentro en FUP", "Cancelado", "Seguimiento", "Hacer Seguimiento", "Seguimiento por wpp"].includes(String(match.estado || "")))
+        const otroDia = match && row.fecha_closer && match.fecha_closer
+          && Math.abs(Date.parse(String(row.fecha_closer)) - Date.parse(String(match.fecha_closer))) > 864e5
+        if (match && conResultado && otroDia) {
+          toInsert.push(item)
+        } else if (match) {
           // Reagendamiento: actualizar fecha_closer y datos en la agenda existente sin crear duplicado
           const patch: Record<string, unknown> = {}
           if (row.fecha_closer && match.fecha_closer !== row.fecha_closer) patch.fecha_closer = row.fecha_closer
