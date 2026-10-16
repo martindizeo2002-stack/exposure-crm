@@ -22,6 +22,22 @@ async function allRows(queryFactory: (from: number, to: number) => PromiseLike<a
   return rows
 }
 
+// Los UTM que iClosed guarda de la URL del calendario ({utmKey, utmValue}; el referrer viene como utmKey "https://…").
+// La landing de YouTube (/llamada-de-admision?utm_source=yt) es la primera que los usa para atribuir agendas.
+const CLAVES_UTM = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const
+function utmFields(call: any): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const item of Array.isArray(call?.utm) ? call.utm : []) {
+    const k = String(item?.utmKey || "").trim().toLowerCase()
+    const v = String(item?.utmValue ?? "").trim()
+    if ((CLAVES_UTM as readonly string[]).includes(k) && v && !out[k]) out[k] = v.slice(0, 300)
+    else if (/^https?:\/\//.test(k) && !out.utm_referrer) out.utm_referrer = k.slice(0, 300)
+  }
+  return out
+}
+// YouTube manda a la landing con utm_source=yt: esas agendas tienen fuente propia, el resto sigue como "Instagram".
+const fuenteDeUtm = (u: Record<string, string>) => (/^(yt|youtube)$/i.test(u.utm_source || "") || /youtube/i.test(u.utm_medium || "") ? "YouTube" : null)
+
 function answerFields(call: any) {
   const out: Record<string, string> = {}
   const valuesOf = (raw: any): any[] => {
@@ -247,6 +263,12 @@ export async function POST(request: Request) {
             }
             if (closer && !existingAgenda.closer) updates.closer = closer
             if (phone && !existingAgenda.telefono) updates.telefono = phone
+            {
+              const u = utmFields(call)
+              for (const [k, v] of Object.entries(u)) if (v && !existingAgenda[k]) updates[k] = v
+              const fy = fuenteDeUtm(u)
+              if (fy && (!existingAgenda.fuente || existingAgenda.fuente === "Instagram")) updates.fuente = fy
+            }
             if (extracted.instagram && !existingAgenda.instagram) updates.instagram = extracted.instagram
             for (const [k, v] of Object.entries(extracted)) {
               if (!k.startsWith("__") && v && !existingAgenda[k]) {
@@ -273,9 +295,10 @@ export async function POST(request: Request) {
               closer,
               cuenta: "@alexmcarrera",
               setter: null,
-              fuente: "Instagram",
+              fuente: fuenteDeUtm(utmFields(call)) || "Instagram",
               calificacion: score?.calificacion || null,
               ...extracted,
+              ...utmFields(call),
             }).select("id,person_id").single()
             if (error) throw error
             agendasInserted++
@@ -309,6 +332,12 @@ export async function POST(request: Request) {
       if (agenda) {
         const extracted = answerFields(call)
         const changes = Object.fromEntries(Object.entries(extracted).filter(([key, value]) => !key.startsWith("__") && value && !agenda[key]))
+        {
+          const u = utmFields(call)
+          for (const [k, v] of Object.entries(u)) if (v && !agenda[k]) changes[k] = v
+          const fy = fuenteDeUtm(u)
+          if (fy && (!agenda.fuente || agenda.fuente === "Instagram")) changes.fuente = fy
+        }
         if (!agenda.calificacion) {
           const score = autoScoreLead({
             ...agenda,
