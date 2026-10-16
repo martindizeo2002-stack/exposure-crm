@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { diasHastaFecha, umbralActual } from "@/lib/recordatorios"
 import { closerMissing, firstName, setterMissing } from "@/lib/crm-compliance"
+import { DetalleMetrica, type MetricaHome } from "@/components/home/detalle-metrica"
 
 const fetcher = async (url: string) => { const r = await fetch(url); if (!r.ok) throw new Error("Error"); return r.json() }
 const money = (value: number) => `USD ${Math.round(value).toLocaleString("es-AR")}`
@@ -130,9 +131,9 @@ function LegacyHomePage() {
         <Stat label="Cash Collected" value={money(metrics?.cash.cc_total || 0)} helper="dinero que realmente entró" icon={CircleDollarSign} tone="emerald" />
         <Stat label="Unidades cerradas" value={String(metrics?.comparacion_cierre.unidades_cerradas || 0)} helper="clientes nuevos este mes (FE+BE)" icon={UsersRound} tone="blue" />
         <Stat label="Ventas totales" value={String(metrics?.comparacion_cierre.pagos_totales || 0)} helper="cierres + fees del mes" icon={Receipt} tone="orange" />
-        <Stat label="ROAS" value={metrics?.cash.roas == null ? "—" : `${metrics.cash.roas.toFixed(2)}x`} helper={metrics?.cash.ad_spend_available ? `FECCU / ${money(metrics.cash.ad_spend)} en ads` : "falta conectar gasto de ads"} icon={Target} tone="orange" />
+        <Stat label="ROAS" value={metrics?.cash.roas == null ? "—" : `${metrics.cash.roas.toFixed(2)}x`} helper={metrics?.cash.ad_spend_available ? `FECCU / ${money(metrics.cash.ad_spend)} en ads` : "falta conectar gasto de ads"} icon={Target} tone="orange"  />
         <Stat label="CAC" value={metrics?.cash.cac == null ? "—" : money(metrics.cash.cac)} helper="costo por venta nueva (gasto ads / ventas nuevas)" icon={Target} tone="violet" />
-        <Stat label="AOV TC" value={metrics?.cash.aov_tc == null ? "—" : money(metrics.cash.aov_tc)} helper="ticket promedio de trato cerrado" icon={TrendingUp} tone="emerald" />
+        <Stat label="AOV TC" value={metrics?.cash.aov_tc == null ? "—" : money(metrics.cash.aov_tc)} helper="ticket promedio de trato cerrado" icon={TrendingUp} tone="emerald"  />
         <Stat label="AOV Día 1" value={metrics?.cash.aov_dia1 == null ? "—" : money(metrics.cash.aov_dia1)} helper="ticket promedio de venta inicial" icon={TrendingUp} tone="blue" />
         <Stat label="Cash Collected FE" value={money((metrics?.cash.feccu || 0) + (metrics?.cash.feccp || 0))} helper="Frontend: FECCU + FECCP" icon={CircleDollarSign} tone="emerald" />
         <Stat label="Cash Collected BE" value={money((metrics?.cash.beccu || 0) + (metrics?.cash.beccpp || 0))} helper="Backend: BECCU + BECCPP" icon={CircleDollarSign} tone="violet" />
@@ -195,6 +196,7 @@ export default function HomePage() {
     setGreeting(hour < 12 ? "Buen día" : hour < 19 ? "Buenas tardes" : "Buenas noches")
   }, [])
   const session = useSession()
+  const [detalle, setDetalle] = useState<MetricaHome | null>(null)
   const isCEO = session.rol === "CEO"
   const isSalesManager = session.rol === "Sales Manager"
   const isMarketingManager = session.rol === "Manager MKT"
@@ -293,17 +295,17 @@ export default function HomePage() {
 
     {loading ? <div className="grid min-h-72 place-items-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div> : isCEO ? <>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-        <Stat label="Revenue" value={money(cash?.revenue || 0)} helper="valor contractual vendido" icon={TrendingUp} tone="violet" />
-        <Stat label="Cash Collected" value={money(cash?.cc_total || 0)} helper="FE + BE efectivamente cobrado" icon={CircleDollarSign} tone="emerald" />
-        <Stat label="FECCU" value={money(cash?.feccu || 0)} helper="frontend cash collected upfront" icon={CircleDollarSign} tone="emerald" />
-        <Stat label="FECCPP" value={money(cash?.feccp || 0)} helper="frontend cash collected payment plans" icon={Receipt} tone="blue" />
-        <Stat label="CUOTAS PENDIENTES" value={money(profitInputs?.pendingInstallments || 0)} helper={`${profitInputs?.pendingInstallmentCount || 0} cuotas por cobrar de tratos cerrados`} icon={Clock3} tone="orange" />
-        <Stat label="Promedio diario" value={money(dailyAverage)} helper={`cash collected ÷ ${elapsedDays} días transcurridos`} icon={TrendingUp} tone="emerald" />
-        <Stat label="ROAS" value={cash?.roas == null ? "—" : `${cash.roas.toFixed(2)}x`} helper={cash?.ad_spend_source === "meta" ? `FECCU ÷ ${money(cash.ad_spend)} Meta Ads · actualiza cada minuto` : cash?.ad_spend_source === "mercury" ? `Estimado con ${money(cash.ad_spend)} debitado en Mercury` : "esperando gasto de Meta Ads"} icon={Target} tone="orange" />
-        <Stat label="AOV TC" value={cash?.aov_tc == null ? "—" : money(cash.aov_tc)} helper="ticket promedio de trato cerrado" icon={TrendingUp} tone="violet" />
-        <Stat label="AOV" value={cash?.aov_dia1 == null ? "—" : money(cash.aov_dia1)} helper="ticket promedio cobrado día 1" icon={TrendingUp} tone="blue" />
+        <Stat label="Revenue" value={money(cash?.revenue || 0)} helper="valor contractual vendido" icon={TrendingUp} tone="violet"  onOpen={() => setDetalle("revenue")} />
+        <Stat label="Cash Collected" value={money(cash?.cc_total || 0)} helper="FE + BE efectivamente cobrado" icon={CircleDollarSign} tone="emerald"  onOpen={() => setDetalle("cash")} />
+        <Stat label="FECCU" value={money(cash?.feccu || 0)} helper="frontend cash collected upfront" icon={CircleDollarSign} tone="emerald"  onOpen={() => setDetalle("feccu")} />
+        <Stat label="FECCPP" value={money(cash?.feccp || 0)} helper="frontend cash collected payment plans" icon={Receipt} tone="blue"  onOpen={() => setDetalle("feccp")} />
+        <Stat label="CUOTAS PENDIENTES" value={money(profitInputs?.pendingInstallments || 0)} helper={`${profitInputs?.pendingInstallmentCount || 0} cuotas por cobrar de tratos cerrados`} icon={Clock3} tone="orange"  onOpen={() => setDetalle("cuotas")} />
+        <Stat label="Promedio diario" value={money(dailyAverage)} helper={`cash collected ÷ ${elapsedDays} días transcurridos`} icon={TrendingUp} tone="emerald"  onOpen={() => setDetalle("promedio")} />
+        <Stat label="ROAS" value={cash?.roas == null ? "—" : `${cash.roas.toFixed(2)}x`} helper={cash?.ad_spend_source === "meta" ? `FECCU ÷ ${money(cash.ad_spend)} Meta Ads · actualiza cada minuto` : cash?.ad_spend_source === "mercury" ? `Estimado con ${money(cash.ad_spend)} debitado en Mercury` : "esperando gasto de Meta Ads"} icon={Target} tone="orange"  onOpen={() => setDetalle("roas")} />
+        <Stat label="AOV TC" value={cash?.aov_tc == null ? "—" : money(cash.aov_tc)} helper="ticket promedio de trato cerrado" icon={TrendingUp} tone="violet"  onOpen={() => setDetalle("aov_tc")} />
+        <Stat label="AOV" value={cash?.aov_dia1 == null ? "—" : money(cash.aov_dia1)} helper="ticket promedio cobrado día 1" icon={TrendingUp} tone="blue"  onOpen={() => setDetalle("aov")} />
       </section>
-      <section className="command-goal">
+      <section className="command-goal cursor-pointer" role="button" tabIndex={0} title="Ver detalle del cash collected" onClick={() => setDetalle("objetivo")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetalle("objetivo") } }}>
         <div className="command-orbit-wrap">
           <div className="command-orbit command-orbit-one" />
           <div className="command-orbit command-orbit-two" />
@@ -322,11 +324,16 @@ export default function HomePage() {
         </div>
       </section>
       <section><div className="mb-3"><p className="text-xs font-bold uppercase tracking-[.18em] text-red-500">Solo CEO</p><h2 className="text-xl font-bold">Rentabilidad y backend</h2></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="CAC integral" value={fullyLoadedCac == null ? "—" : money(fullyLoadedCac)} helper={`Ads ${money(cash?.ad_spend || 0)} + software ${money(profitInputs?.softwareCost || 0)} + comisiones ${money(commercialCommissions)} ÷ ${metrics?.funnel.cierres_fe || 0} cierres${profitInputs?.softwareEstimated ? ` · software base ${profitInputs.softwareSourceMonth}` : ""}`} icon={Target} tone="orange" />
-        <Stat label="BECCU" value={money(cash?.beccu || 0)} helper="backend upfront" icon={CircleDollarSign} tone="violet" />
-        <Stat label="BECCPP" value={money(cash?.beccpp || 0)} helper="backend payment plans" icon={Receipt} tone="blue" />
-        <Stat label="Profit" value={profit == null ? "Pendiente" : money(profit)} helper={profit == null ? "faltan gastos/comisiones del mes" : `Cash − ${money((profitInputs?.expenses || 0) + (profitInputs?.commissions || 0))} de gastos y comisiones`} icon={TrendingUp} tone="emerald" />
+        <Stat label="CAC integral" value={fullyLoadedCac == null ? "—" : money(fullyLoadedCac)} helper={`Ads ${money(cash?.ad_spend || 0)} + software ${money(profitInputs?.softwareCost || 0)} + comisiones ${money(commercialCommissions)} ÷ ${metrics?.funnel.cierres_fe || 0} cierres${profitInputs?.softwareEstimated ? ` · software base ${profitInputs.softwareSourceMonth}` : ""}`} icon={Target} tone="orange"  onOpen={() => setDetalle("cac")} />
+        <Stat label="BECCU" value={money(cash?.beccu || 0)} helper="backend upfront" icon={CircleDollarSign} tone="violet"  onOpen={() => setDetalle("beccu")} />
+        <Stat label="BECCPP" value={money(cash?.beccpp || 0)} helper="backend payment plans" icon={Receipt} tone="blue"  onOpen={() => setDetalle("beccpp")} />
+        <Stat label="Profit" value={profit == null ? "Pendiente" : money(profit)} helper={profit == null ? "faltan gastos/comisiones del mes" : `Cash − ${money((profitInputs?.expenses || 0) + (profitInputs?.commissions || 0))} de gastos y comisiones`} icon={TrendingUp} tone="emerald"  onOpen={() => setDetalle("profit")} />
       </div></section>
+      <DetalleMetrica metrica={detalle} onClose={() => setDetalle(null)} start={selectedMonth.start} end={selectedMonth.end} monthKey={monthKey} goal={goal} dias={Math.max(1, elapsedDays)}
+        valor={detalle === "revenue" ? cash?.revenue ?? 0 : detalle === "cash" || detalle === "objetivo" ? cash?.cc_total ?? 0 : detalle === "feccu" ? cash?.feccu ?? 0 : detalle === "feccp" ? cash?.feccp ?? 0
+          : detalle === "beccu" ? cash?.beccu ?? 0 : detalle === "beccpp" ? cash?.beccpp ?? 0 : detalle === "cuotas" ? profitInputs?.pendingInstallments ?? 0 : detalle === "promedio" ? Math.round(dailyAverage * 100) / 100
+          : detalle === "roas" ? cash?.roas ?? null : detalle === "aov_tc" ? cash?.aov_tc ?? null : detalle === "aov" ? cash?.aov_dia1 ?? null : detalle === "cac" ? (fullyLoadedCac == null ? null : Math.round(fullyLoadedCac * 100) / 100) : detalle === "profit" ? profit : null}
+        extra={{ softwareCost: profitInputs?.softwareCost, commissions: profitInputs?.commissions, expenses: profitInputs?.expenses, comisionesComerciales: commercialCommissions }} />
     </> : isSalesManager ? <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Stat label="Cash del equipo" value={money(cash?.cc_total || 0)} helper="sin acceso a cierres o administración crítica" icon={CircleDollarSign} tone="emerald" />
       <Stat label="Unidades cerradas" value={String(metrics?.comparacion_cierre.unidades_cerradas || 0)} helper="equipo comercial este mes" icon={Target} tone="violet" />
@@ -353,9 +360,14 @@ export default function HomePage() {
   </div>
 }
 
-function Stat({ label, value, helper, icon: Icon, tone }: { label: string; value: string; helper: string; icon: typeof Target; tone: "emerald" | "violet" | "orange" | "blue" }) {
+function Stat({ label, value, helper, icon: Icon, tone, onOpen }: { label: string; value: string; helper: string; icon: typeof Target; tone: "emerald" | "violet" | "orange" | "blue"; onOpen?: () => void }) {
   const colors = { emerald: "command-tone-emerald", violet: "command-tone-violet", orange: "command-tone-orange", blue: "command-tone-blue" }
-  return <article className={`command-stat page-enter stagger-1 ${colors[tone]}`}><div className="command-stat-glow" /><div className="relative z-10 flex items-start justify-between gap-3"><p className="command-stat-label">{label}</p><span className="command-stat-icon"><Icon className="h-4 w-4" /></span></div><p className="command-stat-value">{value}</p><div className="command-stat-signal"><i /><i /><i /><i /><i /></div></article>
+  const contenido = <><div className="command-stat-glow" /><div className="relative z-10 flex items-start justify-between gap-3"><p className="command-stat-label">{label}</p><span className="command-stat-icon"><Icon className="h-4 w-4" /></span></div><p className="command-stat-value">{value}</p><div className="command-stat-signal"><i /><i /><i /><i /><i /></div></>
+  if (!onOpen) return <article className={`command-stat page-enter stagger-1 ${colors[tone]}`} title={helper}>{contenido}</article>
+  return <button type="button" onClick={onOpen} title={helper} aria-label={`${label}: ${value}. Ver detalle`} className={`command-stat page-enter stagger-1 group w-full cursor-pointer text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${colors[tone]}`}>
+    {contenido}
+    <span className="pointer-events-none absolute bottom-3 left-4 z-10 inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">Ver detalle <ArrowRight className="h-3 w-3" /></span>
+  </button>
 }
 
 function FocusCard({ href, icon: Icon, label, value, detail, urgent }: { href: string; icon: typeof Clock3; label: string; value: string; detail: string; urgent?: boolean }) {

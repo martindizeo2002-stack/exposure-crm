@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   const [{ data: expenses, error: expenseError }, { data: payroll, error: payrollError }, { data: plansRaw, error: plansError }] = await Promise.all([
     admin.from("gastos").select("monto_usd,tipo_gasto,mes,mes_orden").gte("fecha", start).lte("fecha", end),
     admin.from("payroll").select("total_usd").eq("mes_orden", monthOrder),
-    admin.from("planes_pago").select("id,person_id,telefono,fecha_alta,created_at,plan_pago_items(monto,concepto,estado,pago_id)").not("fecha_alta", "is", null),
+    admin.from("planes_pago").select("id,cliente,closer,operacion,person_id,telefono,fecha_alta,created_at,plan_pago_items(monto,concepto,estado,pago_id,fecha_planeada,numero_cuota)").not("fecha_alta", "is", null),
   ])
   if (expenseError) return NextResponse.json({ error: expenseError.message }, { status: 500 })
   if (payrollError) return NextResponse.json({ error: payrollError.message }, { status: 500 })
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   const softwareCost = softwareRows.reduce((sum, row) => sum + Number(row.monto_usd || 0), 0)
   // Cuotas pendientes de un plan (FE o BE). Un "Completó PIF" no es cuota.
   const installmentConcept = (concept: string) => concept.startsWith("Cuota") || FECCPP_TYPES.has(concept) || BECCPP_TYPES.has(concept)
-  const pendingItems = (plans || []).flatMap((plan: any) => plan.plan_pago_items || [])
+  const pendingItems = (plans || []).flatMap((plan: any) => (plan.plan_pago_items || []).map((item: any) => ({ ...item, _plan: plan })))
     .filter((item: any) => item.estado === "pendiente" && !item.pago_id && installmentConcept(String(item.concepto || "")))
   const pendingInstallments = pendingItems.reduce((sum: number, item: any) => sum + Number(item.monto || 0), 0)
   return NextResponse.json({
@@ -66,5 +66,10 @@ export async function GET(request: Request) {
     softwareEstimated,
     pendingInstallments: Math.round(pendingInstallments * 100) / 100,
     pendingInstallmentCount: pendingItems.length,
+    // ?detalle=1: cada cuota que suma la tarjeta "Cuotas pendientes" (todas las de planes con alta, no solo del mes)
+    pendingInstallmentItems: searchParams.get("detalle") === "1" ? pendingItems.map((item: any) => ({
+      plan_id: item._plan.id, cliente: item._plan.cliente || "Sin nombre", closer: item._plan.closer || "", operacion: item._plan.operacion || "",
+      concepto: item.concepto || "", numero_cuota: item.numero_cuota ?? null, fecha_planeada: item.fecha_planeada || null, monto: Math.round(Number(item.monto || 0) * 100) / 100,
+    })).sort((a: any, b: any) => String(a.fecha_planeada || "9").localeCompare(String(b.fecha_planeada || "9"))) : undefined,
   })
 }

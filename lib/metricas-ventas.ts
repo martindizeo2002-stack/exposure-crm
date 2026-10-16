@@ -34,6 +34,7 @@ export type LlamadaClasificada = {
   calificada: boolean; reprogramada_a: string | null; embudo: Embudo
   agenda_ids?: string[] // todas las agendas de esa persona en el período (la de arriba es la que quedó)
 }
+export type PagoVentas = { id: string; fecha: string; cliente: string; tipo: string; monto: number; closer: string; grupo: "FECCU" | "FECCP" | "BECCU" | "BECCPP" | "Otro"; venta_nueva: boolean; via: string }
 export type CierreVentas = { persona: string; nombre: string; closer: string; fecha: string; monto: number; agenda_id: string | null; calificada: boolean; via: string }
 
 export type MetricasVentas = {
@@ -48,6 +49,7 @@ export type MetricasVentas = {
   llamadas: LlamadaClasificada[]
   lista_cierres: CierreVentas[]
   lista_fees: CierreVentas[]
+  lista_pagos: PagoVentas[] // todos los pagos activos del período que suman el cash (mismo filtro de closer y embudo)
 }
 
 const ARCHIVADA = new Set(["Archivada manualmente", "Archivada"])
@@ -207,15 +209,19 @@ export async function metricasVentas(sb: SupabaseClient, f: FiltroMetricasVentas
   const delPeriodoPagos = enlazados.filter((x) => dia(x.p.fecha) >= f.desde)
 
   const cash = { total: 0, feccu: 0, feccp: 0, beccu: 0, beccpp: 0, otros: 0, ventas_nuevas: 0 }
-  for (const { p } of delPeriodoPagos) {
+  const lista_pagos: PagoVentas[] = []
+  for (const x of delPeriodoPagos) {
+    const p = x.p
     const m = Number(p.monto) || 0, t = String(p.tipo || "")
+    const grupo: PagoVentas["grupo"] = BECCPP_TYPES.has(t) ? "BECCPP" : BECCU_TYPES.has(t) ? "BECCU" : FECCU_TYPES.has(t) ? "FECCU" : FECCPP_TYPES.has(t) ? "FECCP" : "Otro"
     cash.total += m
-    if (BECCPP_TYPES.has(t)) cash.beccpp += m
-    else if (BECCU_TYPES.has(t)) cash.beccu += m
-    else if (FECCU_TYPES.has(t)) cash.feccu += m
-    else if (FECCPP_TYPES.has(t)) cash.feccp += m
+    if (grupo === "BECCPP") cash.beccpp += m
+    else if (grupo === "BECCU") cash.beccu += m
+    else if (grupo === "FECCU") cash.feccu += m
+    else if (grupo === "FECCP") cash.feccp += m
     else cash.otros += m
     if (FRONT_END_SALE_TYPES.has(t)) cash.ventas_nuevas += m
+    lista_pagos.push({ id: String(p.id), fecha: dia(p.fecha), cliente: String(p.cliente || "Sin nombre"), tipo: t || "Sin concepto", monto: r2(m), closer: x.closer, grupo, venta_nueva: FRONT_END_SALE_TYPES.has(t), via: x.via })
   }
   for (const k of Object.keys(cash) as Array<keyof typeof cash>) cash[k] = r2(cash[k])
 
@@ -274,6 +280,6 @@ export async function metricasVentas(sb: SupabaseClient, f: FiltroMetricasVentas
     tasa_cierre: pct(lista_cierres.length, presentadas.length), tasa_cierre_calif: pct(cierresCalif, califPres),
     por_closer,
     llamadas: llamadas.map(({ _claves, _ids, ...l }: any) => ({ ...l, agenda_ids: _ids })),
-    lista_cierres, lista_fees,
+    lista_cierres, lista_fees, lista_pagos,
   }
 }

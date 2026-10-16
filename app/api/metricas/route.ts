@@ -195,7 +195,7 @@ export async function GET(request: Request) {
       // Fuente de verdad igual a producción: contrato estructurado cargado en
       // el período, sumando los ítems del plan, estén pagos o pendientes.
       sb.from("planes_pago")
-        .select("id,person_id,telefono,fecha_alta,created_at,plan_pago_items(monto,concepto)")
+        .select("id,cliente,operacion,closer,person_id,telefono,fecha_alta,created_at,plan_pago_items(monto,concepto)")
         .gte("created_at", `${start}T00:00:00`)
         .lte("created_at", `${end}T23:59:59.999`),
       sb.from("agendas")
@@ -795,7 +795,20 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       mes, weekIdx, weekCount, volumen, embudo, embudos,
-      ventas: u,
+      ventas: searchParams.get("detalle") === "1" ? u : { ...u, llamadas: undefined, lista_pagos: undefined },
+      // ?detalle=1: las filas que suman cada tarjeta del Home (mismas variables que los totales de abajo)
+      detalle: searchParams.get("detalle") === "1" ? {
+        planes: planes.map((plan: any) => ({
+          id: plan.id, cliente: plan.cliente || "Sin nombre", operacion: plan.operacion || "", closer: plan.closer || "",
+          fecha: String(plan.created_at || "").slice(0, 10),
+          total: r2((plan.plan_pago_items || []).reduce((t: number, i: any) => t + Number(i.monto || 0), 0)),
+          ventas_nuevas: r2((plan.plan_pago_items || []).reduce((t: number, i: any) => t + (VENTA_NUEVA_EXTERNA.has(i.concepto || "") ? Number(i.monto || 0) : 0), 0)),
+          cuotas: (plan.plan_pago_items || []).length,
+        })),
+        aov_tc: aov_tc_arr.map((x: any) => ({ fecha: x.fecha, cliente: x.cliente, tipo: x.tipo, monto: r2(x.monto || 0), closer: x.closer })),
+        aov_dia1: aov_d1_arr.map((x: any) => ({ fecha: x.fecha, cliente: x.cliente, tipo: x.tipo, monto: r2(x.monto || 0), closer: x.closer })),
+        ad_spend: { spend: metaSpend.spend, source: metaSpend.source, estimated: metaSpend.estimated, available: metaSpend.available, por_embudo: gastoEmbudos },
+      } : undefined,
       trazabilidad,
       funnel: {
         total_agendas: u.agendas, calls_evaluables: u.ocurridas, calificadas: u.calificadas, presentadas: u.presentadas, calif_presentadas: u.calif_presentadas,
