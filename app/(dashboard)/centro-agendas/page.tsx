@@ -52,7 +52,7 @@ const AGENDAS_CSV_COLUMNS = [
   { label: "Puntos de Contacto", get: (a: any) => a.puntos_contacto },
   { label: "Resumen de Chat", get: (a: any) => a.resumen_chat },
   { label: "Contenido de origen", get: (a: any) => a.recurso || "Contenido no identificado" },
-  { label: "Show", get: (a: any) => a.estado === "Cancelado" ? "CANCELADO POR TRIAGE" : a.show === true ? "SÍ" : a.show === false ? "NO" : "PENDIENTE" },
+  { label: "Show", get: (a: any) => a.estado === "Cancelado" ? "CANCELADO POR TRIAGE" : a.estado === "Cancelado en precall" ? "CANCELÓ EN PRECALL" : a.show === true ? "SÍ" : a.show === false ? "NO" : "PENDIENTE" },
   { label: "Cerró", get: (a: any) => a.cerro ? "Sí" : "No" },
   { label: "Estado", get: (a: any) => a.estado },
   { label: "Motivo No Cierre", get: (a: any) => a.motivo_no_cierre },
@@ -334,7 +334,7 @@ function callYaOcurrio(a: Agenda) {
 // Solo campos manuales accionables. No incluye datos automáticos de iClosed ni
 // Call Confirmer, que dejó de operar el 07/08/2026.
 function faltantesManuales(a: Agenda): string[] {
-  if (a.estado === "Cancelado") return []
+  if (a.estado === "Cancelado" || a.estado === "Cancelado en precall") return []
   if (callYaOcurrio(a) && a.show == null) return ["Resultado (Show)"]
   return faltantesCloser(a)
 }

@@ -268,7 +268,7 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
       lines.push("❌ NO SHOWS / CANCELADAS")
       lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━")
       noShows.forEach((ns) => {
-        const motivo = ns.resultado === "NO SHOW" ? ` · Motivo: ${ns.motivo_no_show?.trim() || "sin cargar"}` : ""
+        const motivo = ns.resultado === "NO SHOW" || ns.resultado === "CANCELADA" ? ` · Motivo: ${ns.motivo_no_show?.trim() || "sin cargar"}` : ""
         lines.push(`• ${ns.nombre} ${ns.hora ? "(" + ns.hora + ")" : ""} — ${ns.resultado} | ${ns.lead_score} (${ns.ingresos_declarados || "Sin datos"})${motivo}`)
       })
       lines.push("")

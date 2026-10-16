@@ -17,7 +17,7 @@ type AgendaResultado = { show?: boolean | null; cerro?: boolean | null; estado?:
 
 // Estados que ya son el resultado de UNA llamada presentada: otra fecha en iClosed es otra llamada (2da call),
 // no una reprogramación. No show, Reprogramó, Grupo Precall o sin resultado sí se reprograman.
-const ESTADOS_DE_LLAMADA_HECHA = new Set(["Fee", "Adentro en Call", "Adentro en FUP", "Cancelado", "Seguimiento", "Hacer Seguimiento", "Seguimiento por wpp"])
+const ESTADOS_DE_LLAMADA_HECHA = new Set(["Fee", "Adentro en Call", "Adentro en FUP", "Cancelado", "Cancelado en precall", "Seguimiento", "Hacer Seguimiento", "Seguimiento por wpp"])
 export function llamadaYaHecha(a: AgendaResultado) {
   return a.show === true || a.cerro === true || ESTADOS_DE_LLAMADA_HECHA.has(String(a.estado || ""))
 }

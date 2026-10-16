@@ -974,7 +974,7 @@ export async function GET(request: NextRequest) {
         motivo_real: a.motivo_no_cierre || (resComercial === "CIERRE" ? "Propuesta y claridad en el modelo" : ""),
         motivo_no_show: reprogramadaA
           ? [`Reprogramó para el ${diaHora(reprogramadaA)}`, motivoNoShowPorAgenda.get(String(a.id))].filter(Boolean).join(" · ")
-          : resComercial === "NO SHOW" ? (motivoNoShowPorAgenda.get(String(a.id)) || null) : null,
+          : resComercial === "NO SHOW" || resComercial === "CANCELADA" ? (motivoNoShowPorAgenda.get(String(a.id)) || null) : null,
         siguiente_paso: reprogramadaA ? `Reprogramada al ${diaHora(reprogramadaA)}`
           : llegoReprogramada ? `Reprogramada (venía del ${diaHora(reprogramadaDesde.get(String(a.id)))})`
           : resComercial === "CIERRE" ? "Onboarding" : (a.estado || "Seguimiento"),

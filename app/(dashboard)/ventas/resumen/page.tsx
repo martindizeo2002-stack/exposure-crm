@@ -220,7 +220,7 @@ export default function ResumenVentasPage() {
       fecha_closer: "",
       estado: c.etiqueta_reprogramada === "Reprogramó y no se presentó" ? "Reprogramó y no se presentó"
         : c.etiqueta_reprogramada === "Reprogramó y no cerró" ? "Reprogramó y no cerró"
-        : c.resultado === "CANCELADA" ? "Cancelado" : (c.resultado === "NO SHOW" ? "No se presentó" : ""),
+        : c.resultado === "CANCELADA" ? (c.estado === "Cancelado en precall" || c.siguiente_paso === "Cancelado en precall" ? "Canceló en precall" : "Cancelado") : (c.resultado === "NO SHOW" ? "No se presentó" : ""),
       reprogramada_desde: c.reprogramada_desde ? String(c.reprogramada_desde).slice(0, 10) : "",
       link_fathom: "",
       problema_actual: c.porque_agendo || "",
@@ -246,7 +246,7 @@ export default function ResumenVentasPage() {
             email: data.email || (data as any)?.crm_people?.primary_email || prev.email,
             instagram: data.instagram || prev.instagram,
             fecha_closer: data.fecha_closer ? data.fecha_closer.slice(0, 16) : prev.fecha_closer,
-            estado: prev.estado.startsWith("Reprogramó y") ? prev.estado : data.estado === "No Show" ? "No se presentó" : (data.estado || prev.estado),
+            estado: prev.estado.startsWith("Reprogramó y") ? prev.estado : data.estado === "No Show" ? "No se presentó" : data.estado === "Cancelado en precall" ? "Canceló en precall" : (data.estado || prev.estado),
             motivo_no_show: data.motivo_no_show || prev.motivo_no_show,
             link_fathom: data.link_fathom || prev.link_fathom,
             problema_actual: data.problema_actual || prev.problema_actual,
@@ -339,6 +339,13 @@ export default function ResumenVentasPage() {
         updates.motivo_no_show = formEdit.motivo_no_show.trim() || null
       } else if (formEdit.estado === "Se presentó") {
         updates.show = true
+      } else if (formEdit.estado === "Canceló en precall") {
+        // canceló antes de la llamada, en el grupo de precall: cuenta como cancelada (no como no show)
+        if (!formEdit.motivo_no_show.trim()) throw new Error("Escribí el motivo de la cancelación")
+        updates.show = null
+        updates.cerro = false
+        updates.estado = "Cancelado en precall"
+        updates.motivo_no_show = formEdit.motivo_no_show.trim()
       } else if (formEdit.estado === "Reprogramó y no se presentó") {
         // segunda reunión de una reprogramación: no show, con la marca de reprogramada
         updates.show = false
@@ -1483,7 +1490,7 @@ export default function ResumenVentasPage() {
                               >
                                 {c.resultado}
                               </Badge>
-                              {c.resultado === "NO SHOW" && c.motivo_no_show && (
+                              {(c.resultado === "NO SHOW" || c.resultado === "CANCELADA") && c.motivo_no_show && (
                                 <span className="text-xs text-rose-300/90">Motivo: {c.motivo_no_show}</span>
                               )}
 
@@ -2052,6 +2059,7 @@ export default function ResumenVentasPage() {
                         <SelectItem value="Reprogramó y no cerró">🟣🟡 Reprogramó y no cerró</SelectItem>
                         <SelectItem value="Se presentó">🟢 Se presentó</SelectItem>
                         <SelectItem value="No se presentó">🔴 No se presentó (No Show)</SelectItem>
+                        <SelectItem value="Canceló en precall">⛔ Canceló en precall</SelectItem>
                         <SelectItem value="Adentro en Call">🏆 Adentro en Call (Cierre)</SelectItem>
                         <SelectItem value="Adentro en FUP">🔄 Adentro en FUP</SelectItem>
                         <SelectItem value="Fee">💳 Fee pagado</SelectItem>
@@ -2097,6 +2105,19 @@ export default function ResumenVentasPage() {
                       onChange={e => setFormEdit(prev => ({ ...prev, reprogramada_desde: e.target.value }))}
                     />
                     <p className="mt-1 text-[11px] text-zinc-500">Con esto el lead aparece en las dos fechas del Resumen y queda marcado como reprogramado. Si ya venía de una reprogramación, la fecha está cargada.</p>
+                  </div>
+                )}
+
+                {formEdit.estado === "Canceló en precall" && (
+                  <div>
+                    <Label className="text-orange-300 font-bold text-xs">Motivo de la cancelación en precall</Label>
+                    <textarea
+                      className="mt-1 min-h-[64px] w-full rounded-md border border-orange-500/30 bg-zinc-900 px-3 py-2 text-xs text-white"
+                      placeholder="Ej.: avisó en el grupo que no tiene la plata, se le complicó el horario, ya no le interesa…"
+                      value={formEdit.motivo_no_show}
+                      onChange={e => setFormEdit(prev => ({ ...prev, motivo_no_show: e.target.value }))}
+                    />
+                    <p className="mt-1 text-[11px] text-zinc-500">Sale al lado del lead en el resumen diario y mensual, en No shows / Canceladas.</p>
                   </div>
                 )}
 

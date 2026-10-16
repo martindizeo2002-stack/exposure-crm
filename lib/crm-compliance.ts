@@ -43,7 +43,7 @@ function localDay(value: string | null) {
 export function operationalStage(a: AgendaCompliance, now = new Date()): OperationalStage {
   // Cancelado es un resultado final cargado por el closer. `show` queda null
   // porque la llamada no ocurrió, pero nunca debe volver a caer en Pendiente.
-  if (a.estado === "Cancelado") return "archivado"
+  if (a.estado === "Cancelado" || a.estado === "Cancelado en precall") return "archivado"
   if (a.estado === "Fee") return "fee"
   if (a.estado === "Adentro en Call" || a.estado === "Adentro en FUP" || a.cerro === true) return "cerrado"
   const confirmer = norm(a.call_confirmer)

@@ -322,7 +322,7 @@ export async function GET(request: Request) {
 
     // No shows: call_confirmer distingue por que no hubo show.
     // Cancelado es un resultado válido: no es no-show ni resultado pendiente.
-    const noShows = callsOccurred.filter(x => x.show !== true && x.estado !== "Cancelado")
+    const noShows = callsOccurred.filter(x => x.show !== true && x.estado !== "Cancelado" && x.estado !== "Cancelado en precall")
     const canceladas_triage = noShows.filter(x => (x.call_confirmer || "").includes("Triage")).length
     const canceladas_triage_calif = noShows.filter(x =>
       CALIFS_AB.has(x.calificacion || "") && (x.call_confirmer || "").includes("Triage")
@@ -334,7 +334,7 @@ export async function GET(request: Request) {
       && !(x.call_confirmer || "").includes("Triage")
     ).length
     const sin_resultado = callsOccurred.filter(x => x.show == null
-      && x.estado !== "Cancelado"
+      && x.estado !== "Cancelado" && x.estado !== "Cancelado en precall"
       && x.call_confirmer !== "No Respondió"
       && !(x.call_confirmer || "").includes("Triage")
     ).length

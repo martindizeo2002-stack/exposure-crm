@@ -156,7 +156,7 @@ export async function GET(request: Request) {
       const nowMs = Date.now()
       const noShows = (data || []).filter(deEmbudo).filter((r: any) => {
         const scheduled = r.fecha_closer ? new Date(r.fecha_closer).getTime() : NaN
-        return Number.isFinite(scheduled) && scheduled <= nowMs && r.show !== true && r.estado !== "Cancelado"
+        return Number.isFinite(scheduled) && scheduled <= nowMs && r.show !== true && r.estado !== "Cancelado" && r.estado !== "Cancelado en precall"
       })
       const rows = key === "canceladas_triage"
         ? noShows.filter((r: any) => (r.call_confirmer || "").includes("Triage"))
