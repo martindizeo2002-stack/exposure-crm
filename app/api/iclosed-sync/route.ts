@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { llamadaYaHecha, registrarReprogramacion } from "@/lib/reprogramaciones"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { authorizePreviewSync, normEmail, normPhone } from "@/lib/integration-auth"
 import { autoScoreLead } from "@/lib/lead-scoring"
@@ -228,13 +229,21 @@ export async function POST(request: Request) {
             // Reprogramada a mano en el CRM: la reserva vieja de iClosed no la devuelve a un día anterior.
             const volveriaAtras = ultimaReprogramacion.has(String(existingAgenda.id))
               && String(fechaCloser || "").slice(0, 10) < String(existingAgenda.fecha_closer || "").slice(0, 10)
-            // Con resultado cargado (show, cierre o estado final) la agenda ya es de su llamada: otra fecha en iClosed
-            // es otra llamada (2da call), no una reprogramación, y no se la mueve.
-            const conResultado = existingAgenda.show != null || existingAgenda.cerro === true
-              || ["No Show", "Fee", "Adentro en Call", "Adentro en FUP", "Cancelado", "Seguimiento", "Hacer Seguimiento", "Seguimiento por wpp"].includes(String(existingAgenda.estado || ""))
-            if (fechaCloser && existingAgenda.fecha_closer !== fechaCloser && !volveriaAtras && !conResultado) {
+            // Ya presentada (show, cierre, fee o seguimiento): otra fecha en iClosed es otra llamada (2da call) y no se
+            // la mueve. No show, "Reprogramó" o sin resultado: es una reprogramación y va al día nuevo, con el día
+            // original registrado (lib/reprogramaciones) para que el Resumen la muestre en las dos fechas.
+            if (fechaCloser && existingAgenda.fecha_closer !== fechaCloser && !volveriaAtras && !llamadaYaHecha(existingAgenda)) {
               updates.fecha_closer = fechaCloser
               updates.fecha_agenda = fechaCloser
+              const reset = await registrarReprogramacion(admin, {
+                agendaId: existingAgenda.id, personId: existingAgenda.person_id, closer: existingAgenda.closer || closer,
+                fechaOriginal: existingAgenda.fecha_closer, fechaNueva: fechaCloser, origen: "iclosed",
+                resultadoOriginal: { show: existingAgenda.show, cerro: existingAgenda.cerro, estado: existingAgenda.estado },
+              })
+              Object.assign(updates, reset)
+              if (String(existingAgenda.fecha_closer || "").slice(0, 10) !== String(fechaCloser).slice(0, 10)) {
+                ultimaReprogramacion.set(String(existingAgenda.id), { metadata: { fecha_original: existingAgenda.fecha_closer, fecha_nueva: fechaCloser } })
+              }
             }
             if (closer && !existingAgenda.closer) updates.closer = closer
             if (phone && !existingAgenda.telefono) updates.telefono = phone

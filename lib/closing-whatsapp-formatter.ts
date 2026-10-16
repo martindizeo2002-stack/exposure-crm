@@ -31,7 +31,9 @@ export type CallDetalle = {
   agenda_id?: number | string
   es_show?: boolean
   tipos_pago?: string[] // conceptos de los pagos del período cruzados con la agenda
-  pago_enlazado_por?: string | null // "agenda" | "persona" | "teléfono" | "nombre": cómo se encontró el pago
+  pago_enlazado_por?: string | null
+  reprogramada_desde?: string | null // fecha de la llamada original, si esta agenda llegó a este día por una reprogramación
+  etiqueta_reprogramada?: string | null // "Reprogramó y no se presentó" | "Reprogramó y no cerró" | "Reprogramó y cerró" | … // "agenda" | "persona" | "teléfono" | "nombre": cómo se encontró el pago
   nombre: string
   fecha?: string
   hora?: string

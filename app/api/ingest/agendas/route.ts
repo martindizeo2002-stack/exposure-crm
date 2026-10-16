@@ -5,6 +5,7 @@ import { autoScoreLead } from "@/lib/lead-scoring"
 import { canonicalCloserName, closerForScore } from "@/lib/closer-routing"
 import { attachEmailToPerson, normalizeLeadEmail } from "@/lib/crm-email"
 import { updateHammerAudience } from "@/lib/meta-hammer-audience"
+import { llamadaYaHecha, registrarReprogramacion } from "@/lib/reprogramaciones"
 
 // Clave compartida para proteger el endpoint. Debe vivir únicamente en las
 // variables cifradas de Vercel y en la automatización que envía los datos.
@@ -169,7 +170,7 @@ export async function POST(request: Request) {
       // Traer agendas recientes para matchear tanto por clave exacta como por identidad (evitar duplicados por reagendas)
       const { data: existingRecent, error: existingError } = await sb
         .from("agendas")
-        .select("id,nombre,telefono,instagram,fecha_agenda,fecha_closer,closer,created_at,show,cerro,estado")
+        .select("id,person_id,nombre,telefono,instagram,fecha_agenda,fecha_closer,closer,created_at,show,cerro,estado")
         .or("estado.is.null,estado.neq.Archivada manualmente")
         .order("created_at", { ascending: false })
         .limit(3000)
@@ -201,10 +202,10 @@ export async function POST(request: Request) {
           return samePhone || sameIg || sameName
         })
 
-        // Una agenda con resultado cargado ya es de su llamada: si la reserva nueva es otro día, es una 2da llamada
-        // y va como agenda propia. Antes se le pisaba la fecha y el resultado quedaba colgado de una llamada que no era.
-        const conResultado = match && (match.show != null || match.cerro === true
-          || ["No Show", "Fee", "Adentro en Call", "Adentro en FUP", "Cancelado", "Seguimiento", "Hacer Seguimiento", "Seguimiento por wpp"].includes(String(match.estado || "")))
+        // Una agenda ya presentada (show, cierre, fee, seguimiento) es de su llamada: si la reserva nueva es otro día,
+        // es una 2da llamada y va como agenda propia. Una no show o sin resultado es una reprogramación: se mueve al
+        // día nuevo y el día original queda registrado (lib/reprogramaciones), sin duplicar el lead.
+        const conResultado = match && llamadaYaHecha(match)
         const otroDia = match && row.fecha_closer && match.fecha_closer
           && Math.abs(Date.parse(String(row.fecha_closer)) - Date.parse(String(match.fecha_closer))) > 864e5
         if (match && conResultado && otroDia) {
@@ -212,7 +213,14 @@ export async function POST(request: Request) {
         } else if (match) {
           // Reagendamiento: actualizar fecha_closer y datos en la agenda existente sin crear duplicado
           const patch: Record<string, unknown> = {}
-          if (row.fecha_closer && match.fecha_closer !== row.fecha_closer) patch.fecha_closer = row.fecha_closer
+          if (row.fecha_closer && match.fecha_closer !== row.fecha_closer) {
+            patch.fecha_closer = row.fecha_closer
+            Object.assign(patch, await registrarReprogramacion(sb, {
+              agendaId: match.id, personId: match.person_id, closer: match.closer || (row.closer as string | null),
+              fechaOriginal: match.fecha_closer, fechaNueva: String(row.fecha_closer), origen: "ingest",
+              resultadoOriginal: { show: match.show, cerro: match.cerro, estado: match.estado },
+            }))
+          }
           if (row.closer && !match.closer) patch.closer = row.closer
           if (row.telefono && !match.telefono) patch.telefono = row.telefono
           if (row.instagram && !match.instagram) patch.instagram = row.instagram

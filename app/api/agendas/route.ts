@@ -7,6 +7,7 @@ import { createSupabaseServer } from "@/lib/supabase-server"
 import { paginatedPayload, parsePagination } from "@/lib/pagination"
 import { attachEmailToPerson, exposeAgendaEmail, normalizeLeadEmail } from "@/lib/crm-email"
 import { shouldRemainInHammerAudience, updateHammerAudience } from "@/lib/meta-hammer-audience"
+import { registrarReprogramacion, REPROGRAMADA_EVENT } from "@/lib/reprogramaciones"
 
 
 function getSupabase() {
@@ -253,24 +254,31 @@ export async function PATCH(request: Request) {
         .maybeSingle()
     const { data: updated, error } = updateResult
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    // Reprogramó a otro día: queda el registro del día original para que el Resumen de ventas lo muestre
-    // ese día como no show. Una sola fila por agenda y día original (dedupe_key), aunque se guarde varias veces.
+    // Reprogramó a otro día (estado "Reprogramó", o era no show y se le cambió la fecha): queda el registro del día
+    // original (lib/reprogramaciones) para que el Resumen de ventas la muestre en los dos días, sin duplicar el lead.
     const estadoFinal = "estado" in updates ? updates.estado : prevEstado
     const diaAnterior = String(prevFechaCloser || "").slice(0, 10)
     const diaNuevo = String(updated?.fecha_closer || "").slice(0, 10)
-    if (updated?.person_id && estadoFinal === "Reprogramó" && "fecha_closer" in updates && diaAnterior && diaNuevo && diaAnterior !== diaNuevo) {
-      const { error: reproError } = await sb.from("crm_events").upsert({
-        person_id: updated.person_id,
-        event_type: REPROGRAMADA_EVENT,
-        occurred_at: `${diaAnterior}T12:00:00-03:00`,
-        source: "CRM",
-        source_record_type: "agendas",
-        source_record_id: String(id),
-        title: `Reprogramó del ${diaAnterior} al ${diaNuevo}`,
-        metadata: { fecha_original: prevFechaCloser, fecha_nueva: updated.fecha_closer, closer: updated.closer || null },
-        dedupe_key: `${REPROGRAMADA_EVENT}:${id}:${diaAnterior}`,
-      }, { onConflict: "dedupe_key" })
-      if (reproError) console.error("[agendas] reprogramación", reproError.message)
+    const eraNoShow = prevShow === false || prevEstado === "No Show"
+    if (updated?.person_id && "fecha_closer" in updates && diaAnterior && diaNuevo && diaAnterior !== diaNuevo && (estadoFinal === "Reprogramó" || eraNoShow)) {
+      const reset = await registrarReprogramacion(sb, {
+        agendaId: id, personId: updated.person_id, closer: updated.closer, fechaOriginal: prevFechaCloser, fechaNueva: updated.fecha_closer,
+        origen: "CRM", resultadoOriginal: { show: prevShow, estado: prevEstado },
+      })
+      // la llamada nueva arranca pendiente, salvo que en este mismo guardado se haya cargado su resultado
+      const pendiente = Object.fromEntries(Object.entries(reset).filter(([k]) => !(k in updates)))
+      if (Object.keys(pendiente).length) await sb.from("agendas").update(pendiente).eq("id", id)
+    }
+    // "Reprogramó y no se presentó" / "Reprogramó y no cerró" desde la ficha: si la agenda todavía no tenía la marca,
+    // se registra con la fecha original que indicó el closer (el resultado de la segunda reunión ya va en `updates`).
+    const reprogramadaDesde = String(rawUpdates.reprogramada_desde || "").slice(0, 10)
+    if (updated?.person_id && /^\d{4}-\d{2}-\d{2}$/.test(reprogramadaDesde)) {
+      const { count: yaMarcada } = await sb.from("crm_events").select("id", { count: "exact", head: true })
+        .eq("event_type", REPROGRAMADA_EVENT).eq("source_record_id", String(id))
+      if (!yaMarcada) await registrarReprogramacion(sb, {
+        agendaId: id, personId: updated.person_id, closer: updated.closer,
+        fechaOriginal: `${reprogramadaDesde}T12:00:00`, fechaNueva: updated.fecha_closer, origen: "CRM",
+      })
     }
     if (updates.resumen_chat && updated) {
       await persistChatSummaryAttribution(sb, [updated])
@@ -369,7 +377,6 @@ export async function PATCH(request: Request) {
 
 const NO_SHOW_EVENT = "agenda_no_show_motivo"
 // Lo lee app/api/ventas/resumen: el día original de una agenda reprogramada se muestra como no show.
-const REPROGRAMADA_EVENT = "agenda_reprogramada"
 
 // Seguimiento y motivo del no show de un lote de agendas, en una sola consulta a crm_events.
 async function agendaEvents(sb: any, ids: string[]) {

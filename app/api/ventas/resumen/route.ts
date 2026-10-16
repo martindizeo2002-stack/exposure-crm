@@ -16,6 +16,7 @@ import {
 } from "@/lib/closing-whatsapp-formatter"
 import { extractBookingContentOrigin } from "@/lib/chat-summary-attribution"
 import { armarEnlazador, cargarAgendasEnlace, tel9 } from "@/lib/embudo-atribucion"
+import { etiquetaReprogramada } from "@/lib/reprogramaciones"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -291,6 +292,8 @@ export async function GET(request: NextRequest) {
     const idsEnRango = new Set(rawAgendas.map((a: any) => String(a.id)))
     // Agendas del rango que llegaron acá por una reprogramación: en su día nuevo están pendientes, no son no show.
     const reprogramadaDesde = new Map<string, string>()
+    // Agendas que alguna vez se reprogramaron: llevan la etiqueta "Reprogramó y …" en su segunda reunión
+    const conReprogramacion = new Set<string>()
     if (idsEnRango.size) {
       const ids = [...idsEnRango]
       for (let i = 0; i < ids.length; i += 300) {
@@ -300,6 +303,7 @@ export async function GET(request: NextRequest) {
           const id = String((ev as any).source_record_id)
           const actual = rawAgendas.find((a: any) => String(a.id) === id)
           const m = (ev as any).metadata || {}
+          conReprogramacion.add(id)
           if (actual && String(m.fecha_nueva || "").slice(0, 10) === String(actual.fecha_closer || "").slice(0, 10)) {
             reprogramadaDesde.set(id, String(m.fecha_original || ""))
           }
@@ -754,8 +758,10 @@ export async function GET(request: NextRequest) {
 
       // Registro de patrones
       if (a.motivo_no_cierre && resComercial === "NO CIERRE") {
-        const objKey = a.motivo_no_cierre.trim()
-        motivosNoCierre[objKey] = (motivosNoCierre[objKey] || 0) + 1
+        // varias objeciones juntas ("Miedo · Desconfianza") cuentan cada una
+        for (const objKey of a.motivo_no_cierre.split(/\s·\s|\n/).map((x: string) => x.trim()).filter(Boolean)) {
+          motivosNoCierre[objKey] = (motivosNoCierre[objKey] || 0) + 1
+        }
       }
       if (a.angulo_entrada && esCalif) {
         const angKey = a.angulo_entrada.trim()
@@ -941,6 +947,8 @@ export async function GET(request: NextRequest) {
         agenda_id: a.id,
         es_show: esShow,
         tipos_pago: pagosLead.map((p: any) => String(p.tipo || "")).filter(Boolean),
+        reprogramada_desde: reprogramadaA ? null : reprogramadaDesde.get(String(a.id)) || null,
+        etiqueta_reprogramada: reprogramadaA ? null : etiquetaReprogramada(a, conReprogramacion.has(String(a.id))),
         pago_enlazado_por: pagosLead.length ? viaPorAgenda.get(String(a.id)) || null : null,
         nombre: a.nombre || "Sin nombre",
         fecha: a.fecha_closer ? a.fecha_closer.slice(0, 10) : undefined,

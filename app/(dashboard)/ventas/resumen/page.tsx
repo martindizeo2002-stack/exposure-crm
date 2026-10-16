@@ -43,6 +43,17 @@ import { AuditoriaMensual } from "@/components/ventas/auditoria-mensual"
 import { RevisionCruces } from "@/components/ventas/revision-cruces"
 
 
+// Las objeciones se guardan juntas en motivo_no_cierre, separadas por " · ". Se suman, no se pisan.
+const OBJ_SEP = " · "
+function objecionesDe(texto: string | null | undefined): string[] {
+  const out: string[] = []
+  for (const parte of String(texto || "").split(/\s·\s|\n/)) {
+    const t = parte.trim()
+    if (t && !out.some(x => x.toLowerCase() === t.toLowerCase())) out.push(t)
+  }
+  return out
+}
+
 const MOTIVOS_NO_CIERRE_CRM = [
   "Le parecia caro",
   "No llego al PIF",
@@ -88,6 +99,7 @@ export default function ResumenVentasPage() {
     objecion: string
     motivo_no_cierre: string
     motivo_no_show: string
+    reprogramada_desde: string
     siguiente_paso: string
     closer: string
     setter: string
@@ -111,6 +123,7 @@ export default function ResumenVentasPage() {
     objecion: "",
     motivo_no_cierre: "",
     motivo_no_show: "",
+    reprogramada_desde: "",
     siguiente_paso: "Seguimiento",
     closer: "Cristian",
     setter: "",
@@ -128,6 +141,7 @@ export default function ResumenVentasPage() {
     inversion: "",
   })
   const [guardandoLead, setGuardandoLead] = useState(false)
+  const [nuevaObjecion, setNuevaObjecion] = useState("")
 
   // Buscador de leads para mover al reporte
   const [busquedaLead, setBusquedaLead] = useState("")
@@ -204,7 +218,10 @@ export default function ResumenVentasPage() {
       email: "",
       instagram: "",
       fecha_closer: "",
-      estado: c.resultado === "CANCELADA" ? "Cancelado" : (c.resultado === "NO SHOW" ? "No se presentó" : ""),
+      estado: c.etiqueta_reprogramada === "Reprogramó y no se presentó" ? "Reprogramó y no se presentó"
+        : c.etiqueta_reprogramada === "Reprogramó y no cerró" ? "Reprogramó y no cerró"
+        : c.resultado === "CANCELADA" ? "Cancelado" : (c.resultado === "NO SHOW" ? "No se presentó" : ""),
+      reprogramada_desde: c.reprogramada_desde ? String(c.reprogramada_desde).slice(0, 10) : "",
       link_fathom: "",
       problema_actual: c.porque_agendo || "",
       tiempo_problema: "",
@@ -229,7 +246,7 @@ export default function ResumenVentasPage() {
             email: data.email || (data as any)?.crm_people?.primary_email || prev.email,
             instagram: data.instagram || prev.instagram,
             fecha_closer: data.fecha_closer ? data.fecha_closer.slice(0, 16) : prev.fecha_closer,
-            estado: data.estado === "No Show" ? "No se presentó" : (data.estado || prev.estado),
+            estado: prev.estado.startsWith("Reprogramó y") ? prev.estado : data.estado === "No Show" ? "No se presentó" : (data.estado || prev.estado),
             motivo_no_show: data.motivo_no_show || prev.motivo_no_show,
             link_fathom: data.link_fathom || prev.link_fathom,
             problema_actual: data.problema_actual || prev.problema_actual,
@@ -303,7 +320,7 @@ export default function ResumenVentasPage() {
         lead_score_grade: formEdit.lead_scoring,
         ocupacion: ocupacionFinal || orig?.ocupacion || null,
         calificaba_realmente: formEdit.calificaba_realmente === "Sin definir" ? (orig?.calificaba_realmente || null) : formEdit.calificaba_realmente,
-        motivo_no_cierre: formEdit.motivo_no_cierre.trim() || (formEdit.objecion && formEdit.objecion !== "none" ? formEdit.objecion : null) || null,
+        motivo_no_cierre: objecionesDe([formEdit.motivo_no_cierre, nuevaObjecion].join(OBJ_SEP)).join(OBJ_SEP) || null,
         estado: estadoFinal,
       }
 
@@ -322,6 +339,22 @@ export default function ResumenVentasPage() {
         updates.motivo_no_show = formEdit.motivo_no_show.trim() || null
       } else if (formEdit.estado === "Se presentó") {
         updates.show = true
+      } else if (formEdit.estado === "Reprogramó y no se presentó") {
+        // segunda reunión de una reprogramación: no show, con la marca de reprogramada
+        updates.show = false
+        updates.cerro = false
+        updates.estado = "No Show"
+        updates.motivo_no_show = formEdit.motivo_no_show.trim() || null
+        updates.reprogramada_desde = formEdit.reprogramada_desde || null
+      } else if (formEdit.estado === "Reprogramó y no cerró") {
+        // segunda reunión de una reprogramación: se presentó y no cerró
+        updates.show = true
+        updates.cerro = false
+        updates.estado = null
+        updates.reprogramada_desde = formEdit.reprogramada_desde || null
+      }
+      if (formEdit.estado.startsWith("Reprogramó y") && !formEdit.reprogramada_desde) {
+        throw new Error("Indicá para qué fecha estaba agendada antes de reprogramar")
       }
 
       const res = await fetch("/api/agendas", {
@@ -1489,6 +1522,14 @@ export default function ResumenVentasPage() {
                               {esCierre && (
                                 <span className="font-black text-emerald-400">${c.cash_d1} USD D1</span>
                               )}
+                              {c.etiqueta_reprogramada && (
+                                <span
+                                  className="rounded border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-purple-300"
+                                  title={c.reprogramada_desde ? `Estaba agendada para el ${String(c.reprogramada_desde).slice(8, 10)}/${String(c.reprogramada_desde).slice(5, 7)}` : "Esta agenda se reprogramó"}
+                                >
+                                  {c.etiqueta_reprogramada}
+                                </span>
+                              )}
                               {c.pago_enlazado_por === "nombre" && (
                                 <span
                                   className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300"
@@ -1857,12 +1898,12 @@ export default function ResumenVentasPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-zinc-300 text-xs">Objeción</Label>
-                    <Select value={formEdit.objecion || "none"} onValueChange={v => setFormEdit(prev => ({ ...prev, objecion: v === "none" ? "" : v, motivo_no_cierre: v === "none" ? "" : v }))}>
+                    <Select value="none" onValueChange={v => { if (v !== "none") setFormEdit(prev => ({ ...prev, objecion: v, motivo_no_cierre: objecionesDe([prev.motivo_no_cierre, v].join(OBJ_SEP)).join(OBJ_SEP) })) }}>
                       <SelectTrigger className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs text-white">
-                        <SelectValue placeholder="Seleccionar objeción..." />
+                        <SelectValue placeholder="Agregar objeción..." />
                       </SelectTrigger>
                       <SelectContent className="bg-zinc-900 border-white/10 text-white">
-                        <SelectItem value="none">Sin objeción cargada</SelectItem>
+                        <SelectItem value="none">Agregar objeción…</SelectItem>
                         {MOTIVOS_NO_CIERRE_CRM.map(m => (
                           <SelectItem key={m} value={m}>{m}</SelectItem>
                         ))}
@@ -1888,13 +1929,39 @@ export default function ResumenVentasPage() {
                 </div>
 
                 <div>
-                  <Label className="text-zinc-300 text-xs">Motivo de no cierre (detalle)</Label>
-                  <Input
-                    className="mt-1 h-8 bg-zinc-900 border-white/10 text-xs placeholder:text-zinc-500 text-white"
-                    placeholder="Explicación detallada o notas del motivo"
-                    value={formEdit.motivo_no_cierre}
-                    onChange={e => setFormEdit(prev => ({ ...prev, motivo_no_cierre: e.target.value }))}
-                  />
+                  <Label className="text-zinc-300 text-xs">Objeciones cargadas</Label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {objecionesDe(formEdit.motivo_no_cierre).length === 0 && <span className="text-[11px] text-zinc-500">Todavía no hay objeciones. Elegí una arriba o escribila acá abajo.</span>}
+                    {objecionesDe(formEdit.motivo_no_cierre).map(o => (
+                      <span key={o} className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200">
+                        {o}
+                        <button type="button" aria-label={`Borrar objeción ${o}`} className="text-amber-300 hover:text-white"
+                          onClick={() => setFormEdit(prev => ({ ...prev, motivo_no_cierre: objecionesDe(prev.motivo_no_cierre).filter(x => x !== o).join(OBJ_SEP) }))}>
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      className="h-8 flex-1 bg-zinc-900 border-white/10 text-xs placeholder:text-zinc-500 text-white"
+                      placeholder="Escribí otra objeción o un detalle y tocá Agregar"
+                      value={nuevaObjecion}
+                      onChange={e => setNuevaObjecion(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter" && nuevaObjecion.trim()) {
+                          e.preventDefault()
+                          setFormEdit(prev => ({ ...prev, motivo_no_cierre: objecionesDe([prev.motivo_no_cierre, nuevaObjecion].join(OBJ_SEP)).join(OBJ_SEP) }))
+                          setNuevaObjecion("")
+                        }
+                      }}
+                    />
+                    <Button type="button" variant="outline" size="sm" className="h-8 border-white/10 text-xs" disabled={!nuevaObjecion.trim()}
+                      onClick={() => { setFormEdit(prev => ({ ...prev, motivo_no_cierre: objecionesDe([prev.motivo_no_cierre, nuevaObjecion].join(OBJ_SEP)).join(OBJ_SEP) })); setNuevaObjecion("") }}>
+                      Agregar
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-[11px] text-zinc-500">Se suman todas. Para sacar una, tocá la ✕.</p>
                 </div>
               </div>
             )}
@@ -1981,6 +2048,8 @@ export default function ResumenVentasPage() {
                       </SelectTrigger>
                       <SelectContent className="bg-zinc-900 border-white/10 text-white">
                         <SelectItem value="Reprogramó">🟣 Reprogramó</SelectItem>
+                        <SelectItem value="Reprogramó y no se presentó">🟣🔴 Reprogramó y no se presentó</SelectItem>
+                        <SelectItem value="Reprogramó y no cerró">🟣🟡 Reprogramó y no cerró</SelectItem>
                         <SelectItem value="Se presentó">🟢 Se presentó</SelectItem>
                         <SelectItem value="No se presentó">🔴 No se presentó (No Show)</SelectItem>
                         <SelectItem value="Adentro en Call">🏆 Adentro en Call (Cierre)</SelectItem>
@@ -2018,7 +2087,20 @@ export default function ResumenVentasPage() {
                   </div>
                 </div>
 
-                {formEdit.estado === "No se presentó" && (
+                {formEdit.estado.startsWith("Reprogramó y") && (
+                  <div>
+                    <Label className="text-purple-300 font-bold text-xs">¿Para qué fecha estaba agendada antes de reprogramar?</Label>
+                    <Input
+                      type="date"
+                      className="mt-1 h-8 bg-zinc-900 border-purple-500/30 text-xs text-white"
+                      value={formEdit.reprogramada_desde}
+                      onChange={e => setFormEdit(prev => ({ ...prev, reprogramada_desde: e.target.value }))}
+                    />
+                    <p className="mt-1 text-[11px] text-zinc-500">Con esto el lead aparece en las dos fechas del Resumen y queda marcado como reprogramado. Si ya venía de una reprogramación, la fecha está cargada.</p>
+                  </div>
+                )}
+
+                {(formEdit.estado === "No se presentó" || formEdit.estado === "Reprogramó y no se presentó") && (
                   <div>
                     <Label className="text-rose-300 font-bold text-xs">Motivo del no show</Label>
                     <textarea
