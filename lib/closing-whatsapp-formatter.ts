@@ -142,6 +142,133 @@ function fmtFecha(iso?: string) {
   return `${partes[2]}/${partes[1]}/${partes[0]}`
 }
 
+// ── Objeciones y ángulos (16/10/2026) ──
+// Objeciones de cada llamada: las que cargó el closer en la ficha (motivo_no_cierre, varias separadas por " · ")
+// y las que detectó el análisis de Fathom (trace_analysis.objections). Se agrupan por tipo para contarlas.
+const TIPOS_OBJECION: Array<[RegExp, string]> = [
+  [/caro|precio|cuesta mucho|muy alto/i, "Precio (le parece caro)"],
+  [/\bpif\b|cuota|financ|pagar en partes/i, "No llega al pago o a la cuota"],
+  [/dinero|plata|fondos|recursos|ahorro|no tiene|no ten[ií]a|presupuesto|econ[oó]m/i, "Dinero"],
+  [/desconf|estaf|confian|garant|humo/i, "Confianza"],
+  [/miedo|riesgo|insegur/i, "Miedo / riesgo"],
+  [/padre|madre|pareja|espos|socio|familia|mayor|consultar/i, "Decide otra persona"],
+  [/tiempo|horario|ocupad/i, "Tiempo"],
+  [/pensar|pensarlo|analizar|decidir/i, "Lo tiene que pensar"],
+  [/m[eé]todo de pago|tarjeta|banco|transferencia/i, "Método de pago"],
+  [/urgencia|m[aá]s adelante/i, "No tiene urgencia"],
+  [/capaz|impostor|no s[eé] si puedo|experiencia/i, "Duda de su capacidad"],
+  [/no califica|desemple|menor/i, "No califica"],
+]
+const tipoObjecion = (t: string) => TIPOS_OBJECION.find(([re]) => re.test(t))?.[1] || "Otra"
+
+function objecionesDeLlamada(c: CallDetalle): Array<{ texto: string; fuente: "ficha" | "Fathom" }> {
+  const out: Array<{ texto: string; fuente: "ficha" | "Fathom" }> = []
+  const vistos = new Set<string>()
+  const add = (texto: unknown, fuente: "ficha" | "Fathom") => {
+    const t = String(texto || "").trim()
+    if (!t || /^sin (motivo|objeci)/i.test(t) || /^propuesta y claridad/i.test(t)) return
+    const k = t.toLowerCase().slice(0, 60)
+    if (vistos.has(k)) return
+    vistos.add(k)
+    out.push({ texto: t.length > 140 ? `${t.slice(0, 140)}…` : t, fuente })
+  }
+  for (const o of String(c.objecion_principal || "").split(/\s·\s|\n/)) add(o, "ficha")
+  const trace = (c.trace_analysis || {}) as { objections?: unknown[] }
+  if (Array.isArray(trace.objections) && trace.objections.length) {
+    for (const o of trace.objections) add(o, "Fathom")
+  } else {
+    const f = String(c.fathom_lead?.objecion || "")
+    const i = f.indexOf("Fathom:")
+    if (i >= 0) for (const o of f.slice(i + 7).split(";")) add(o, "Fathom")
+  }
+  return out
+}
+const presento = (c: CallDetalle) => c.resultado !== "NO SHOW" && c.resultado !== "CANCELADA"
+const cerroLlamada = (c: CallDetalle) => c.resultado === "CIERRE" || c.resultado === "FEE"
+const recortar = (t: string, n: number) => (t.length > n ? `${t.slice(0, n)}…` : t)
+
+function seccionObjecionesYAngulos(calls: CallDetalle[], etiqueta: string, detalleCompleto: boolean): string[] {
+  const L: string[] = []
+  const linea = "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  const noCerradas = calls.filter((c) => presento(c) && !cerroLlamada(c))
+  const cerradas = calls.filter(cerroLlamada)
+  const conteo = (lista: CallDetalle[]) => {
+    const m = new Map<string, Set<string>>()
+    for (const c of lista) for (const o of objecionesDeLlamada(c)) {
+      const t = tipoObjecion(o.texto)
+      if (!m.has(t)) m.set(t, new Set())
+      m.get(t)!.add(c.nombre)
+    }
+    return [...m.entries()].sort((a, b) => b[1].size - a[1].size)
+  }
+  const nombres = (set: Set<string>) => `${[...set].slice(0, 6).join(", ")}${set.size > 6 ? "…" : ""}`
+
+  // Objeciones que no permitieron cerrar
+  L.push(linea, `🛑 OBJECIONES NO RESUELTAS ${etiqueta}`, linea)
+  const nr = conteo(noCerradas)
+  if (!noCerradas.length) L.push("• No hubo llamadas presentadas sin cerrar.")
+  else if (!nr.length) L.push(`• ${noCerradas.length} llamadas sin cerrar, pero ninguna tiene la objeción cargada en la ficha ni en Fathom.`)
+  else {
+    for (const [t, set] of nr) L.push(`• ${t}: ${set.size} (${nombres(set)})`)
+    const sinDato = noCerradas.filter((c) => !objecionesDeLlamada(c).length).length
+    if (sinDato) L.push(`• Sin objeción cargada (ni ficha ni Fathom): ${sinDato}`)
+    if (detalleCompleto) {
+      L.push("")
+      for (const c of noCerradas) {
+        const obs = objecionesDeLlamada(c)
+        L.push(`• ${c.nombre} (${c.closer}) — ${obs.length ? obs.map((o) => `${o.texto} [${o.fuente}]`).join(" · ") : "sin objeción cargada"}`)
+      }
+    }
+  }
+  L.push("")
+
+  // Objeciones resueltas en las ventas
+  L.push(linea, `✅ OBJECIONES RESUELTAS ${etiqueta}`, linea)
+  if (!cerradas.length) L.push("• No hubo ventas ni fees.")
+  else {
+    const res = conteo(cerradas)
+    if (!res.length) L.push(`• ${cerradas.length} ventas/fees sin objeciones registradas en Fathom ni en la ficha.`)
+    for (const [t, set] of res) L.push(`• ${t}: ${set.size} (${nombres(set)})`)
+    if (detalleCompleto) {
+      L.push("")
+      for (const c of cerradas) {
+        const obs = objecionesDeLlamada(c)
+        const como = String(((c.trace_analysis || {}) as { why_bought?: string }).why_bought || "").trim()
+        L.push(`• ${c.nombre} (${c.closer}, ${c.resultado}) — ${obs.length ? obs.map((o) => o.texto).join(" · ") : "sin objeciones registradas"}${como ? ` → cómo se resolvió: ${recortar(como, 160)}` : ""}`)
+      }
+    }
+  }
+  L.push("")
+
+  // Calificadas que no cerraron
+  const califNoCerradas = noCerradas.filter((c) => c.es_calificado)
+  L.push(linea, `🎯 CALIFICADAS QUE NO CERRARON ${etiqueta} (${califNoCerradas.length})`, linea)
+  if (!califNoCerradas.length) L.push("• Ninguna: todas las calificadas presentadas cerraron (o no hubo).")
+  for (const c of califNoCerradas) {
+    const obs = objecionesDeLlamada(c)
+    L.push(`• ${c.nombre} (${c.closer}) · ${c.lead_score} · ${c.resultado} — ${obs.length ? obs.map((o) => o.texto).join(" · ") : "sin objeción cargada"}${c.siguiente_paso ? ` · Siguiente paso: ${c.siguiente_paso}` : ""}${c.link_fathom ? ` · ${c.link_fathom}` : ""}`)
+  }
+  L.push("")
+
+  // Ángulos que destacaron
+  const angulos = (lista: CallDetalle[]) => {
+    const m = new Map<string, number>()
+    for (const c of lista) {
+      const a = String(c.angulo_adquisicion || "").trim() || "Sin ángulo cargado"
+      m.set(a, (m.get(a) || 0) + 1)
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  }
+  const calificadas = calls.filter((c) => c.es_calificado)
+  L.push(linea, `📣 ÁNGULOS QUE DESTACARON ${etiqueta}`, linea)
+  const enVentas = angulos(cerradas)
+  const enCalif = angulos(calificadas)
+  L.push(`• En ventas (${cerradas.length}): ${enVentas.length ? enVentas.map(([a, n]) => `${a} ${n}`).join(" · ") : "sin ventas"}`)
+  L.push(`• En agendas calificadas (${calificadas.length}): ${enCalif.length ? enCalif.map(([a, n]) => `${a} ${n}`).join(" · ") : "sin calificadas"}`)
+  L.push("")
+  return L
+}
+
 export function generarTextoWhatsApp(data: ResumenPayload): string {
   const { periodo, fecha_desde, fecha_hasta, closer, metricas: m, arquetipos: arq, calls } = data
   const lines: string[] = []
@@ -263,6 +390,8 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
       lines.push("")
     }
 
+    lines.push(...seccionObjecionesYAngulos(calls, "DEL DÍA", true))
+
     if (noShows.length > 0) {
       lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━")
       lines.push("❌ NO SHOWS / CANCELADAS")
@@ -344,6 +473,8 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
       lines.push("")
     }
 
+    lines.push(...seccionObjecionesYAngulos(calls, "DE LA SEMANA", false))
+
     lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━")
     lines.push("🧠 PATRONES DE LA SEMANA")
     lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -381,6 +512,8 @@ export function generarTextoWhatsApp(data: ResumenPayload): string {
     if (arq.sin_clasificar.total > 0) {
       lines.push(`• Sin clasificar: ${arq.sin_clasificar.total} calls | ${arq.sin_clasificar.calificadas || 0} calificadas | ${arq.sin_clasificar.presentadas_calificadas || 0} presentadas calif | ${arq.sin_clasificar.cierres || 0} cierres (${arq.sin_clasificar.cierres_calificados || 0} calificados, ${arq.sin_clasificar.cierres_no_calificados || 0} no calificados) | ${"$"}${arq.sin_clasificar.cash_d1 || 0} USD D1`)
     }
+    lines.push("")
+    lines.push(...seccionObjecionesYAngulos(calls, "DEL MES", false))
   }
 
   return lines.join("\n")
