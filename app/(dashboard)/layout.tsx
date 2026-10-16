@@ -5,7 +5,8 @@ import { SessionProvider } from "@/components/session-provider"
 import { createSupabaseServer } from "@/lib/supabase-server"
 import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { CrmSoundscape } from "@/components/crm-soundscape"
-import { effectiveCRMRole } from "@/lib/role-access"
+import { canAccessApi, effectiveCRMRole } from "@/lib/role-access"
+import { AsistenteGlobo } from "@/components/asistente-globo"
 import { SecuritySessionTracker } from "@/components/security-session-tracker"
 
 export default async function DashboardLayout({
@@ -47,6 +48,8 @@ export default async function DashboardLayout({
       <main className="crm-main relative z-10 min-h-screen">
         <SessionProvider value={{ rol: effectiveRole, email: user.email, nombre: member.nombre ?? "" }}>
           {children}
+          {/* Globo del asistente: solo para los roles que pueden usar /api/asistente */}
+          {canAccessApi("/api/asistente", effectiveRole, "POST") && <AsistenteGlobo />}
         </SessionProvider>
       </main>
     </div>
