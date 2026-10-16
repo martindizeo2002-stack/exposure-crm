@@ -104,6 +104,7 @@ export type MetricasClosing = {
   fees: number
   cash_d1: number
   cash_fees: number
+  cash_total?: number // todo lo cobrado en el período (ventas, fees, cuotas, back end) — regla única
   ticket_total: number
   show_rate_pct: number
   show_rate_calificados_pct: number

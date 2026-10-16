@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import { metricasVentas } from "@/lib/metricas-ventas"
 import { NextResponse } from "next/server"
 import { applyStrikes, BECCU_TYPES, closerTopTarget, closerUnlockedRate, FECCU_TYPES, frontendCohort, setterUnlockedRate, withinSetterWindow } from "@/lib/commission-scheme"
 import { FEE_TIPOS } from "@/lib/cash-collected"
@@ -386,7 +387,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const CALIFS_AB = new Set(["S", "A", "B", "C", "LEAD A", "LEAD B", "LEAD C"])  // EXPOSURE: A, B y C califican; D no
+    const CALIFS_AB = new Set(["S", "A", "B", "C", "LEAD S", "LEAD A", "LEAD B", "LEAD C"])  // Lead S/A/B/C (regla única, 15/10/2026)  // EXPOSURE: A, B y C califican; D no
 
     const ahoraMs = Date.now()
     for (const ag of agendasLlamada || []) {
@@ -466,8 +467,13 @@ export async function GET(request: Request) {
     const topCloser = Array.from(closerMap.entries()).sort((a, b) => b[1].cc_total - a[1].cc_total || b[1].feccu - a[1].feccu)[0]?.[0]
     const topSetter = Array.from(setterMap.entries()).sort((a, b) => b[1].cc_total - a[1].cc_total || b[1].feccu - a[1].feccu)[0]?.[0]
 
+    // Cierres, fees, llamadas, tasa de cierre y show up: la regla única de lib/metricas-ventas (los mismos números
+    // que Métricas y Resumen de ventas). El cash comisionable y las comisiones siguen con el esquema de comisiones.
+    const ventas = await metricasVentas(sb, { desde: start, hasta: end }).catch((e) => { console.error("[leaderboard] metricas-ventas", e); return null })
     const closers = Array.from(closerMap.entries())
-      .map(([nombre, d]) => {
+      .map(([nombre, d0]) => {
+        const uv = ventas?.por_closer[nombre]
+        const d = uv ? { ...d0, unidades: uv.cierres, fees: uv.fees, llamadas: uv.presentadas, total_ag: uv.ocurridas } : d0
         const strikes = strikesMap.get(nombre) ?? 0
         const tcAB = d.pres_ab > 0 ? round2((d.cerr_ab / d.pres_ab) * 100) : 0
         const legacyNivel = legacyCloserNivel(d.cc_ponderado, tcAB, strikes)
@@ -483,7 +489,7 @@ export async function GET(request: Request) {
           unidades: d.unidades, fees: d.fees, llamadas: d.llamadas, cerradas: d.cerradas,
           tasa_cierre: d.llamadas > 0 ? round2((d.unidades / d.llamadas) * 100) : 0,
           tc_ab: tcAB, aov: d.unidades > 0 ? round2(d.cc_nuevo / d.unidades) : 0,
-          show_up: d.total_ag > 0 ? round2((d.llamadas / d.total_ag) * 100) : 0,
+          show_up: uv ? uv.show_rate ?? 0 : d.total_ag > 0 ? round2((d.llamadas / d.total_ag) * 100) : 0,
           nivel, rate: round2(rate * 100), unlocked_rate: round2(unlockedRate * 100), strikes,
           is_top: nombre === topCloser, next_target: nextTarget, next_rate: nextRate,
           personal_goal: personalMonthlyGoal(month, nombre),

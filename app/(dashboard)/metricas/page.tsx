@@ -403,7 +403,7 @@ export default function MetricasPage() {
                 <h3 className="text-muted-foreground font-medium text-sm uppercase tracking-wide mb-4">Funnel</h3>
                 <div className="space-y-3">
                   <FunnelRow label="Agendas totales" value={f!.total_agendas} max={f!.total_agendas} opacity={1} />
-                  <FunnelRow label="Calificadas S/A/B" value={f!.calificadas} max={f!.total_agendas} opacity={0.8} />
+                  <FunnelRow label="Calificadas S/A/B/C" value={f!.calificadas} max={f!.total_agendas} opacity={0.8} />
                   <FunnelRow label="Presentadas" value={f!.presentadas} max={f!.total_agendas} opacity={0.6} />
                   <FunnelRow label="Calif. Presentadas" value={f!.calif_presentadas} max={f!.total_agendas} opacity={0.45} />
                   <FunnelRow label="Cierres FE" value={f!.cierres_fe} max={f!.total_agendas} opacity={0.3} />
@@ -420,7 +420,7 @@ export default function MetricasPage() {
                     value={f!.show_sin_triage === null ? "No aplica" : fmtPct(f!.show_sin_triage)}
                     desc={f!.show_sin_triage === null
                       ? "0 canceladas calificadas por triage: sería idéntico al Show de calificadas"
-                      : `${f!.calif_presentadas} / (S/A/B - canceladas por triage) · mínimo 60% · objetivo 75–80%`}
+                      : `${f!.calif_presentadas} / (S/A/B/C - canceladas por triage) · mínimo 60% · objetivo 75–80%`}
                   />
                   <TasaRow label="TC sobre agendas" value={fmtPct(f!.tc_total)} desc={`${f!.cierres_fe} cierres FE / ${f!.total_agendas}`} />
                   <TasaRow label="TC sobre presentadas" value={fmtPct(f!.tc_presentadas)} desc={`${f!.cierres_fe} / ${f!.presentadas}`} />

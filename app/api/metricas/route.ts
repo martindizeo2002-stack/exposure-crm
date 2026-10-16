@@ -7,6 +7,7 @@ import { ALL_SALE_TYPES, BACK_END_SALE_TYPES, CLOSED_IN_CALL_TYPES, FRONT_END_SA
 import { FEE_TIPOS, FRONT_END_FEE_TIPOS } from "@/lib/cash-collected"
 import { nombreCanonico } from "@/lib/equipo"
 import { armarEnlazador, cargarAgendasEnlace, embudoDe, EMBUDOS, leerEmbudos, nombreEmbudos, type Embudo } from "@/lib/embudo-atribucion"
+import { metricasVentas } from "@/lib/metricas-ventas"
 import { gastoAdsPorEmbudo } from "@/lib/ads-embudos"
 import { seguidoresPeriodo } from "@/lib/seguidores"
 
@@ -51,7 +52,7 @@ const SETTERS_NO_ACTIVOS = new Set<string>()
 const CLOSERS_EXCLUIDOS = new Set<string>()
 
 // Definición operativa (Alex, 11/09/2026): una agenda calificada es LEAD A, B o C; LEAD D no.
-const CALIFS_AB = new Set(["S", "A", "B", "C", "LEAD A", "LEAD B", "LEAD C"])  // EXPOSURE: A, B y C califican; D no
+const CALIFS_AB = new Set(["S", "A", "B", "C", "LEAD S", "LEAD A", "LEAD B", "LEAD C"])  // Lead S/A/B/C (regla única, 15/10/2026)  // EXPOSURE: A, B y C califican; D no
 
 // Conjuntos compartidos (lib/commission-scheme.ts, lib/revenue.ts,
 // lib/cash-collected.ts) con el vocabulario de EXPOSURE.
@@ -787,37 +788,46 @@ export async function GET(request: Request) {
       anuncios,
     }
 
+    // Embudo de llamadas, cierres, fees, tasas y cash: la regla única de lib/metricas-ventas (la misma que Home y
+    // Resumen de ventas, definida con Alex el 15/10/2026). El resto de los bloques sigue con su cálculo.
+    const u = await metricasVentas(sb, { desde: start, hasta: end, embudos })
+    const roasU = metaSpend.spend > 0 ? r2(u.cash.feccu / metaSpend.spend) : null
+
     return NextResponse.json({
       mes, weekIdx, weekCount, volumen, embudo, embudos,
+      ventas: u,
       trazabilidad,
       funnel: {
-        total_agendas, calls_evaluables: callsOccurred.length, calificadas, presentadas, calif_presentadas,
-        cierres, cierres_fe, cierres_be, cierres_llamada, cierres_seguimiento,
-        canceladas_triage, no_show, no_response, sin_resultado,
-        pct_calificadas: pct(calificadas, total_agendas),
-        show_total: pct(presentadas, callsOccurred.length),
-        show_calif: pct(calif_presentadas, calificadasOcurridas.length),
+        total_agendas: u.agendas, calls_evaluables: u.ocurridas, calificadas: u.calificadas, presentadas: u.presentadas, calif_presentadas: u.calif_presentadas,
+        cierres: u.cierres, cierres_fe: u.cierres, cierres_be: u.cierres_back_end, cierres_llamada, cierres_seguimiento,
+        cierres_calificados: u.cierres_calificados, fees: u.fees, pendientes: u.pendientes, canceladas: u.canceladas,
+        canceladas_triage, no_show: u.no_show, no_response, sin_resultado: u.sin_resultado,
+        pct_calificadas: pct(u.calificadas, u.agendas),
+        show_total: u.show_rate,
+        show_calif: u.show_rate_calif,
         // Si no hubo triage, esta tasa sería idéntica al show calificado y no
         // agrega información. Se devuelve null para que la UI diga "No aplica"
         // en vez de mostrar dos porcentajes iguales que parecen un error.
         show_sin_triage: canceladas_triage_calif > 0
           ? pct(calif_presentadas, calificadasOcurridas.length - canceladas_triage_calif)
           : null,
-        pct_canceladas_triage: pct(canceladas_triage, callsOccurred.length),
-        pct_no_show: pct(no_show, callsOccurred.length),
-        pct_no_response: pct(no_response, callsOccurred.length),
-        pct_sin_resultado: pct(sin_resultado, callsOccurred.length),
+        pct_canceladas_triage: pct(canceladas_triage, u.ocurridas + canceladas_triage),
+        pct_no_show: pct(u.no_show, u.ocurridas),
+        pct_no_response: pct(no_response, u.ocurridas + no_response),
+        pct_sin_resultado: pct(u.sin_resultado, u.ocurridas),
         con_calificaba_realmente, calificaron_si_realmente,
         pct_calificaba_realmente: pct(calificaron_si_realmente, con_calificaba_realmente),
         // TC (tasa de cierre) del funnel de Front End: solo unidades FE.
         // Las ventas internas (Venta Nueva Interna / BE) no cuentan acá.
-        tc_total: pct(cierres_fe, total_agendas),
-        tc_presentadas: pct(cierres_fe, presentadas),
-        tc_calificadas: pct(cierres_fe, calif_presentadas),
+        tc_total: pct(u.cierres, u.agendas),
+        tc_presentadas: u.tasa_cierre,
+        tc_calificadas: u.tasa_cierre_calif,
       },
       cash: {
-        feccu, feccp, beccu, beccpp, cc_total, fees_count: fees_arr.length,
-        fees_sum, aov_dia1, aov_tc, revenue, ventas_nuevas_revenue, roas, cac,
+        feccu: u.cash.feccu, feccp: u.cash.feccp, beccu: u.cash.beccu, beccpp: u.cash.beccpp, cc_total: u.cash.total, otros: u.cash.otros,
+        ventas_nuevas: u.cash.ventas_nuevas, fees_count: u.fees,
+        fees_sum: u.fees_monto, aov_dia1, aov_tc, revenue, ventas_nuevas_revenue,
+        roas: roas ?? roasU, cac: metaSpend.spend > 0 && u.cierres > 0 ? r2(metaSpend.spend / u.cierres) : cac,
         ad_spend: metaSpend.spend, ad_spend_available: metaSpend.available,
         ad_spend_source: metaSpend.source, ad_spend_estimated: metaSpend.estimated,
       },
@@ -825,13 +835,13 @@ export async function GET(request: Request) {
       cash_por_closer,
       comparacion_cierre: {
         pagos_totales,
-        unidades_cerradas,
+        unidades_cerradas: u.cierres,
         tc_pagos_totales_agendas: pct(pagos_totales, total_agendas),
         tc_pagos_totales_presentadas: pct(pagos_totales, presentadas),
         tc_pagos_totales_calificadas: pct(pagos_totales, calif_presentadas),
-        tc_unidades_agendas: pct(unidades_cerradas, total_agendas),
-        tc_unidades_presentadas: pct(unidades_cerradas, presentadas),
-        tc_unidades_calificadas: pct(unidades_cerradas, calif_presentadas),
+        tc_unidades_agendas: pct(u.cierres, u.agendas),
+        tc_unidades_presentadas: u.tasa_cierre,
+        tc_unidades_calificadas: u.tasa_cierre_calif,
       },
       seguidores: await seguidoresP.then((x) => x && { nuevos: x.nuevos, gasto: x.gasto, costo_por_seguidor: x.costo_por_seguidor, neto: x.neto, costo_por_seguidor_neto: x.costo_por_seguidor_neto }),
       setters,

@@ -145,7 +145,7 @@ function LegacyHomePage() {
         <Stat label="CC comisionable ≤30 días" value={money(ownSetter.cc_total)} helper={`FECCU ${money(ownSetter.feccu)} + FECCPP ${money(ownSetter.feccpp)}`} icon={CircleDollarSign} tone="emerald" />
         <Stat label="Unidades atribuidas" value={String(ownSetter.unidades)} helper="cierres de tus agendas" icon={Target} tone="violet" />
         <Stat label="Tus agendas" value={String(ownSetter.agendas)} helper="volumen del mes" icon={CalendarCheck} tone="orange" />
-        <Stat label="Agendas calificadas" value={String(ownSetter.agendas_ab)} helper={ownSetter.t_agenda == null ? "S/A/B" : `${ownSetter.t_agenda.toFixed(1)}% de calidad`} icon={TrendingUp} tone="blue" />
+        <Stat label="Agendas calificadas" value={String(ownSetter.agendas_ab)} helper={ownSetter.t_agenda == null ? "S/A/B/C" : `${ownSetter.t_agenda.toFixed(1)}% de calidad`} icon={TrendingUp} tone="blue" />
       </section> : <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Pendientes CRM" value={String(crm.incomplete)} helper="asignados a vos" icon={Kanban} tone="violet" />
         <Stat label="Cobros atrasados" value={String(work.overdue.length)} helper={money(work.amount)} icon={Clock3} tone="orange" />
@@ -258,7 +258,7 @@ export default function HomePage() {
         {isSetter ? <>
           <FocusCard href="/centro-agendas" icon={Kanban} label="Agendas por completar" value={String(ownTasks.setting)} detail="setting asignado a vos" urgent={ownTasks.setting > 0} />
           <FocusCard href="/ventas" icon={CalendarCheck} label="Tus agendas del mes" value={String(ownSetter?.agendas || 0)} detail="solo tu producción" />
-          <FocusCard href="/ventas" icon={Target} label="Calificadas S/A/B" value={String(ownSetter?.agendas_ab || 0)} detail="calidad de tus agendas" />
+          <FocusCard href="/ventas" icon={Target} label="Calificadas S/A/B/C" value={String(ownSetter?.agendas_ab || 0)} detail="calidad de tus agendas" />
         </> : isCloser ? <>
           <FocusCard href="/centro-agendas" icon={Kanban} label="Llamadas por completar" value={String(ownTasks.calls)} detail="closing asignado a vos" urgent={ownTasks.calls > 0} />
           <FocusCard href="/recordatorios" icon={Clock3} label="Cobros atrasados" value={String(ownTasks.overdue.length)} detail="solo clientes tuyos" urgent={ownTasks.overdue.length > 0} />
@@ -347,7 +347,7 @@ export default function HomePage() {
         <Stat label="CC comisionable ≤30 días" value={money(ownSetter?.cc_total || 0)} helper={`FECCU ${money(ownSetter?.feccu || 0)} + FECCPP ${money(ownSetter?.feccpp || 0)}`} icon={CircleDollarSign} tone="emerald" />
         <Stat label="Unidades atribuidas" value={String(ownSetter?.unidades || 0)} helper="cierres de tus agendas" icon={Target} tone="violet" />
         <Stat label="Tus agendas" value={String(ownSetter?.agendas || 0)} helper="volumen del mes" icon={CalendarCheck} tone="orange" />
-        <Stat label="Calificadas" value={String(ownSetter?.agendas_ab || 0)} helper="S/A/B" icon={TrendingUp} tone="blue" />
+        <Stat label="Calificadas" value={String(ownSetter?.agendas_ab || 0)} helper="S/A/B/C" icon={TrendingUp} tone="blue" />
       </>}
     </section>}
   </div>

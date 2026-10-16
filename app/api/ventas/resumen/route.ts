@@ -17,6 +17,7 @@ import {
 import { extractBookingContentOrigin } from "@/lib/chat-summary-attribution"
 import { armarEnlazador, cargarAgendasEnlace, tel9 } from "@/lib/embudo-atribucion"
 import { etiquetaReprogramada } from "@/lib/reprogramaciones"
+import { metricasVentas } from "@/lib/metricas-ventas"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -993,32 +994,53 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const calificadosNoCerrados = Math.max(0, calificadasPresentadas - cierresCalificados)
-    const showRatePct = programadas > 0 ? (presentadas / programadas) * 100 : 0
-    const showRateCalifPct = calificadasProgramadas > 0 ? (calificadasPresentadas / calificadasProgramadas) * 100 : 0
-    const tcPresentadasPct = presentadas > 0 ? (cierres / presentadas) * 100 : 0
-    const tcCalifPct = calificadasPresentadas > 0 ? (cierresCalificados / calificadasPresentadas) * 100 : 0
-
+    // ── Regla única (lib/metricas-ventas, 15/10/2026): los mismos números que Métricas y Home ──
+    // Cierre = 1 por persona, primer pago de venta nueva, en el día del pago; fees aparte; cuotas y back end no
+    // son cierres. Calificada = Lead S/A/B/C. Cash = todo lo cobrado en el período, con desglose.
+    const u = await metricasVentas(sb, { desde: fechaDesde, hasta: fechaHasta, closer })
+    const personaPorAgenda = new Map<string, string>()
+    for (const l of u.llamadas) for (const id of l.agenda_ids || [l.agenda_id]) personaPorAgenda.set(String(id), l.persona)
+    const cierrePorPersona = new Map(u.lista_cierres.map((c) => [c.persona, c]))
+    const feePorPersona = new Map(u.lista_fees.map((c) => [c.persona, c]))
+    const cierrePorAgenda = new Map(u.lista_cierres.filter((c) => c.agenda_id).map((c) => [String(c.agenda_id), c]))
+    for (const c of callsDetalle) {
+      if (c.resultado === "NO SHOW" || c.resultado === "CANCELADA") continue
+      const persona = personaPorAgenda.get(String(c.agenda_id))
+      const cierre = (persona && cierrePorPersona.get(persona)) || cierrePorAgenda.get(String(c.agenda_id))
+      const fee = persona ? feePorPersona.get(persona) : undefined
+      if (cierre) {
+        c.resultado = "CIERRE"; c.cash_d1 = cierre.monto; c.ticket_total = c.ticket_total || 1500
+      } else if (fee) {
+        c.resultado = "FEE"; c.cash_d1 = fee.monto; c.ticket_total = fee.monto
+      } else if (c.resultado === "CIERRE" || c.resultado === "FEE") {
+        // marcada como cerrada o con pagos que no son venta nueva del período (cuota, back end, venta de otro mes)
+        c.resultado = "SEGUIMIENTO"
+        c.siguiente_paso = c.cash_d1 > 0 ? "Pago del período que no es venta nueva (cuota, back end o venta anterior)" : "Marcada como cerrada, sin pago de venta nueva cargado"
+        c.cash_d1 = 0; c.ticket_total = 0
+      }
+    }
+    const llamadasCalif = u.llamadas.filter((l) => l.calificada)
     const metricas: MetricasClosing = {
-      programadas,
-      presentadas,
-      no_shows: noShows,
-      canceladas,
-      calificadas_programadas: calificadasProgramadas,
-      calificadas_presentadas: calificadasPresentadas,
-      no_shows_calificados: noShowsCalificados,
-      calificados_no_cerrados: calificadosNoCerrados,
-      cierres,
-      cierres_calificados: cierresCalificados,
-      no_cierres: noCierres,
-      fees,
-      cash_d1: cashD1,
-      cash_fees: cashFees,
-      ticket_total: ticketTotal,
-      show_rate_pct: showRatePct,
-      show_rate_calificados_pct: showRateCalifPct,
-      tc_presentadas_pct: tcPresentadasPct,
-      tc_calificadas_pct: tcCalifPct,
+      programadas: u.agendas,
+      presentadas: u.presentadas,
+      no_shows: u.no_show,
+      canceladas: u.canceladas,
+      calificadas_programadas: u.calificadas,
+      calificadas_presentadas: u.calif_presentadas,
+      no_shows_calificados: llamadasCalif.filter((l) => l.estado_llamada === "no_show").length,
+      calificados_no_cerrados: Math.max(0, u.calif_presentadas - u.cierres_calificados),
+      cierres: u.cierres,
+      cierres_calificados: u.cierres_calificados,
+      no_cierres: Math.max(0, u.presentadas - u.cierres),
+      fees: u.fees,
+      cash_d1: u.cash.ventas_nuevas,
+      cash_fees: u.fees_monto,
+      cash_total: u.cash.total,
+      ticket_total: u.cierres * 1500,
+      show_rate_pct: u.show_rate ?? 0,
+      show_rate_calificados_pct: u.show_rate_calif ?? 0,
+      tc_presentadas_pct: u.tasa_cierre ?? 0,
+      tc_calificadas_pct: u.tasa_cierre_calif ?? 0,
     }
 
     if (searchParams.get("auditar_cruce") === "1") {
