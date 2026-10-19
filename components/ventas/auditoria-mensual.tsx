@@ -66,6 +66,21 @@ function unicas(calls: CallDetalle[]) {
   })
 }
 
+type EstadoSeguimiento = "No se presentó" | "Se presentó y no cerró" | "Dejó fee" | "Canceló" | "Sin resultado cargado"
+const ESTADOS_SEGUIMIENTO: EstadoSeguimiento[] = ["No se presentó", "Se presentó y no cerró", "Dejó fee", "Canceló", "Sin resultado cargado"]
+const COLOR_SEGUIMIENTO: Record<EstadoSeguimiento, string> = {
+  "No se presentó": "bg-rose-500/15 text-rose-300", "Se presentó y no cerró": "bg-amber-500/15 text-amber-300",
+  "Dejó fee": "bg-violet-500/15 text-violet-300", "Canceló": "bg-orange-500/15 text-orange-300", "Sin resultado cargado": "bg-zinc-500/20 text-zinc-300",
+}
+function estadoSeguimiento(c: CallDetalle, show: boolean, hoyIso: string): EstadoSeguimiento | null {
+  if (c.resultado === "NO SHOW") return "No se presentó"
+  if (c.resultado === "CANCELADA") return "Canceló"
+  if (show && c.resultado === "FEE") return "Dejó fee"
+  if (show) return "Se presentó y no cerró"
+  // sin show ni no show cargado: solo si la llamada ya pasó
+  return String(c.fecha || "") && String(c.fecha) < hoyIso ? "Sin resultado cargado" : null
+}
+
 type Analisis = ReturnType<typeof analizar>
 function analizar(datos: ResumenPayload) {
   const calls = unicas(datos.calls || [])
@@ -85,11 +100,19 @@ function analizar(datos: ResumenPayload) {
   })
   const frenos: Record<string, number> = {}
   noCierres.forEach((c) => { const f = freno(c); frenos[f] = (frenos[f] || 0) + 1 })
+  // Para el seguimiento del setter: calificados (Lead S/A/B/C) que no cerraron, se presentaran o no.
+  // Las llamadas que todavía no pasaron no entran.
+  const hoyIso = new Date().toISOString().slice(0, 10)
+  const califSinCierre = calls
+    .filter((c) => (c.es_calificado || grado(c) === "A/B/S" || grado(c) === "C") && !cierresSet.has(c))
+    .map((c) => ({ c, estado: estadoSeguimiento(c, esShow(c), hoyIso) }))
+    .filter((x): x is { c: CallDetalle; estado: EstadoSeguimiento } => x.estado !== null)
+    .sort((a, b) => String(b.c.fecha || "").localeCompare(String(a.c.fecha || "")))
   return {
     agendas: datos.metricas?.programadas ?? calls.length,
     shows: shows.length,
     showPct: Math.round(datos.metricas?.show_rate_pct ?? 0),
-    cierres, noCierres, cobrosChicos,
+    cierres, noCierres, cobrosChicos, califSinCierre,
     cash: cierres.reduce((a, c) => a + (c.cash_d1 || 0), 0),
     seguimientos: noCierres.filter((c) => c.resultado === "SEGUIMIENTO").length,
     estudiantes: shows.filter((c) => c.arquetipo_macro === "ESTUDIANTE").length,
@@ -163,6 +186,12 @@ export function AuditoriaMensual({ onAbrirFicha }: { onAbrirFicha?: (c: CallDeta
   const [filtro, setFiltro] = useState("")
   const [abierto, setAbierto] = useState<string | null>(null)
   const [copiado, setCopiado] = useState(false)
+  // Filtro de abajo: calificados sin cerrar, para el seguimiento del setter
+  const [segVer, setSegVer] = useState(false)
+  const [segMes, setSegMes] = useState<"act" | "ant" | "ambos">("act")
+  const [segEstado, setSegEstado] = useState<EstadoSeguimiento | "">("")
+  const [segQ, setSegQ] = useState("")
+  const [segAbierto, setSegAbierto] = useState<string | null>(null)
 
   const cargar = async () => {
     setCargando(true); setError(null)
@@ -199,6 +228,27 @@ export function AuditoriaMensual({ onAbrirFicha }: { onAbrirFicha?: (c: CallDeta
     const q = filtro.trim().toLowerCase()
     return q ? base.filter((c) => `${c.nombre} ${c.closer} ${freno(c)} ${c.resultado}`.toLowerCase().includes(q)) : base
   }, [res, tab, filtro])
+
+  const seguimiento = useMemo(() => {
+    if (!res) return { filas: [] as Array<{ c: CallDetalle; estado: EstadoSeguimiento; mes: string }>, conteo: {} as Record<string, number>, total: 0 }
+    const base = [
+      ...(segMes !== "ant" ? res.act.califSinCierre.map((x) => ({ ...x, mes: mesCorto(mA) })) : []),
+      ...(segMes !== "act" ? res.ant.califSinCierre.map((x) => ({ ...x, mes: mesCorto(mB) })) : []),
+    ]
+    const conteo: Record<string, number> = {}
+    for (const x of base) conteo[x.estado] = (conteo[x.estado] || 0) + 1
+    const q = segQ.trim().toLowerCase()
+    const filas = base.filter((x) => (!segEstado || x.estado === segEstado) && (!q || `${x.c.nombre} ${x.c.closer} ${freno(x.c)}`.toLowerCase().includes(q)))
+    return { filas, conteo, total: base.length }
+  }, [res, segMes, segEstado, segQ])
+
+  const copiarSeguimiento = async () => {
+    const l = [`SEGUIMIENTO · CALIFICADOS SIN CERRAR (${seguimiento.filas.length})`, ""]
+    for (const { c, estado } of seguimiento.filas) {
+      l.push(`• ${c.nombre} · ${c.fecha?.slice(8, 10)}/${c.fecha?.slice(5, 7)} · ${c.closer} · ${c.lead_score} · ${estado}${estado === "Se presentó y no cerró" || estado === "Dejó fee" ? ` · freno: ${freno(c)}` : ""}${c.motivo_no_show ? ` · motivo: ${c.motivo_no_show}` : ""}${c.link_fathom ? ` · ${c.link_fathom}` : ""}`)
+    }
+    try { await navigator.clipboard.writeText(l.join("\n")); toast.success("Lista de seguimiento copiada") } catch { toast.error("No se pudo copiar") }
+  }
 
   return (
     <div className="space-y-4 pt-2">
@@ -425,6 +475,94 @@ export function AuditoriaMensual({ onAbrirFicha }: { onAbrirFicha?: (c: CallDeta
                 Cierre = venta a lead nuevo con USD {TICKET_MINIMO} o más cobrados en el mes; no cuentan fees, cuotas sueltas ni ventas internas.
                 Calificación = Lead Score del CRM. El freno sale del motivo de no cierre y del análisis de Fathom.
               </p>
+            </div>
+
+            {/* Filtro de abajo: calificados sin cerrar, para el seguimiento del setter */}
+            <div className="space-y-2 border-t border-white/10 pt-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => setSegVer((v) => !v)} aria-pressed={segVer}
+                  className={cn("rounded-full border px-3 py-1 font-sans text-[11px] font-semibold",
+                    segVer ? "border-sky-400 bg-sky-400 text-zinc-950" : "border-sky-400/40 text-sky-300 hover:bg-sky-400/10")}>
+                  🎯 Calificados sin cerrar · para seguimiento ({(res.act.califSinCierre.length)})
+                </button>
+                {segVer && (
+                  <>
+                    <select value={segMes} onChange={(e) => setSegMes(e.target.value as typeof segMes)} aria-label="Mes del seguimiento"
+                      className="h-7 rounded-md border border-white/10 bg-zinc-900 px-2 font-sans text-[11px] text-white">
+                      <option value="act">{mesLabel(mA)}</option>
+                      <option value="ant">{mesLabel(mB)}</option>
+                      <option value="ambos">Los dos meses</option>
+                    </select>
+                    <Button type="button" variant="outline" size="sm" onClick={copiarSeguimiento} disabled={!seguimiento.filas.length}
+                      className="ml-auto h-7 border-sky-400/30 text-[11px] text-sky-300 hover:bg-sky-400/10">
+                      <Copy className="mr-1 h-3 w-3" />Copiar lista
+                    </Button>
+                  </>
+                )}
+              </div>
+              {segVer && (
+                <>
+                  <p className="font-sans text-[11px] text-zinc-500">
+                    Leads calificados (Lead S, A, B o C) que no cerraron: no se presentaron, se presentaron y no cerraron, dejaron fee, cancelaron o quedaron sin resultado. Las llamadas que todavía no pasaron no aparecen.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button type="button" onClick={() => setSegEstado("")} aria-pressed={!segEstado}
+                      className={cn("rounded-full border px-2 py-0.5 font-sans text-[10.5px]", !segEstado ? "border-white bg-white text-zinc-950" : "border-white/10 text-zinc-300")}>
+                      Todos ({seguimiento.total})
+                    </button>
+                    {ESTADOS_SEGUIMIENTO.filter((e) => seguimiento.conteo[e]).map((e) => (
+                      <button key={e} type="button" onClick={() => setSegEstado(e)} aria-pressed={segEstado === e}
+                        className={cn("rounded-full border px-2 py-0.5 font-sans text-[10.5px]", segEstado === e ? "border-white bg-white text-zinc-950" : "border-white/10 text-zinc-300")}>
+                        {e} ({seguimiento.conteo[e]})
+                      </button>
+                    ))}
+                    <Input placeholder="Buscar nombre, closer o freno…" value={segQ} onChange={(e) => setSegQ(e.target.value)}
+                      className="h-7 min-w-[140px] flex-1 border-white/10 bg-zinc-900 text-xs text-white placeholder:text-zinc-500" />
+                  </div>
+                  <div className="max-h-[420px] space-y-1.5 overflow-y-auto pr-1">
+                    {seguimiento.filas.length === 0 && <div className="py-4 text-center text-zinc-500">No hay calificados sin cerrar con este filtro.</div>}
+                    {seguimiento.filas.map(({ c, estado, mes }) => {
+                      const id = `${mes}:${c.agenda_id || c.nombre}`
+                      const open = segAbierto === id
+                      const f = c.fathom_lead
+                      return (
+                        <div key={id} className="rounded border border-sky-400/15 bg-zinc-900/50">
+                          <button type="button" onClick={() => setSegAbierto(open ? null : id)} className="flex w-full items-center gap-2 px-2.5 py-2 text-left">
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-sans text-[12.5px] font-semibold text-white">{c.nombre}</div>
+                              <div className="text-[10.5px] text-zinc-500">{c.fecha?.slice(8, 10)}/{c.fecha?.slice(5, 7)} · {c.closer} · Lead {grado(c)}{c.etiqueta_reprogramada ? ` · ${c.etiqueta_reprogramada}` : ""}</div>
+                            </div>
+                            <span className={cn("rounded px-1.5 py-0.5 text-[10px]", COLOR_SEGUIMIENTO[estado])}>{estado}</span>
+                            {open ? <ChevronUp className="h-3.5 w-3.5 text-zinc-500" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />}
+                          </button>
+                          {open && (
+                            <div className="space-y-1.5 border-t border-white/10 px-2.5 py-2 font-sans text-[12px] leading-snug">
+                              {[["Motivo del no show / cancelación", c.motivo_no_show], ["Freno", estado === "Se presentó y no cerró" || estado === "Dejó fee" ? freno(c) : null],
+                                ["Objeción", f?.objecion], ["Dolor", f?.dolor_problema], ["Quiere", f?.situacion_deseada], ["Plata declarada", c.ingresos_declarados],
+                                ["Siguiente paso", c.siguiente_paso], ["Ángulo", c.angulo_adquisicion]]
+                                .filter(([, v]) => v && !/^no (registrada|especificada|detectado)|^N\/A|^sin objeci/i.test(String(v)))
+                                .map(([k, v]) => <div key={k as string}><span className="text-zinc-500">{k}: </span><span className="text-zinc-200">{v}</span></div>)}
+                              <div className="flex gap-2 pt-1">
+                                {c.link_fathom && (
+                                  <a href={c.link_fathom} target="_blank" rel="noopener noreferrer"
+                                    className="inline-flex h-7 items-center gap-1 rounded-md border border-purple-500/30 bg-purple-500/10 px-2 text-[11px] text-purple-300 hover:bg-purple-500/20">
+                                    <ExternalLink className="h-3 w-3" />Fathom
+                                  </a>
+                                )}
+                                {onAbrirFicha && (
+                                  <Button type="button" variant="outline" size="sm" onClick={() => onAbrirFicha(c)} className="h-7 border-white/10 text-[11px] text-zinc-300">
+                                    <Pencil className="mr-1 h-3 w-3" />Ficha
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </>
         )}
