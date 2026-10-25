@@ -16,6 +16,7 @@ import { Loader2, Pencil, Filter, BarChart2, X, Search, FileText, Check, Chevron
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { OPERACION_LABELS as OPERACION } from "@/lib/operaciones"
+import { DURACIONES_ELEGIBLES, calcularFechaBajaPrograma, mesesEntreFechas } from "@/lib/programas"
 import { useSession } from "@/components/session-provider"
 import { canExportAgendas } from "@/lib/export-access"
 import type { Agenda } from "@/lib/supabase"
@@ -1331,10 +1332,23 @@ export default function CentroAgendasPage() {
                 <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">Fecha TC (solo trato cerrado){reqFechaTC && <span className="text-red-500"> *</span>}<HelpHint text='Fecha del "trato cerrado": cuando quedó definido el programa/plan de pago, no necesariamente el día que se cobró el primer pago. No aplica a Fees (por eso este campo se oculta si el Estado es Fee).' /></Label>
                 <Input type="date" className={cn("h-9 text-sm", reqFechaTC && !form.fecha_tc ? "border-red-500/50" : "")} value={form.fecha_tc?.split("T")[0] || ""} onChange={e => setF("fecha_tc", e.target.value)} />
               </div>}
-              {form.show && form.cerro && <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Fecha Baja</Label>
-                <Input type="date" className="h-9 text-sm" value={form.fecha_baja?.split("T")[0] || ""} onChange={e => setF("fecha_baja", e.target.value)} />
-              </div>}
+              {form.show && form.cerro && (() => {
+                // Duración del acceso (4, 6, 8 meses o 1 año): calcula la baja desde la Fecha TC (o la de la llamada).
+                const baseAlta = (form.fecha_tc || form.fecha_closer || "").split("T")[0] || null
+                const mesesActuales = mesesEntreFechas(baseAlta, form.fecha_baja)
+                const duracionActual = DURACIONES_ELEGIBLES.find(d => d.meses === mesesActuales)?.label || null
+                return <>
+                  <Sel label="Duración del acceso" value={duracionActual} options={DURACIONES_ELEGIBLES.map(d => d.label)} onChange={v => {
+                    const d = DURACIONES_ELEGIBLES.find(x => x.label === v)
+                    const baja = d ? calcularFechaBajaPrograma(baseAlta, d.meses) : null
+                    if (baja) setF("fecha_baja", baja)
+                  }} />
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Fecha Baja</Label>
+                    <Input type="date" className="h-9 text-sm" value={form.fecha_baja?.split("T")[0] || ""} onChange={e => setF("fecha_baja", e.target.value)} />
+                  </div>
+                </>
+              })()}
             </div>
             {form.show && form.cerro && <div className="mt-3">
               <TxtArea label="PPP Plan de Pago Personalizado" value={form.plan_de_pago} onChange={v => setF("plan_de_pago", v)} req={reqClose} />

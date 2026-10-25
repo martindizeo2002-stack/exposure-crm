@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils"
 import { Users, Loader2, Search, X, Save, Link2, Phone, UserRoundCheck, Activity, UserRoundX, CalendarCheck, Archive } from "lucide-react"
 import type { Cliente } from "@/lib/supabase"
 import { OPERACION_LABELS as OPERACION_OPTS, OPERACION_LABELS as OPERACION_RESELL_OPTS } from "@/lib/operaciones"
+import { PROGRAMAS, calcularFechaBajaPrograma, programaPorTexto } from "@/lib/programas"
 import { CrmPageIntro, CrmStat } from "@/components/crm-ui"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
@@ -104,8 +105,9 @@ function getEtapa(c: Cliente): Etapa {
   return "entrega_activa"
 }
 
-function programa(c: Cliente): "IA Partner" | "Agency Pro" | "Agency" | "Content" | "Círculo" | "Sin definir" {
+function programa(c: Cliente): "Agencia de IA" | "IA Partner" | "Agency Pro" | "Agency" | "Content" | "Círculo" | "Sin definir" {
   const value = norm(c.operacion_original || "")
+  if (value.includes("agencia de ia")) return "Agencia de IA"
   if (value.includes("partner")) return "IA Partner"
   if (value.includes("circulo")) return "Círculo"
   if (value.includes("agency pro") || /pro/.test(value)) return "Agency Pro"
@@ -199,6 +201,19 @@ function EditModal({ cliente, onClose }: { cliente: Cliente; onClose: () => void
   const set = (key: keyof Cliente) => (v: string | null) =>
     setForm((f) => ({ ...f, [key]: v }))
 
+  // Programa → Operación en cascada. El programa sale de la operación guardada; cambiarlo solo filtra las operaciones.
+  const [programaSel, setProgramaSel] = useState<string | null>(programaPorTexto(cliente.operacion_original)?.nombreCompleto ?? null)
+  const programaDef = PROGRAMAS.find((p) => p.nombreCompleto === programaSel)
+  const operacionOpts = programaDef
+    ? [...(form.operacion_original && !programaDef.operaciones.some((o) => o.label === form.operacion_original) ? [form.operacion_original] : []), ...programaDef.operaciones.map((o) => o.label)]
+    : [...(form.operacion_original && !OPERACION_OPTS.includes(form.operacion_original) ? [form.operacion_original] : []), ...OPERACION_OPTS]
+  // Duración: al elegirla se recalcula la baja desde la fecha de ingreso (se ve antes de guardar y se puede corregir a mano).
+  const setDuracion = (v: string | null) => setForm((f) => {
+    const meses = v ? Number(v.match(/\d+/)?.[0]) : NaN
+    const baja = Number.isFinite(meses) ? calcularFechaBajaPrograma(f.fecha_ingreso ? String(f.fecha_ingreso).slice(0, 10) : null, meses) : null
+    return { ...f, duracion: v, ...(baja ? { fecha_baja: baja } : {}) }
+  })
+
   const save = async () => {
     setSaving(true)
     const { id, created_at, ...updates } = form
@@ -261,7 +276,7 @@ function EditModal({ cliente, onClose }: { cliente: Cliente; onClose: () => void
           <FieldText label="Nombre" value={form.nombre} onChange={set("nombre")} />
           <FieldText label="Teléfono" value={form.telefono} onChange={set("telefono")} />
           <FieldSel label="Calificación" value={form.calificacion} opts={CALIFICACION_OPTS} onChange={set("calificacion")} />
-          <FieldSel label="Duración" value={form.duracion} opts={DURACION_OPTS} onChange={set("duracion")} />
+          <FieldSel label="Duración" value={form.duracion} opts={DURACION_OPTS} onChange={setDuracion} />
 
           <div className="col-span-2">
             <FieldSel label="Etapa (Pipeline de Clientes)" value={form.etapa} opts={ETAPAS.map(e => e.label)} onChange={(v) => {
@@ -271,7 +286,11 @@ function EditModal({ cliente, onClose }: { cliente: Cliente; onClose: () => void
           </div>
 
           <div className="col-span-2">
-            <FieldSel label="Operación Original" value={form.operacion_original} opts={OPERACION_OPTS} onChange={set("operacion_original")} />
+            <FieldSel label="Programa" value={programaSel} opts={PROGRAMAS.map((p) => p.nombreCompleto)} onChange={setProgramaSel} />
+          </div>
+
+          <div className="col-span-2">
+            <FieldSel label="Operación Original" value={form.operacion_original} opts={operacionOpts} onChange={set("operacion_original")} />
           </div>
 
           <FieldSel label="Medio de Pago" value={form.medio_de_pago} opts={MEDIO_PAGO_OPTS} onChange={set("medio_de_pago")} />

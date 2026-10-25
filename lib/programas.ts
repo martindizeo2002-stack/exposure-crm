@@ -5,7 +5,10 @@
 // Precio IA Partner vigente desde septiembre 2026 (Alex, 12/09/2026): $1500 PIF · 2 x $750 si se completa
 // antes de los 21 días · si no, 2 x $1000 ($2000). Las etiquetas de $1300 pasaron a históricas.
 // 3 x $667 ($2000) sumado al selector el 13/10/2026 (pedido de Alex).
-export type ProgramaId = "ia_partner" | "agency" | "agency_pro" | "content" | "circulo"
+// Exposure Agencia de IA (24/10/2026, pedido de Alex): es el nuevo nombre de IA Partner. Se suma como programa
+// aparte para no tocar las ventas ya cargadas como IA PARTNER. Las etiquetas llevan el total con "$" para que
+// contractValueFromOperation (lib/revenue.ts) lea exactamente $1500 o $2000.
+export type ProgramaId = "ia_partner" | "agencia_ia" | "agency" | "agency_pro" | "content" | "circulo"
 
 export type OperacionCatalogo = { label: string; total: number; meses?: number }
 
@@ -28,6 +31,19 @@ export const PROGRAMAS: ProgramaDef[] = [
       { label: "IA PARTNER | 2 x $750 (antes de 21 días)", total: 1500 },
       { label: "IA PARTNER | 2 x $1000", total: 2000 },
       { label: "IA PARTNER | 3 x $667", total: 2000 },
+    ],
+  },
+  {
+    id: "agencia_ia",
+    nombreCompleto: "Exposure Agencia de IA",
+    nombreCorto: "Agencia de IA",
+    duracionMeses: 4,
+    operaciones: [
+      { label: "Agencia de IA | 1500 PIF - $1500", total: 1500 },
+      { label: "Agencia de IA | 2 cuotas de 750 (antes de 21 días) | $1500", total: 1500 },
+      { label: "Agencia de IA | 2 cuotas de 1000 | $2000 total", total: 2000 },
+      { label: "Agencia de IA | 3 cuotas de 667 | $2000 total", total: 2000 },
+      { label: "Agencia de IA | 3 cuotas (la primera de 500) + 750 + 650 | $2000 total", total: 2000 },
     ],
   },
   {
@@ -119,6 +135,7 @@ function normalizar(s: string): string {
 export function programaPorTexto(operacionLabel: string | null | undefined): ProgramaDef | undefined {
   const s = normalizar(operacionLabel || "")
   if (!s) return undefined
+  if (s.includes("agencia de ia")) return buscarPrograma("agencia_ia")
   if (s.includes("partner")) return buscarPrograma("ia_partner")
   if (s.includes("circulo")) return buscarPrograma("circulo")
   if (s.includes("agency pro") || /\bpro\b/.test(s)) return buscarPrograma("agency_pro")
@@ -175,6 +192,24 @@ export function resolverInfoPrograma(
     duracionLabel: meses != null ? `${meses} Meses` : null,
     total: filasFallback.reduce((s, f) => s + (f.monto || 0), 0),
   }
+}
+
+// Duraciones que se pueden elegir al cargar el pago (Venta Nueva Interna / renovaciones) y en el plan ya guardado.
+export const DURACIONES_ELEGIBLES: Array<{ meses: number; label: string }> = [
+  { meses: 4, label: "4 meses" },
+  { meses: 6, label: "6 meses" },
+  { meses: 8, label: "8 meses" },
+  { meses: 12, label: "1 año" },
+]
+
+// Meses entre el alta y la baja guardadas (para respetar la duración que se eligió al cargar). null si falta alguna.
+export function mesesEntreFechas(altaISO: string | null | undefined, bajaISO: string | null | undefined): number | null {
+  if (!altaISO || !bajaISO) return null
+  const [ya, ma, da] = String(altaISO).slice(0, 10).split("-").map(Number)
+  const [yb, mb, db] = String(bajaISO).slice(0, 10).split("-").map(Number)
+  if (![ya, ma, da, yb, mb, db].every(Number.isFinite)) return null
+  const meses = (yb - ya) * 12 + (mb - ma) + (db >= da ? 0 : -1)
+  return meses > 0 ? meses : null
 }
 
 // Suma `meses` a una fecha ISO (YYYY-MM-DD). null si meses es null (sin baja).

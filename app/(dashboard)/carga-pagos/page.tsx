@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { CONCEPTOS_FILA1, CONCEPTOS_FILA2, daAccesoDeFila, esCuota, generarMensajePPP, type FilaPlan } from "@/lib/conceptos-pago"
-import { PROGRAMAS, buscarPrograma, buscarProgramaPorOperacion, resolverInfoPrograma, calcularFechaBajaPrograma } from "@/lib/programas"
+import { PROGRAMAS, DURACIONES_ELEGIBLES, buscarPrograma, buscarProgramaPorOperacion, resolverInfoPrograma, calcularFechaBajaPrograma, mesesEntreFechas } from "@/lib/programas"
 import { FuenteSelect } from "@/components/fuente-picker"
 import { CrmPageIntro } from "@/components/crm-ui"
 import { playSaleConfirmedSound } from "@/lib/crm-sounds"
@@ -386,6 +386,9 @@ function NuevoPlanTab() {
   // del primer pago que da acceso. Antes no existía la casilla y "Guardar plan"
   // dejaba el plan sin alta (el cliente no aparecía en Clientes ni se podía dar de alta).
   const [fechaAlta, setFechaAlta] = useState("")
+  // Duración del acceso elegida por quien carga (4, 6, 8 o 12 meses). Vacío = la del programa.
+  // Pensado para la Venta Nueva Interna: que la baja del cliente que renovó quede como se cerró en la llamada.
+  const [duracionElegida, setDuracionElegida] = useState("")
   const [guardandoSolo, setGuardandoSolo] = useState(false)
   const [guardandoCRM, setGuardandoCRM] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -429,10 +432,12 @@ function NuevoPlanTab() {
     : ""
   const operacionCatalogo = programaDef?.operaciones.find((o) => o.label === operacionFinal)
   const totalPrograma = operacionCatalogo?.total ?? 0
-  const duracionLabel = programaDef?.duracionMeses != null ? `${programaDef.duracionMeses} Meses` : null
+  const mesesAcceso: number | null = duracionElegida ? Number(duracionElegida) : (programaDef?.duracionMeses ?? null)
+  const duracionLabel = mesesAcceso != null ? `${mesesAcceso} Meses` : null
+  const hayVentaNuevaInterna = filas.some((f) => f.concepto === "Venta Nueva Interna")
   const fechaAltaSugerida = filas.find((f) => daAccesoDeFila({ concepto: f.concepto, masAcceso: f.masAcceso }) && f.fechaPlaneada)?.fechaPlaneada || ""
   const fechaAltaFinal: string | null = fechaAlta || fechaAltaSugerida || null
-  const fechaBajaFinal = calcularFechaBajaPrograma(fechaAltaFinal, programaDef?.duracionMeses ?? null)
+  const fechaBajaFinal = calcularFechaBajaPrograma(fechaAltaFinal, mesesAcceso)
 
   function handleProgramaChange(id: string) {
     setLastSavedMessage(null)
@@ -495,6 +500,7 @@ function NuevoPlanTab() {
     setFilas([{ ...EMPTY_FILA }])
     setFilaHoyIdx(0)
     setFechaAlta("")
+    setDuracionElegida("")
   }
 
   function validarComun(): string[] {
@@ -606,7 +612,7 @@ function NuevoPlanTab() {
       const fila0DaAcceso = daAccesoDeFila({ concepto: filaHoy.concepto, masAcceso: filaHoy.masAcceso })
       // El pago lleva la alta solo si ES el pago que da acceso; el plan la lleva siempre que se conozca.
       const fechaAltaPago = fila0DaAcceso ? (fechaAltaFinal || filaHoy.fechaPlaneada) : null
-      const fechaBajaPago = fila0DaAcceso ? calcularFechaBajaPrograma(fechaAltaPago, programaDef?.duracionMeses ?? null) : null
+      const fechaBajaPago = fila0DaAcceso ? calcularFechaBajaPrograma(fechaAltaPago, mesesAcceso) : null
       const fuenteFinal = shared.fuente && shared.fuente !== NONE ? shared.fuente : null
       const medioFinal = shared.medio_de_pago && shared.medio_de_pago !== NONE ? shared.medio_de_pago : null
       const ccArsFinal = shared.ccArsModo === "en_pesos" && shared.cc_ars ? parseFloat(shared.cc_ars) : null
@@ -920,9 +926,18 @@ function NuevoPlanTab() {
 
       {/* ALTA DEL CLIENTE */}
       <Sec title="Alta del cliente" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <F label="Fecha de alta">
           <Input type="date" value={fechaAlta} onChange={(e) => { setLastSavedMessage(null); setFechaAlta(e.target.value) }} />
+        </F>
+        <F label="Duración del acceso">
+          <Select value={duracionElegida || NONE} onValueChange={(v) => { setLastSavedMessage(null); setDuracionElegida(v === NONE ? "" : v) }}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>{programaDef?.duracionMeses != null ? `La del programa (${programaDef.duracionMeses === 12 ? "1 año" : `${programaDef.duracionMeses} meses`})` : "La del programa"}</SelectItem>
+              {DURACIONES_ELEGIBLES.map((d) => <SelectItem key={d.meses} value={String(d.meses)}>{d.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </F>
         <F label="Fecha de baja (calculada)">
           <Input type="date" value={fechaBajaFinal || ""} readOnly className="bg-muted/40" />
@@ -934,8 +949,11 @@ function NuevoPlanTab() {
           : fechaAltaSugerida
             ? `Si la dejás vacía se toma la fecha del primer pago que da acceso: ${fechaAltaSugerida}.`
             : "Ningún pago del plan da acceso todavía: si no cargás una fecha acá, el cliente queda sin alta y no aparece en Clientes hasta que se confirme un pago con acceso."}
-        {programaDef?.duracionMeses != null && fechaAltaFinal ? ` La baja se calcula a ${programaDef.duracionMeses} meses.` : ""}
+        {mesesAcceso != null && fechaAltaFinal ? ` La baja se calcula a ${mesesAcceso} meses.` : ""}
       </p>
+      {hayVentaNuevaInterna && !duracionElegida && (
+        <p className="mt-1 text-xs text-amber-600">Es una Venta Nueva Interna: elegí en «Duración del acceso» cuánto se cerró en la llamada (4, 6, 8 meses o 1 año) para que la baja del cliente quede bien.</p>
+      )}
 
       <hr className="my-6 border-border" />
 
@@ -1072,9 +1090,16 @@ function AltaPlanEditor({ plan, onSaved }: { plan: PlanPago; onSaved: () => void
   const [fechaAlta, setFechaAlta] = useState(plan.fecha_alta ? String(plan.fecha_alta).slice(0, 10) : "")
   const [guardando, setGuardando] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
-  const meses = buscarProgramaPorOperacion(plan.operacion)?.programa.duracionMeses ?? null
+  // Respeta la duración con la que se guardó el plan (alta → baja); si no hay, la del programa.
+  const mesesGuardados = mesesEntreFechas(plan.fecha_alta, plan.fecha_baja) ?? buscarProgramaPorOperacion(plan.operacion)?.programa.duracionMeses ?? null
+  const [mesesSel, setMesesSel] = useState(mesesGuardados != null ? String(mesesGuardados) : "")
+  const meses = mesesSel ? Number(mesesSel) : null
   const fechaBaja = calcularFechaBajaPrograma(fechaAlta || null, meses)
   const sinCambios = (fechaAlta || "") === (plan.fecha_alta ? String(plan.fecha_alta).slice(0, 10) : "")
+    && (fechaBaja || "") === (plan.fecha_baja ? String(plan.fecha_baja).slice(0, 10) : "")
+  const opcionesMeses = DURACIONES_ELEGIBLES.some((d) => String(d.meses) === mesesSel) || !mesesSel
+    ? DURACIONES_ELEGIBLES
+    : [{ meses: Number(mesesSel), label: `${mesesSel} meses` }, ...DURACIONES_ELEGIBLES]
 
   async function guardar() {
     setGuardando(true); setMsg(null)
@@ -1089,7 +1114,7 @@ function AltaPlanEditor({ plan, onSaved }: { plan: PlanPago; onSaved: () => void
         setMsg(r.error || "No se pudo guardar la fecha de alta.")
         return
       }
-      setMsg("Fecha de alta guardada.")
+      setMsg("Alta y duración guardadas.")
       onSaved()
     } catch {
       setMsg("Error de conexión.")
@@ -1106,11 +1131,21 @@ function AltaPlanEditor({ plan, onSaved }: { plan: PlanPago; onSaved: () => void
           <Input type="date" className="h-8 w-44 text-sm" value={fechaAlta} onChange={(e) => { setFechaAlta(e.target.value); setMsg(null) }} />
         </div>
         <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Duración</Label>
+          <Select value={mesesSel || NONE} onValueChange={(v) => { setMesesSel(v === NONE ? "" : v); setMsg(null) }}>
+            <SelectTrigger className="h-8 w-32 text-sm"><SelectValue placeholder="Elegir" /></SelectTrigger>
+            <SelectContent>
+              {!mesesSel && <SelectItem value={NONE}>Sin duración</SelectItem>}
+              {opcionesMeses.map((d) => <SelectItem key={d.meses} value={String(d.meses)}>{d.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Baja{meses != null ? ` (${meses} meses)` : ""}</Label>
           <Input type="date" className="h-8 w-44 text-sm bg-muted/40" value={fechaBaja || ""} readOnly />
         </div>
         <Button type="button" size="sm" variant="outline" disabled={guardando || sinCambios} onClick={guardar}>
-          {guardando ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Guardando...</> : "Guardar alta"}
+          {guardando ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Guardando...</> : "Guardar alta y duración"}
         </Button>
         {!plan.fecha_alta && !fechaAlta && <span className="text-xs text-amber-600">Este plan no tiene fecha de alta: el cliente no aparece en Clientes.</span>}
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
